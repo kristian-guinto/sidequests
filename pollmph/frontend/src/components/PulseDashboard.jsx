@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '../supabaseClient';
 import { LineChart, Line, XAxis, YAxis, ReferenceLine, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts';
 import { Activity } from 'lucide-react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,30 +10,6 @@ import { ThemeToggle } from '@/components/theme-toggle';
 // ============================================================================
 // 1. DATA GENERATION & MOVING AVERAGE LOGIC
 // ============================================================================
-
-/**
- * Robust environment variable accessor to prevent "import.meta" 
- * compilation errors in ES2015/older target environments.
- */
-const getEnv = (key) => {
-    try {
-        // Check for Vite's import.meta.env
-        const viteEnv = (import.meta && import.meta.env) ? import.meta.env[`VITE_${key}`] : undefined;
-        if (viteEnv !== undefined) return viteEnv;
-
-        // Fallback to process.env (CRA/Node)
-        const nodeEnv = (typeof process !== 'undefined' && process.env) ? process.env[`REACT_APP_${key}`] : undefined;
-        if (nodeEnv !== undefined) return nodeEnv;
-    } catch (e) {
-        // Silent catch for environments where import.meta might throw
-    }
-    return '';
-};
-
-// Initialize Supabase client
-const supabaseUrl = getEnv('SUPABASE_URL');
-const supabaseKey = getEnv('SUPABASE_KEY');
-const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
 
 const calculateMovingAverage = (data, windowSize = 7) => {
     // Ensure data is sorted by date before calculating MA
@@ -121,7 +98,7 @@ const CustomTooltip = ({ active, payload, label }) => {
     return null;
 };
 
-const PropositionCard = ({ proposition }) => {
+const PropositionCard = ({ proposition, onClick }) => {
     const { proposition_text, evaluations } = proposition;
     const latest = evaluations[evaluations.length - 1];
     const previous = evaluations[evaluations.length - 2] || latest;
@@ -131,7 +108,10 @@ const PropositionCard = ({ proposition }) => {
     const isMajority = currentMA >= 0.5;
 
     return (
-        <Card className="group cursor-pointer hover:border-primary/50 transition-colors duration-200 bg-muted/30">
+        <Card 
+            className="group cursor-pointer hover:border-primary/50 transition-colors duration-200 bg-muted/30"
+            onClick={onClick}
+        >
             <CardHeader className="pb-4 space-y-2">
                 <CardTitle className="text-base font-medium leading-snug line-clamp-2">
                     {proposition_text}
@@ -250,6 +230,7 @@ const PropositionCard = ({ proposition }) => {
 // ============================================================================
 
 const PulseDashboard = () => {
+    const navigate = useNavigate();
     const [propositions, setPropositions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -361,7 +342,11 @@ const PulseDashboard = () => {
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {propositions.map(p => (
-                            <PropositionCard key={p.id} proposition={p} />
+                            <PropositionCard 
+                                key={p.id} 
+                                proposition={p} 
+                                onClick={() => navigate(`/proposition/${p.id}`)}
+                            />
                         ))}
                     </div>
                 )}
