@@ -45,7 +45,29 @@ def setup_supabase():
     return sb.create_client(url, key)
 
 
-def load_propositions() -> List[PropositionModel]:
+def load_propositions(supabase=None) -> List[PropositionModel]:
+    if supabase is None:
+        supabase = setup_supabase()
+
+    try:
+        response = supabase.table("propositions").select("*").execute()
+        if response.data:
+            propositions = []
+            for p in response.data:
+                propositions.append(
+                    PropositionModel(
+                        proposition_id=p["proposition_id"],
+                        proposition_text=p["proposition_text"],
+                        search_queries=p.get("search_queries") or [],
+                    )
+                )
+            print(f"Loaded {len(propositions)} propositions from Supabase.")
+            return propositions
+    except Exception as e:
+        print(
+            f"Failed to load propositions from Supabase ({e}), falling back to local file"
+        )
+
     prop_file = Path(__file__).parent / "propositions.json"
     default_props = [
         {
@@ -149,8 +171,8 @@ How loudly is the public talking about this today?
     return default_prompt
 
 
-PROPOSITIONS = load_propositions()
 SYSTEM_PROMPT = load_system_prompt()
+PROPOSITIONS = load_propositions()
 
 
 def get_xai_client():
