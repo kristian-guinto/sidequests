@@ -1,7 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { LineChart, Line, XAxis, YAxis, ReferenceLine, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts';
-import { TrendingUp, TrendingDown, Info, Calendar } from 'lucide-react';
+import { Activity } from 'lucide-react';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 // ============================================================================
 // 1. DATA GENERATION & MOVING AVERAGE LOGIC
@@ -69,30 +72,28 @@ const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
         const maConsensus = payload.find(p => p.dataKey === "ma_consensus")?.value;
         const rawConsensus = payload.find(p => p.dataKey === "consensus_value")?.value;
-        const attention = payload.find(p => p.dataKey === "ma_attention")?.value;
+        const maAttention = payload.find(p => p.dataKey === "ma_attention")?.value;
 
         return (
-            <div className="bg-white border border-slate-200 p-3 rounded-lg shadow-xl min-w-[180px] z-50">
-                <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mb-2 border-b border-slate-100 pb-1">
-                    {label}
-                </div>
-                <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                        <span className="text-xs text-slate-500">7D Trend</span>
-                        <span className={`text-xs font-mono font-bold ${maConsensus >= 0.5 ? 'text-emerald-600' : 'text-rose-600'}`}>
+            <div className="bg-popover/95 backdrop-blur-sm border px-3 py-2 rounded-lg shadow-lg">
+                <div className="text-[10px] text-muted-foreground mb-2 font-medium">{label}</div>
+                <div className="space-y-1">
+                    <div className="flex items-center justify-between gap-3">
+                        <span className="text-xs text-muted-foreground">Consensus (7d)</span>
+                        <span className={`text-sm font-semibold tabular-nums ${maConsensus >= 0.5 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
                             {(maConsensus * 100).toFixed(1)}%
                         </span>
                     </div>
-                    <div className="flex justify-between items-center">
-                        <span className="text-xs text-slate-400 italic">Raw Point</span>
-                        <span className="text-[10px] font-mono text-slate-400">
+                    <div className="flex items-center justify-between gap-3">
+                        <span className="text-xs text-muted-foreground italic">Raw value</span>
+                        <span className="text-xs font-medium tabular-nums text-muted-foreground">
                             {(rawConsensus * 100).toFixed(1)}%
                         </span>
                     </div>
-                    <div className="flex justify-between items-center pt-1 border-t border-slate-50">
-                        <span className="text-xs text-slate-500">Attention</span>
-                        <span className="text-xs font-mono font-bold text-slate-900">
-                            {(attention * 100).toFixed(1)}%
+                    <div className="flex items-center justify-between gap-3">
+                        <span className="text-xs text-muted-foreground">Attention</span>
+                        <span className="text-sm font-medium tabular-nums text-foreground">
+                            {(maAttention * 100).toFixed(0)}%
                         </span>
                     </div>
                 </div>
@@ -112,61 +113,117 @@ const PropositionCard = ({ proposition }) => {
     const isMajority = currentMA >= 0.5;
 
     return (
-        <div className="rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-sm overflow-hidden flex flex-col transition-all hover:shadow-md">
-            <div className="p-6 flex flex-col gap-4">
-                <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                    <Calendar className="w-3 h-3" />
-                    Tracking Since {evaluations[0].shortDate}
-                </div>
-
-                <h3 className="font-bold text-lg leading-snug text-slate-900 tracking-tight h-14 line-clamp-2">
+        <Card className="group cursor-pointer hover:border-primary/50 transition-colors duration-200 bg-muted/30">
+            <CardHeader className="pb-4 space-y-2">
+                <CardTitle className="text-base font-medium leading-snug line-clamp-2">
                     {proposition_text}
-                </h3>
-
-                <div className="flex items-end justify-between">
-                    <div>
-                        <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">Trend Consensus</span>
-                        <div className="flex items-baseline gap-2">
-                            <span className={`text-4xl font-black tracking-tighter tabular-nums ${isMajority ? 'text-emerald-600' : 'text-rose-600'}`}>
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">
+                    Tracking since {evaluations[0].shortDate}
+                </p>
+            </CardHeader>
+            
+            <CardContent className="space-y-4">
+                {/* Metrics Row */}
+                <div className="flex items-center justify-between">
+                    <div className="flex flex-col gap-1">
+                        <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Consensus</span>
+                        <div className="flex items-center gap-2.5">
+                            <span className={`text-3xl font-bold tabular-nums leading-none ${isMajority ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
                                 {(currentMA * 100).toFixed(0)}%
                             </span>
-                            <span className={`text-sm font-bold flex items-center px-1.5 py-0.5 rounded-md ${delta >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                                {delta >= 0 ? <TrendingUp className="w-3 h-3 mr-1" /> : <TrendingDown className="w-3 h-3 mr-1" />}
-                                {Math.abs(delta * 100).toFixed(1)}%
+                            {delta !== 0 && (
+                                <Badge 
+                                    variant="secondary"
+                                    className={`h-5 text-[11px] font-semibold ${delta > 0 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400' : 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-400'}`}
+                                >
+                                    {delta > 0 ? '+' : ''}{(delta * 100).toFixed(1)}%
+                                </Badge>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1 items-end">
+                        <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Attention</span>
+                        <div className="flex items-center gap-1.5 text-foreground">
+                            <Activity className="w-3.5 h-3.5" />
+                            <span className="text-lg font-semibold tabular-nums">
+                                {(latest.ma_attention * 100).toFixed(0)}%
                             </span>
                         </div>
                     </div>
-                    <div className="text-right">
-                        <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">Attention</span>
-                        <div className="text-xl font-bold text-slate-800 tabular-nums">
-                            {(latest.ma_attention * 100).toFixed(0)}%
-                        </div>
-                    </div>
                 </div>
-            </div>
 
-            <div className="h-48 w-full bg-slate-50/30 border-y border-slate-100 relative">
-                <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={evaluations} margin={{ top: 20, right: 20, left: 20, bottom: 10 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                        <XAxis dataKey="shortDate" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#94a3b8', fontWeight: 600 }} minTickGap={40} />
-                        <YAxis domain={[0, 1]} hide />
-                        <ReferenceLine y={0.5} stroke="#e2e8f0" strokeWidth={1} />
-                        <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#e2e8f0', strokeWidth: 1 }} isAnimationActive={false} />
-                        <Line type="monotone" dataKey="consensus_value" stroke="transparent" dot={{ r: 1.5, fill: isMajority ? '#a7f3d0' : '#fecdd3', strokeWidth: 0 }} isAnimationActive={false} />
-                        <Line type="monotone" dataKey="ma_consensus" stroke={isMajority ? '#10b981' : '#f43f5e'} strokeWidth={3} dot={false} activeDot={{ r: 6, stroke: '#fff', strokeWidth: 2, fill: isMajority ? '#10b981' : '#f43f5e' }} />
-                        <Line type="monotone" dataKey="ma_attention" stroke="#94a3b8" strokeWidth={1} strokeDasharray="4 4" dot={false} />
-                    </LineChart>
-                </ResponsiveContainer>
-            </div>
-
-            <div className="p-4 flex items-center gap-2 bg-white">
-                <Info className="w-3.5 h-3.5 text-slate-300" />
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">
-                    7-Day Moving Average Trend Visualized
-                </span>
-            </div>
-        </div>
+                {/* Chart Section */}
+                <div className="h-32 w-full pt-4 -mx-6 -mb-6 px-6 pb-6">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={evaluations} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                            <defs>
+                                <linearGradient id={`gradient-${proposition.id}-green`} x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="rgb(5, 150, 105)" stopOpacity={0.1}/>
+                                    <stop offset="100%" stopColor="rgb(5, 150, 105)" stopOpacity={0}/>
+                                </linearGradient>
+                                <linearGradient id={`gradient-${proposition.id}-red`} x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="rgb(225, 29, 72)" stopOpacity={0.1}/>
+                                    <stop offset="100%" stopColor="rgb(225, 29, 72)" stopOpacity={0}/>
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.3} />
+                            <XAxis dataKey="shortDate" hide />
+                            <YAxis domain={[0, 1]} hide />
+                            {/* Boundary lines */}
+                            <ReferenceLine y={0} stroke="hsl(var(--border))" strokeWidth={1} opacity={0.4} />
+                            <ReferenceLine y={1} stroke="hsl(var(--border))" strokeWidth={1} opacity={0.4} />
+                            <ReferenceLine y={0.5} stroke="hsl(var(--muted-foreground))" strokeWidth={1} strokeDasharray="5 5" opacity={0.5} />
+                            <Tooltip 
+                                content={<CustomTooltip />} 
+                                cursor={{ stroke: 'hsl(var(--border))', strokeWidth: 1 }} 
+                                isAnimationActive={false} 
+                            />
+                            {/* Raw data points (subtle dots) */}
+                            <Line 
+                                type="monotone" 
+                                dataKey="consensus_value" 
+                                stroke="transparent"
+                                strokeWidth={0}
+                                dot={{ r: 2, fill: isMajority ? 'rgb(5, 150, 105)' : 'rgb(225, 29, 72)', stroke: 'none', opacity: 0.3 }}
+                                activeDot={false}
+                                isAnimationActive={false}
+                            />
+                            {/* Attention line (subtle background) */}
+                            <Line 
+                                type="monotone" 
+                                dataKey="ma_attention" 
+                                stroke="hsl(var(--muted-foreground))" 
+                                strokeWidth={1.5} 
+                                strokeOpacity={0.5}
+                                strokeDasharray="5 5"
+                                dot={false}
+                                activeDot={{ r: 3, stroke: 'hsl(var(--card))', strokeWidth: 2, fill: 'hsl(var(--muted-foreground))' }}
+                                isAnimationActive={false}
+                            />
+                            {/* Consensus line (main - 7d average) */}
+                            <Line 
+                                type="monotone" 
+                                dataKey="ma_consensus" 
+                                stroke={isMajority ? 'rgb(5, 150, 105)' : 'rgb(225, 29, 72)'}
+                                strokeWidth={2.5} 
+                                dot={false}
+                                activeDot={{ r: 4, stroke: 'hsl(var(--card))', strokeWidth: 2, fill: isMajority ? 'rgb(5, 150, 105)' : 'rgb(225, 29, 72)' }}
+                                fill={isMajority ? `url(#gradient-${proposition.id}-green)` : `url(#gradient-${proposition.id}-red)`}
+                            />
+                        </LineChart>
+                    </ResponsiveContainer>
+                </div>
+            </CardContent>
+            
+            <CardFooter className="pt-4 border-t">
+                <div className="flex items-center justify-between w-full text-xs text-muted-foreground">
+                    <span>Latest: {latest.shortDate}</span>
+                    <span>{(latest.ma_consensus * 100).toFixed(1)}% consensus · {(latest.ma_attention * 100).toFixed(0)}% attention</span>
+                </div>
+            </CardFooter>
+        </Card>
     );
 };
 
@@ -254,38 +311,37 @@ const PulseDashboard = () => {
 
     if (loading) {
         return (
-            <div className="w-full h-screen flex items-center justify-center bg-slate-50 text-slate-400 font-bold uppercase tracking-widest text-xs animate-pulse">
-                Loading Pulse Data...
+            <div className="w-full h-screen flex items-center justify-center bg-background text-muted-foreground font-medium text-sm animate-pulse">
+                Loading data...
             </div>
         );
     }
 
     if (error) {
          return (
-            <div className="w-full h-screen flex items-center justify-center bg-slate-50 text-rose-500 font-bold p-4 text-center">
+            <div className="w-full h-screen flex items-center justify-center bg-background text-destructive font-medium p-4 text-center">
                 Error: {error}
             </div>
         );
     }
 
     return (
-        <div className="w-full bg-slate-50 text-slate-900 font-sans p-4 md:p-6">
-            <div className="max-w-6xl mx-auto">
-                <header className="mb-8">
-                    <div className="flex items-center gap-2 mb-2">
-                        <div className="px-2 py-0.5 bg-emerald-100 rounded text-[9px] font-black text-emerald-700 uppercase tracking-widest">
-                            Live Index
-                        </div>
+        <div className="min-h-screen w-full bg-background text-foreground">
+            <div className="max-w-7xl mx-auto px-4 py-8 md:px-6 md:py-12">
+                <header className="mb-10 flex items-start justify-between">
+                    <div>
+                        <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-2">
+                            poll<span className="text-primary">mph</span>
+                        </h1>
+                        <p className="text-muted-foreground text-sm">Philippine political sentiment tracker</p>
                     </div>
-                    <h1 className="text-3xl font-black tracking-tight text-slate-900">
-                        poll<span className="text-emerald-600">mph</span>
-                    </h1>
+                    <ThemeToggle />
                 </header>
 
                 {propositions.length === 0 ? (
-                    <div className="text-center text-slate-400 py-20">No data available</div>
+                    <div className="text-center text-muted-foreground py-20">No data available</div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {propositions.map(p => (
                             <PropositionCard key={p.id} proposition={p} />
                         ))}
