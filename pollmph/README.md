@@ -1,5 +1,7 @@
 # pollmph: AI-Powered Sentiment Oracle
 
+> Deployed app availabe [here.](https://pollmph.vercel.app/)
+
 pollmph is an automated sentiment analysis engine designed to track Philippine socio-political discourse. It acts as a "Predictive Market Oracle" by validating specific propositions against real-time web and social media data.
 
 ## 🚀 Concept
