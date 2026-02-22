@@ -1,0 +1,28 @@
+name: Daily Sentiment Analysis
+
+on:
+  schedule:
+    # Runs at 15:59 UTC daily (11:59 PM Philippine Standard Time is UTC+8)
+    # 23:59 PHT = 15:59 UTC
+    - cron: '59 15 * * *'
+  workflow_dispatch: # Allows manual triggering
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Run Sentiment Analysis Pipeline
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+        run: |
+          uv run pipeline/main.py
