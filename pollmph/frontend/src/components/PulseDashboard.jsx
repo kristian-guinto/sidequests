@@ -73,26 +73,44 @@ const CustomTooltip = ({ active, payload, label }) => {
         const maConsensus = payload.find(p => p.dataKey === "ma_consensus")?.value;
         const rawConsensus = payload.find(p => p.dataKey === "consensus_value")?.value;
         const maAttention = payload.find(p => p.dataKey === "ma_attention")?.value;
+        
+        const isMajority = maConsensus >= 0.5;
+        const lineColor = isMajority ? 'rgb(5, 150, 105)' : 'rgb(225, 29, 72)';
 
         return (
-            <div className="bg-popover/95 backdrop-blur-sm border px-3 py-2 rounded-lg shadow-lg">
-                <div className="text-[10px] text-muted-foreground mb-2 font-medium">{label}</div>
-                <div className="space-y-1">
+            <div className="bg-card border shadow-xl rounded-md p-2 min-w-[160px]">
+                <div className="text-[10px] font-semibold text-foreground mb-2 pb-1.5 border-b">{label}</div>
+                
+                <div className="space-y-1.5">
+                    {/* Main Consensus (7d MA) */}
                     <div className="flex items-center justify-between gap-3">
-                        <span className="text-xs text-muted-foreground">Consensus (7d)</span>
-                        <span className={`text-sm font-semibold tabular-nums ${maConsensus >= 0.5 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                        <div className="flex items-center gap-1.5">
+                            <div className="w-2.5 h-0.5 rounded-full" style={{ backgroundColor: lineColor }}></div>
+                            <span className="text-[10px] font-medium text-foreground">Consensus</span>
+                        </div>
+                        <span className="text-sm font-bold tabular-nums" style={{ color: lineColor }}>
                             {(maConsensus * 100).toFixed(1)}%
                         </span>
                     </div>
-                    <div className="flex items-center justify-between gap-3">
-                        <span className="text-xs text-muted-foreground italic">Raw value</span>
-                        <span className="text-xs font-medium tabular-nums text-muted-foreground">
+                    
+                    {/* Raw Value */}
+                    <div className="flex items-center justify-between gap-3 pl-4">
+                        <div className="flex items-center gap-1.5">
+                            <div className="w-1 h-1 rounded-full opacity-40" style={{ backgroundColor: lineColor }}></div>
+                            <span className="text-[10px] text-muted-foreground">Raw</span>
+                        </div>
+                        <span className="text-[10px] font-medium tabular-nums text-muted-foreground">
                             {(rawConsensus * 100).toFixed(1)}%
                         </span>
                     </div>
-                    <div className="flex items-center justify-between gap-3">
-                        <span className="text-xs text-muted-foreground">Attention</span>
-                        <span className="text-sm font-medium tabular-nums text-foreground">
+                    
+                    {/* Attention */}
+                    <div className="flex items-center justify-between gap-3 pt-1 mt-1 border-t border-border/50">
+                        <div className="flex items-center gap-1.5">
+                            <div className="w-2.5 h-0.5 rounded-full bg-muted-foreground opacity-50"></div>
+                            <span className="text-[10px] font-medium text-foreground">Attention</span>
+                        </div>
+                        <span className="text-xs font-semibold tabular-nums text-foreground">
                             {(maAttention * 100).toFixed(0)}%
                         </span>
                     </div>
@@ -155,7 +173,7 @@ const PropositionCard = ({ proposition }) => {
                 </div>
 
                 {/* Chart Section */}
-                <div className="h-32 w-full pt-4 -mx-6 -mb-6 px-6 pb-6">
+                <div className="h-32 w-full pt-4">
                     <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={evaluations} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
                             <defs>
