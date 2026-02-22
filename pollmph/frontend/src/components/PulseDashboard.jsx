@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createClient } from '@supabase/supabase-js';
 import { LineChart, Line, XAxis, YAxis, ReferenceLine, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts';
 import { TrendingUp, TrendingDown, Info, Calendar } from 'lucide-react';
 
@@ -25,53 +26,40 @@ const getEnv = (key) => {
     return '';
 };
 
+// Initialize Supabase client
+const supabaseUrl = getEnv('SUPABASE_URL');
+const supabaseKey = getEnv('SUPABASE_KEY');
+const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
+
 const calculateMovingAverage = (data, windowSize = 7) => {
-    return data.map((val, idx, arr) => {
-        if (idx < windowSize - 1) return { ...val, ma_consensus: val.consensus_value, ma_attention: val.attention_value };
+    // Ensure data is sorted by date before calculating MA
+    const sortedData = [...data].sort((a, b) => new Date(a.date_generated) - new Date(b.date_generated));
+    
+    return sortedData.map((val, idx, arr) => {
+        // Create date object for formatting
+        const dateObj = new Date(val.date_generated);
+        const shortDate = dateObj.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
+        
+        const base = { 
+            ...val, 
+            shortDate,
+            ma_consensus: val.consensus_value, 
+            ma_attention: val.attention_value 
+        };
+
+        if (idx < windowSize - 1) return base;
+
         const window = arr.slice(idx - windowSize + 1, idx + 1);
         const sumC = window.reduce((acc, curr) => acc + curr.consensus_value, 0);
         const sumA = window.reduce((acc, curr) => acc + curr.attention_value, 0);
+        
         return {
-            ...val,
+            ...base,
             ma_consensus: Number((sumC / windowSize).toFixed(3)),
             ma_attention: Number((sumA / windowSize).toFixed(3))
         };
     });
 };
-
-const generateMockHistory = (baseConsensus, baseAttention, volatility, startDateStr, days = 30) => {
-    let rawData = [];
-    let currentC = baseConsensus;
-    let currentA = baseAttention;
-    const start = new Date(startDateStr);
-
-    for (let i = 0; i <= days; i++) {
-        const date = new Date(start);
-        date.setDate(date.getDate() + i);
-        currentC = Math.max(0, Math.min(1, currentC + (Math.random() - 0.5) * volatility));
-        currentA = Math.max(0, Math.min(1, currentA + (Math.random() - 0.5) * (volatility * 0.5)));
-
-        rawData.push({
-            shortDate: date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' }),
-            consensus_value: Number(currentC.toFixed(3)),
-            attention_value: Number(currentA.toFixed(3)),
-        });
-    }
-    return calculateMovingAverage(rawData, 7);
-};
-
-const MOCK_DATA = [
-    {
-        id: 'marcos_robredo_2028',
-        proposition_text: 'Bongbong Marcos and Leni Robredo will team up for the 2028 Philippine Presidential Election',
-        evaluations: generateMockHistory(0.22, 0.80, 0.12, '2024-04-10', 45)
-    },
-    {
-        id: 'sarah_duterte_wins_2028',
-        proposition_text: 'Sara Duterte will win the 2028 Philippine Presidential Election',
-        evaluations: generateMockHistory(0.58, 0.90, 0.08, '2024-03-20', 60)
-    }
-];
 
 // ============================================================================
 // 2. SUB-COMPONENTS
@@ -187,6 +175,99 @@ const PropositionCard = ({ proposition }) => {
 // ============================================================================
 
 const PulseDashboard = () => {
+    const [propositions, setPropositions] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            if (!supabase) {
+                setError("Supabase client not initialized. Check environment variables.");
+                setLoading(false);
+                return;
+            }
+
+            try {
+                // 1. Fetch Propositions (text and ID)
+                const { data: propsData, error: propsError } = await supabase
+                    .from('propositions')
+                    .select('proposition_id, proposition_text');
+
+                if (propsError) throw propsError;
+
+                const propositionMap = propsData.reduce((acc, curr) => {
+                    acc[curr.proposition_id] = curr.proposition_text;
+                    return acc;
+                }, {});
+
+                // 2. Fetch Sentiments
+                const { data: sentimentsData, error: sentimentsError } = await supabase
+                    .from('sentiments')
+                    .select('*')
+                    .neq('proposition_id', 'demo-prop')
+                    .order('date_generated', { ascending: true });
+
+                if (sentimentsError) throw sentimentsError;
+
+                if (!sentimentsData || sentimentsData.length === 0) {
+                    setPropositions([]);
+                    return;
+                }
+
+                // Group by proposition_id
+                const grouped = sentimentsData.reduce((acc, curr) => {
+                    if (!acc[curr.proposition_id]) {
+                        acc[curr.proposition_id] = [];
+                    }
+                    acc[curr.proposition_id].push(curr);
+                    return acc;
+                }, {});
+
+                // Transform to component format
+                const formattedPropositions = Object.entries(grouped)
+                    .map(([id, evaluations]) => {
+                        // Use text from propositions table, fallback to ID if not found
+                        const text = propositionMap[id] || id; 
+                        
+                        // Sort evaluations by date
+                        evaluations.sort((a, b) => new Date(a.date_generated) - new Date(b.date_generated));
+                        
+                        return {
+                            id,
+                            proposition_text: text,
+                            evaluations: calculateMovingAverage(evaluations, 7)
+                        };
+                    });
+
+                setPropositions(formattedPropositions);
+
+            } catch (err) {
+                console.error("Error fetching data:", err);
+                setError(err.message);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, []);
+
+    if (loading) {
+        return (
+            <div className="w-full h-screen flex items-center justify-center bg-slate-50 text-slate-400 font-bold uppercase tracking-widest text-xs animate-pulse">
+                Loading Pulse Data...
+            </div>
+        );
+    }
+
+    if (error) {
+         return (
+            <div className="w-full h-screen flex items-center justify-center bg-slate-50 text-rose-500 font-bold p-4 text-center">
+                Error: {error}
+            </div>
+        );
+    }
+
     return (
         <div className="w-full bg-slate-50 text-slate-900 font-sans p-4 md:p-6">
             <div className="max-w-6xl mx-auto">
@@ -197,15 +278,19 @@ const PulseDashboard = () => {
                         </div>
                     </div>
                     <h1 className="text-3xl font-black tracking-tight text-slate-900">
-                        Pulse<span className="text-emerald-600">PH</span> Sentiment
+                        poll<span className="text-emerald-600">mph</span>
                     </h1>
                 </header>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {MOCK_DATA.map(p => (
-                        <PropositionCard key={p.id} proposition={p} />
-                    ))}
-                </div>
+                {propositions.length === 0 ? (
+                    <div className="text-center text-slate-400 py-20">No data available</div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {propositions.map(p => (
+                            <PropositionCard key={p.id} proposition={p} />
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
     );
