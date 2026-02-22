@@ -1,0 +1,2 @@
+insert into "sentiments" (proposition_id, consensus_value, attention_value, movement_analysis, rationale_consensus, rationale_attention, data_quality, date_generated) values
+('demo-prop', 0.8, 0.6, 'The proposition is generally agreed upon.', 'The proposition has received moderate attention.', 'demo movement analysis',0.9, '2024-06-01');

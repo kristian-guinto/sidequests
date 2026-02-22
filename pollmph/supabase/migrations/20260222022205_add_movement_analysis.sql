@@ -1,0 +1,1 @@
+alter table sentiments add movement_analysis text;
