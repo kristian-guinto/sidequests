@@ -1,6 +1,6 @@
-# pollmph: AI-Powered Sentiment Oracle
-
-> Deployed app availabe [here.](https://pollmph.vercel.app/)
+# pollmph (poll-em PH): AI-Powered Sentiment Oracle
+ 
+> Deployed app available [here.](https://pollmph.vercel.app/)
 
 pollmph is an automated sentiment analysis engine designed to track Philippine socio-political discourse. It acts as a "Predictive Market Oracle" by validating specific propositions against real-time web and social media data.
 
@@ -17,13 +17,20 @@ The core idea is to obtain objective, quantitative metrics for subjective politi
     *   **Attention (0.00 - 1.00)**: How loudly is the public talking about it?
 4.  **Visualization**: Results are stored and visualized in an interactive dashboard to show trends over time.
 
+## ✨ Features
+
+- **Interactive Dashboard**: Browse all tracked propositions with real-time sentiment trends
+- **Detailed Analysis Pages**: Dive deep into individual propositions with full analysis history
+- **Trend Visualization**: 7-day moving average charts with raw data points and attention metrics
+- **Daily Analysis Cards**: View consensus rationale, attention analysis, and movement insights for each day
+
 ## 🛠 Tech Stack & Architecture
 
 This project is designed to be **serverless and effectively cost-free** by leveraging the free tiers of modern infrastructure providers.
 
-*   **LLM Intelligence**: [Grok-beta (xAI)](https://x.ai/api) for high-speed reasoning and real-time web search capabilities.
-*   **Database**: [Supabase](https://supabase.com) (PostgreSQL) for storing propositions and sentiment history.
-*   **Frontend**: React + Vite + Tailwind CSS, hosted on [Vercel](https://vercel.com).
+*   **LLM Intelligence**: [Grok (xAI)](https://x.ai/api) for high-speed reasoning and real-time web search capabilities.
+*   **Database**: [Supabase](https://supabase.com) (PostgreSQL) for storing propositions and sentiment history with indexed queries.
+*   **Frontend** (vibe-coded): React 19 + Vite + Tailwind CSS 4 + shadcn/ui components, hosted on [Vercel](https://vercel.com).
 *   **Automation**: [GitHub Actions](https://github.com/features/actions) runs the Python analysis pipeline daily at 11:59 PM PHT.
 *   **Package Management**: `uv` for extremely fast Python dependency management.
 
@@ -41,7 +48,7 @@ Transparency is key. The [System Prompt](pipeline/system_prompt.txt) used to str
 ## 🏃‍♂️ Getting Started
 
 ### Prerequisites
-*   Node.js 20+
+*   Node.js 18+
 *   Python 3.13+
 *   Reference to a Supabase project
 *   xAI API Key
@@ -57,8 +64,17 @@ Transparency is key. The [System Prompt](pipeline/system_prompt.txt) used to str
     ```bash
     cd frontend
     npm install
-    cp .env.example .env # Add your VITE_SUPABASE keys
+    
+    # Configure environment files
+    # Add your Supabase credentials to:
+    # .env.development (for local Supabase)
+    # .env.production (for production Supabase)
+    
+    # Run with development keys
     npm run dev
+    
+    # Or run with production keys
+    npm run dev:prod
     ```
 3.  **Setup Pipeline**
     ```bash
