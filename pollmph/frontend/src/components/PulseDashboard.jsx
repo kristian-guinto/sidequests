@@ -47,9 +47,10 @@ const calculateMovingAverage = (data, windowSize = 7) => {
 
 const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
-        const maConsensus = payload.find(p => p.dataKey === "ma_consensus")?.value;
-        const rawConsensus = payload.find(p => p.dataKey === "consensus_value")?.value;
-        const maAttention = payload.find(p => p.dataKey === "ma_attention")?.value;
+        // Access data directly from the data point
+        const dataPoint = payload[0]?.payload;
+        const maConsensus = dataPoint?.ma_consensus;
+        const maAttention = dataPoint?.ma_attention;
         
         const isMajority = maConsensus >= 0.5;
         const lineColor = isMajority ? 'rgb(5, 150, 105)' : 'rgb(225, 29, 72)';
@@ -67,17 +68,6 @@ const CustomTooltip = ({ active, payload, label }) => {
                         </div>
                         <span className="text-sm font-bold tabular-nums" style={{ color: lineColor }}>
                             {(maConsensus * 100).toFixed(1)}%
-                        </span>
-                    </div>
-                    
-                    {/* Raw Value */}
-                    <div className="flex items-center justify-between gap-3 pl-4">
-                        <div className="flex items-center gap-1.5">
-                            <div className="w-1 h-1 rounded-full opacity-40" style={{ backgroundColor: lineColor }}></div>
-                            <span className="text-[10px] text-muted-foreground">Raw</span>
-                        </div>
-                        <span className="text-[10px] font-medium tabular-nums text-muted-foreground">
-                            {(rawConsensus * 100).toFixed(1)}%
                         </span>
                     </div>
                     
@@ -177,16 +167,6 @@ const PropositionCard = ({ proposition, onClick }) => {
                                 content={<CustomTooltip />} 
                                 cursor={{ stroke: 'hsl(var(--border))', strokeWidth: 1 }} 
                                 isAnimationActive={false} 
-                            />
-                            {/* Raw data points (subtle dots) */}
-                            <Line 
-                                type="monotone" 
-                                dataKey="consensus_value" 
-                                stroke="transparent"
-                                strokeWidth={0}
-                                dot={{ r: 2, fill: isMajority ? 'rgb(5, 150, 105)' : 'rgb(225, 29, 72)', stroke: 'none', opacity: 0.3 }}
-                                activeDot={false}
-                                isAnimationActive={false}
                             />
                             {/* Attention line (subtle background) */}
                             <Line 

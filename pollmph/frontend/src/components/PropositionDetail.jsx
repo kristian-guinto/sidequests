@@ -49,7 +49,7 @@ export default function PropositionDetail() {
       .from('sentiments')
       .select('*')
       .eq('proposition_id', id)
-      .order('date_generated', { ascending: true })
+      .order('date_generated', { ascending: false })
       .limit(30);
 
     if (sentError) {
@@ -59,7 +59,11 @@ export default function PropositionDetail() {
     }
 
     setProposition(propData);
-    setSentiments(sentData || []);
+    // Sort in ascending order (oldest to newest) for chart calculations
+    const sortedData = (sentData || []).sort((a, b) => 
+      new Date(a.date_generated) - new Date(b.date_generated)
+    );
+    setSentiments(sortedData);
     setLoading(false);
   }
 
@@ -103,20 +107,27 @@ export default function PropositionDetail() {
   const attentionMA = chartData[chartData.length - 1]?.attentionMA;
   const isMajority = consensusMA >= 50;
   
+  // Get latest sentiment for summary card
+  const latestSentiment = sentiments[sentiments.length - 1];
+  
+  // Show newest first in the timeline
   const visibleSentiments = [...sentiments].reverse().slice(0, visibleCount);
   const hasMore = visibleCount < sentiments.length;
 
   const CustomTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {
-      const maConsensus = payload.find(p => p.dataKey === "consensusMA")?.value;
-      const rawConsensus = payload.find(p => p.dataKey === "consensus")?.value;
-      const maAttention = payload.find(p => p.dataKey === "attention")?.value;
+      // Access the data point directly from payload
+      const dataPoint = payload[0]?.payload;
+      
+      const maConsensus = dataPoint?.consensusMA;
+      const rawConsensus = dataPoint?.consensus;
+      const rawAttention = dataPoint?.attention;
       const isMajorityLocal = maConsensus >= 50;
       const lineColor = isMajorityLocal ? 'rgb(5, 150, 105)' : 'rgb(225, 29, 72)';
       
       return (
         <div className="bg-card border shadow-xl rounded-md p-2 min-w-[160px]">
-          <div className="text-[10px] font-semibold text-foreground mb-2 pb-1.5 border-b">{payload[0].payload.date}</div>
+          <div className="text-[10px] font-semibold text-foreground mb-2 pb-1.5 border-b">{dataPoint?.date}</div>
           
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-3">
@@ -145,7 +156,7 @@ export default function PropositionDetail() {
                 <span className="text-[10px] font-medium text-foreground">Attention</span>
               </div>
               <span className="text-xs font-semibold tabular-nums text-foreground">
-                {maAttention?.toFixed(0)}%
+                {rawAttention?.toFixed(0)}%
               </span>
             </div>
           </div>
@@ -176,49 +187,74 @@ export default function PropositionDetail() {
         )}
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3 mb-6">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Consensus (7d)
+      {latestSentiment && (
+        <Card className="mb-6 bg-muted/30">
+          <CardHeader>
+            <CardTitle>Latest Update</CardTitle>
+            <CardDescription>
+              {new Date(latestSentiment.date_generated).toLocaleDateString('en-US', { 
+                weekday: 'long',
+                month: 'long', 
+                day: 'numeric',
+                year: 'numeric'
+              })}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">
-              {consensusMA ? `${consensusMA.toFixed(1)}%` : 'N/A'}
+            <div className="grid gap-6 md:grid-cols-2">
+              <div className="space-y-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <TrendingUp className="h-4 w-4" />
+                    <span className="text-sm font-semibold">Consensus</span>
+                    <Badge variant="secondary" className="ml-auto">
+                      {(latestSentiment.consensus_value * 100).toFixed(1)}%
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {latestSentiment.rationale_consensus || 'No rationale available'}
+                  </p>
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Activity className="h-4 w-4" />
+                    <span className="text-sm font-semibold">Attention</span>
+                    <Badge variant="secondary" className="ml-auto">
+                      {(latestSentiment.attention_value * 100).toFixed(0)}%
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {latestSentiment.rationale_attention || 'No rationale available'}
+                  </p>
+                </div>
+              </div>
+              
+              {latestSentiment.movement_analysis && (
+                <div className="md:col-span-2 pt-4 border-t">
+                  <div className="text-sm font-semibold mb-2">Movement Analysis</div>
+                  <p className="text-sm text-muted-foreground">
+                    {latestSentiment.movement_analysis}
+                  </p>
+                </div>
+              )}
+              
+              {latestSentiment.data_quality && (
+                <div className="md:col-span-2 flex items-center gap-2 text-xs text-muted-foreground">
+                  <span>Data Quality:</span>
+                  <Badge variant="outline" className="text-xs">
+                    {(latestSentiment.data_quality * 100).toFixed(0)}%
+                  </Badge>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
+      )}
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription className="flex items-center gap-2">
-              <Activity className="h-4 w-4" />
-              Attention
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">
-              {attentionMA ? `${attentionMA.toFixed(1)}%` : 'N/A'}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription className="flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              Data Points
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{sentiments.length}</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="mb-6">
+      <Card className="mb-6 bg-muted/30">
         <CardHeader>
           <CardTitle>Consensus Trend</CardTitle>
           <CardDescription>7-day moving average with attention levels</CardDescription>
@@ -246,7 +282,7 @@ export default function PropositionDetail() {
                 dataKey="consensus"
                 stroke="transparent"
                 strokeWidth={0}
-                dot={{ r: 2, fill: isMajority ? 'rgb(5, 150, 105)' : 'rgb(225, 29, 72)', stroke: 'none', opacity: 0.3 }}
+                dot={{ r: 3, fill: isMajority ? 'rgb(5, 150, 105)' : 'rgb(225, 29, 72)', stroke: 'none', opacity: 0.5 }}
                 activeDot={false}
                 isAnimationActive={false}
               />
