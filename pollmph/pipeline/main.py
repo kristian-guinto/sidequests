@@ -30,19 +30,19 @@ except ImportError:
 
 load_dotenv()
 
+SB_URL = os.getenv("SUPABASE_URL")
+SB_KEY = os.getenv("SUPABASE_KEY")
+
 
 def setup_supabase():
     import supabase as sb
 
-    url: str | None = os.environ.get("SUPABASE_URL")
-    key: str | None = os.environ.get("SUPABASE_KEY")
-
-    if not url or not key:
+    if not SB_URL or not SB_KEY:
         raise ValueError(
             "Supabase URL and Key must be set in environment variables SUPABASE_URL and SUPABASE_KEY"
         )
 
-    return sb.create_client(url, key)
+    return sb.create_client(SB_URL, SB_KEY)
 
 
 def load_propositions(supabase=None) -> List[PropositionModel]:
@@ -408,8 +408,19 @@ def main():
     parser.add_argument("--backfill-start", help="Start date for backfill (YYYY-MM-DD)")
     parser.add_argument("--backfill-end", help="End date for backfill (YYYY-MM-DD)")
     parser.add_argument("--date", help="Run for a specific single date (YYYY-MM-DD)")
+    parser.add_argument(
+        "--prod", action="store_true", help="Use production environment"
+    )
 
     args = parser.parse_args()
+
+    if args.prod:
+        # this is for local testing with production supabase, not for running in prod environment.
+        # In prod environment, env vars should just be set to prod values.
+        global SB_URL, SB_KEY
+        SB_URL = os.getenv("SUPABASE_URL_PROD")
+        SB_KEY = os.getenv("SUPABASE_SERVICE_KEY_PROD")
+        print("Using PRODUCTION Supabase environment.")
 
     if args.backfill_start and args.backfill_end:
         print(f"Starting backfill from {args.backfill_start} to {args.backfill_end}")
