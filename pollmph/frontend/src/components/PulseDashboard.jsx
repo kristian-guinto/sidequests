@@ -224,23 +224,33 @@ const PulseDashboard = () => {
             }
 
             try {
-                // 1. Fetch Propositions (text and ID)
+                // 1. Fetch Propositions (text and ID) - only non-archived
                 const { data: propsData, error: propsError } = await supabase
                     .from('propositions')
-                    .select('proposition_id, proposition_text');
+                    .select('proposition_id, proposition_text')
+                    .eq('is_archived', false);
 
                 if (propsError) throw propsError;
 
+                if (!propsData || propsData.length === 0) {
+                    setPropositions([]);
+                    setLoading(false);
+                    return;
+                }
+
+                // Extract proposition IDs for filtering sentiments
+                const propositionIds = propsData.map(p => p.proposition_id);
+                
                 const propositionMap = propsData.reduce((acc, curr) => {
                     acc[curr.proposition_id] = curr.proposition_text;
                     return acc;
                 }, {});
 
-                // 2. Fetch Sentiments
+                // 2. Fetch Sentiments only for non-archived propositions
                 const { data: sentimentsData, error: sentimentsError } = await supabase
                     .from('sentiments')
-                    .select('*')
-                    .neq('proposition_id', 'demo-prop')
+                    .select('proposition_id, consensus_value, attention_value, date_generated')
+                    .in('proposition_id', propositionIds)
                     .order('date_generated', { ascending: true });
 
                 if (sentimentsError) throw sentimentsError;

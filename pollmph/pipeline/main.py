@@ -50,7 +50,12 @@ def load_propositions(supabase=None) -> List[PropositionModel]:
         supabase = setup_supabase()
 
     try:
-        response = supabase.table("propositions").select("*").execute()
+        response = (
+            supabase.table("propositions")
+            .select("proposition_id, proposition_text, search_queries")
+            .eq("is_archived", False)
+            .execute()
+        )
         if response.data:
             propositions = []
             for p in response.data:
