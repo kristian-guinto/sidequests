@@ -310,9 +310,9 @@ const PulseDashboard = () => {
                     <header className="mb-10 flex items-start justify-between">
                         <div>
                             <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-2">
-                                poll<span className="text-primary">mph</span>
+                                <span className="text-foreground">pollm</span><span className="text-emerald-600 dark:text-emerald-400">ph</span>
                             </h1>
-                            <p className="text-muted-foreground text-sm">Philippine political sentiment tracker</p>
+                            <p className="text-muted-foreground text-sm italic">poll-em PH</p>
                         </div>
                         <ThemeToggle />
                     </header>
@@ -356,9 +356,9 @@ const PulseDashboard = () => {
                 <header className="mb-10 flex items-start justify-between">
                     <div>
                         <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-2">
-                            poll<span className="text-primary">mph</span>
+                            <span className="text-foreground">pollm</span><span className="text-emerald-600 dark:text-emerald-400">ph</span>
                         </h1>
-                        <p className="text-muted-foreground text-sm">Philippine political sentiment tracker</p>
+                        <p className="text-muted-foreground text-sm italic">poll-em PH</p>
                     </div>
                     <ThemeToggle />
                 </header>
