@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { LineChart, Line, XAxis, YAxis, ReferenceLine, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts';
@@ -246,11 +246,16 @@ const PulseDashboard = () => {
                     return acc;
                 }, {});
 
-                // 2. Fetch Sentiments only for non-archived propositions
+                // Calculate date 30 days ago for efficient querying
+                const thirtyDaysAgo = new Date();
+                thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+                // 2. Fetch Sentiments only for non-archived propositions (last 30 days)
                 const { data: sentimentsData, error: sentimentsError } = await supabase
                     .from('sentiments')
                     .select('proposition_id, consensus_value, attention_value, date_generated')
                     .in('proposition_id', propositionIds)
+                    .gte('date_generated', thirtyDaysAgo.toISOString())
                     .order('date_generated', { ascending: true });
 
                 if (sentimentsError) throw sentimentsError;
@@ -300,8 +305,39 @@ const PulseDashboard = () => {
 
     if (loading) {
         return (
-            <div className="w-full h-screen flex items-center justify-center bg-background text-muted-foreground font-medium text-sm animate-pulse">
-                Loading data...
+            <div className="min-h-screen w-full bg-background">
+                <div className="max-w-7xl mx-auto px-4 py-8 md:px-6 md:py-12">
+                    <header className="mb-10 flex items-start justify-between">
+                        <div>
+                            <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-2">
+                                poll<span className="text-primary">mph</span>
+                            </h1>
+                            <p className="text-muted-foreground text-sm">Philippine political sentiment tracker</p>
+                        </div>
+                        <ThemeToggle />
+                    </header>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {[1, 2, 3, 4].map(i => (
+                            <Card key={i} className="bg-muted/30 animate-pulse">
+                                <CardHeader className="pb-4 space-y-2">
+                                    <div className="h-5 bg-muted rounded w-3/4" />
+                                    <div className="h-3 bg-muted rounded w-1/3" />
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div className="flex justify-between">
+                                        <div className="h-10 bg-muted rounded w-24" />
+                                        <div className="h-10 bg-muted rounded w-20" />
+                                    </div>
+                                    <div className="h-32 bg-muted rounded" />
+                                </CardContent>
+                                <CardFooter className="pt-4 border-t">
+                                    <div className="h-3 bg-muted rounded w-full" />
+                                </CardFooter>
+                            </Card>
+                        ))}
+                    </div>
+                </div>
             </div>
         );
     }
