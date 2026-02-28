@@ -48,18 +48,3 @@ class SentimentModel(AgentResponseModel):
     date_generated: str = Field(
         ..., description="The date of the evaluation in ISO8601 format"
     )
-
-
-class PropositionModel(BaseModel):
-    proposition_id: str = Field(..., description="The ID of the proposition")
-    proposition_text: str = Field(..., description="The text of the proposition")
-    search_queries: List[str] = Field(
-        default=[], description="The search queries to use for gathering information"
-    )
-
-
-class PromptParameters(BaseModel):
-    proposition: str
-    search_queries_list: List[str]
-    yesterday_consensus: float
-    yesterday_attention: float
