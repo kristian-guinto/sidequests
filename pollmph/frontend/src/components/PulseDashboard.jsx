@@ -246,16 +246,11 @@ const PulseDashboard = () => {
                     return acc;
                 }, {});
 
-                // Calculate date 30 days ago for efficient querying
-                const thirtyDaysAgo = new Date();
-                thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-                // 2. Fetch Sentiments only for non-archived propositions (last 30 days)
+                // 2. Fetch all sentiments for non-archived propositions
                 const { data: sentimentsData, error: sentimentsError } = await supabase
                     .from('sentiments')
                     .select('proposition_id, consensus_value, attention_value, date_generated')
                     .in('proposition_id', propositionIds)
-                    .gte('date_generated', thirtyDaysAgo.toISOString())
                     .order('date_generated', { ascending: true });
 
                 if (sentimentsError) throw sentimentsError;
