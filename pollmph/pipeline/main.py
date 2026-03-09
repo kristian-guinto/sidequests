@@ -215,7 +215,7 @@ def analyze_date(
                 prior_context=prior_context,
             )
         )
-        print(query)
+
         try:
             chat = llm_client.chat.create(
                 model=GROK_MODEL,
@@ -266,7 +266,7 @@ def analyze_date(
                 **agent_response.model_dump(),
                 date_generated=start_of_day.strftime("%Y-%m-%d"),
             ).model_dump()
-            print(sentiment)
+
             results.append(sentiment)
 
         except Exception as e:
