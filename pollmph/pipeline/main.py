@@ -213,6 +213,8 @@ def analyze_date(
                 proposition=proposition.proposition_text,
                 search_queries_list=proposition.search_queries,
                 prior_context=prior_context,
+                start_search_date=search_start.strftime("%Y-%m-%d"),
+                end_search_date=end_of_day.strftime("%Y-%m-%d"),
             )
         )
 
