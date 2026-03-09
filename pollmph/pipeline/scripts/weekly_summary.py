@@ -24,7 +24,12 @@ def generate_weekly_summary(
 
     # Find the closest previous Sunday
     today = datetime.now().date()
-    last_sunday = today - timedelta(days=today.weekday() + 1)
+
+    if today.weekday() == 6:  # If today is Sunday, use today as the end of the week
+        last_sunday = today
+    else:
+        last_sunday = today - timedelta(days=today.weekday() + 1)
+
     week_start = last_sunday - timedelta(days=6)  # Get the previous Monday
     week_end = last_sunday
 
