@@ -1,7 +1,6 @@
-from pipeline.main import backfill, run_today, analyze_date
+from pipeline.main import analyze_date
 from pipeline.util import get_mock_xai_client
-from datetime import datetime, timedelta
-import pytest
+from datetime import datetime
 
 
 def test_analyze_date_with_mock(monkeypatch):

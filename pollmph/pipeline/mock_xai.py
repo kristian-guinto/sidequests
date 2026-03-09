@@ -3,7 +3,7 @@ Mock xAI client for testing purposes.
 Mimics the xai_sdk.Client API with fixed responses.
 """
 
-from typing import Iterator, Tuple, Any
+from typing import Iterator, Tuple
 
 
 class MockToolCall:

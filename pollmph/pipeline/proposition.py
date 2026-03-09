@@ -1,8 +1,3 @@
-try:
-    from util import get_supabase_client
-except ImportError:
-    from pipeline.util import get_supabase_client
-
 from supabase import Client as SupabaseClient
 from pydantic import BaseModel, Field
 from typing import List

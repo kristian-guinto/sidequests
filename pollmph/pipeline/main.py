@@ -1,17 +1,13 @@
 import os
-import json
 import time
 import argparse
-from pathlib import Path
 from dotenv import load_dotenv
-from typing import List, Optional
+from typing import List
 from datetime import datetime, timedelta
 import numpy as np
 
-from xai_sdk import Client
 from xai_sdk.chat import user
 from xai_sdk.tools import web_search, x_search
-from pydantic import BaseModel, Field
 
 # Assuming running from inside pipeline/ or with pipeline/ in pythonpath
 try:
@@ -289,7 +285,7 @@ def save_results(results: List[dict]):
     print(f"Saving {len(results)} records to Supabase...")
     try:
         supabase_client = get_supabase_client()
-        response = supabase_client.table("sentiments").insert(results).execute()
+        _ = supabase_client.table("sentiments").insert(results).execute()
         print("Save successful.")
     except Exception as e:
         print(f"Error saving to Supabase: {e}")
