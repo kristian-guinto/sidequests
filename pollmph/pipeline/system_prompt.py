@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 class PromptParameters(BaseModel):
     proposition: str
-    search_queries_list: List[str]
+    search_queries_list: List[str] | None
     prior_context: str | None
 
 
@@ -16,7 +16,7 @@ def load_system_prompt(parameters: PromptParameters) -> str:
 
         ### INPUT DATA
         Proposition to Evaluate: "{parameters.proposition}"
-        Recommended Search Queries: {parameters.search_queries_list}, if empty use default queries based on the proposition text.
+        Recommended Search Queries: {parameters.search_queries_list if parameters.search_queries_list else "No search queries provided."}
 
         Prior Context: 
 
@@ -60,3 +60,39 @@ def load_system_prompt(parameters: PromptParameters) -> str:
     """
 
     return system_prompt
+
+
+def load_weekly_summary_prompt(parameters: PromptParameters) -> str:
+    prompt = f"""
+    You are a quantitative sentiment analyst specializing in Philippine socio-political discourse.
+    Your task is to synthesize a week of pre-collected sentiment data for a specific proposition
+    into a concise narrative summary.
+
+    ### INPUT DATA
+    Proposition: "{parameters.proposition}"
+
+    ### 7-DAY SENTIMENT DATA
+    {parameters.prior_context}   
+
+    ### INSTRUCTIONS
+    STEP 1: Review the 7-day data above. Do not perform any searches; this is a synthesis task only.
+    STEP 2: Identify the weekly arc — how did scores evolve? Were there turning points?
+    STEP 3: Determine the overall trend verdict: rising, falling, stable, or volatile.
+    STEP 4: Output strictly as JSON. No conversational text outside the JSON.
+
+    ### TREND VERDICT DEFINITIONS
+    - rising: Consensus or attention meaningfully increased over the week.
+    - falling: Consensus or attention meaningfully decreased over the week.
+    - stable: Scores remained largely flat with no significant movement.
+    - volatile: Large swings in either direction without a clear trend.
+
+    ### JSON OUTPUT SCHEMA
+    {{
+        "week_summary": "<3-5 sentence prose narrative of the week's trajectory>",
+        "key_drivers": "<1-2 sentences on what drove changes, or lack thereof>",
+        "trend_verdict": "<rising | falling | stable | volatile>",
+        "outlook": "<1 sentence on what to watch for next week>"
+    }}
+    """
+
+    return prompt

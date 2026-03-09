@@ -1,4 +1,3 @@
-
 from pydantic import BaseModel, Field
 
 
@@ -46,3 +45,32 @@ class SentimentModel(AgentResponseModel):
     date_generated: str = Field(
         ..., description="The date of the evaluation in ISO8601 format"
     )
+
+
+class AgentResponseWeeklySummary(BaseModel):
+    summary: str = Field(
+        ...,
+        description="A 3-5 sentence summary of the sentiment and trends for the week",
+    )
+    key_drivers: str = Field(
+        ...,
+        description="A 1-2 sentence explanation of the key drivers behind the sentiment and trends for the week",
+    )
+    trend_verdict: str = Field(
+        ...,
+        description="rising | falling | stable | volatile",
+    )
+    outlook: str = Field(
+        ...,
+        description="A 1-2 sentence outlook for the future based on the trends and drivers identified",
+    )
+
+
+class WeeklySummaryModel(AgentResponseWeeklySummary):
+    proposition_id: str = Field(
+        ..., description="The ID of the proposition being summarized"
+    )
+    week_start: str = Field(
+        ..., description="The start date of the week in ISO8601 format"
+    )
+    week_end: str = Field(..., description="The end date of the week in ISO8601 format")
