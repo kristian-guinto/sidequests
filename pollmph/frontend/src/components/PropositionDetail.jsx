@@ -21,6 +21,7 @@ export default function PropositionDetail() {
   const { id } = useParams();
   const [proposition, setProposition] = useState(null);
   const [sentiments, setSentiments] = useState([]);
+  const [weeklySummary, setWeeklySummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [visibleCount, setVisibleCount] = useState(5);
 
@@ -30,7 +31,7 @@ export default function PropositionDetail() {
 
   async function fetchData() {
     setLoading(true);
-    
+
     // Fetch proposition details
     const { data: propData, error: propError } = await supabase
       .from('propositions')
@@ -60,10 +61,25 @@ export default function PropositionDetail() {
 
     setProposition(propData);
     // Sort in ascending order (oldest to newest) for chart calculations
-    const sortedData = (sentData || []).sort((a, b) => 
+    const sortedData = (sentData || []).sort((a, b) =>
       new Date(a.date_generated) - new Date(b.date_generated)
     );
     setSentiments(sortedData);
+
+    // Fetch latest weekly summary
+    const { data: summaryData, error: summaryError } = await supabase
+      .from('weekly_summaries')
+      .select('*')
+      .eq('proposition_id', id)
+      .order('week_end', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (summaryError) {
+      console.error('Error fetching weekly summary:', summaryError);
+    }
+    setWeeklySummary(summaryData);
+
     setLoading(false);
   }
 
@@ -106,10 +122,7 @@ export default function PropositionDetail() {
   const consensusMA = chartData[chartData.length - 1]?.consensusMA;
   const attentionMA = chartData[chartData.length - 1]?.attentionMA;
   const isMajority = consensusMA >= 50;
-  
-  // Get latest sentiment for summary card
-  const latestSentiment = sentiments[sentiments.length - 1];
-  
+
   // Show newest first in the timeline
   const visibleSentiments = [...sentiments].reverse().slice(0, visibleCount);
   const hasMore = visibleCount < sentiments.length;
@@ -118,17 +131,17 @@ export default function PropositionDetail() {
     if (active && payload && payload.length) {
       // Access the data point directly from payload
       const dataPoint = payload[0]?.payload;
-      
+
       const maConsensus = dataPoint?.consensusMA;
       const rawConsensus = dataPoint?.consensus;
       const rawAttention = dataPoint?.attention;
       const isMajorityLocal = maConsensus >= 50;
       const lineColor = isMajorityLocal ? 'rgb(5, 150, 105)' : 'rgb(225, 29, 72)';
-      
+
       return (
         <div className="bg-card border shadow-xl rounded-md p-2 min-w-[160px]">
           <div className="text-[10px] font-semibold text-foreground mb-2 pb-1.5 border-b">{dataPoint?.date}</div>
-          
+
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-1.5">
@@ -139,7 +152,7 @@ export default function PropositionDetail() {
                 {maConsensus?.toFixed(1)}%
               </span>
             </div>
-            
+
             <div className="flex items-center justify-between gap-3 pl-4">
               <div className="flex items-center gap-1.5">
                 <div className="w-1 h-1 rounded-full opacity-40" style={{ backgroundColor: lineColor }}></div>
@@ -149,7 +162,7 @@ export default function PropositionDetail() {
                 {rawConsensus?.toFixed(1)}%
               </span>
             </div>
-            
+
             <div className="flex items-center justify-between gap-3 pt-1 mt-1 border-t border-border/50">
               <div className="flex items-center gap-1.5">
                 <div className="w-2.5 h-0.5 rounded-full bg-muted-foreground opacity-50"></div>
@@ -187,69 +200,39 @@ export default function PropositionDetail() {
         )}
       </div>
 
-      {latestSentiment && (
+      {weeklySummary && (
         <Card className="mb-6 bg-muted/30">
           <CardHeader>
-            <CardTitle>Latest Update</CardTitle>
-            <CardDescription>
-              {new Date(latestSentiment.date_generated).toLocaleDateString('en-US', { 
-                weekday: 'long',
-                month: 'long', 
-                day: 'numeric',
-                year: 'numeric'
-              })}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-6 md:grid-cols-2">
-              <div className="space-y-4">
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <TrendingUp className="h-4 w-4" />
-                    <span className="text-sm font-semibold">Consensus</span>
-                    <Badge variant="secondary" className="ml-auto">
-                      {(latestSentiment.consensus_value * 100).toFixed(1)}%
-                    </Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    {latestSentiment.rationale_consensus || 'No rationale available'}
-                  </p>
-                </div>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <CardTitle>Weekly Summary</CardTitle>
+                <CardDescription>
+                  {new Date(weeklySummary.week_start).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                  {' – '}
+                  {new Date(weeklySummary.week_end).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                </CardDescription>
               </div>
-              
-              <div className="space-y-4">
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Activity className="h-4 w-4" />
-                    <span className="text-sm font-semibold">Attention</span>
-                    <Badge variant="secondary" className="ml-auto">
-                      {(latestSentiment.attention_value * 100).toFixed(0)}%
-                    </Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    {latestSentiment.rationale_attention || 'No rationale available'}
-                  </p>
-                </div>
-              </div>
-              
-              {latestSentiment.movement_analysis && (
-                <div className="md:col-span-2 pt-4 border-t">
-                  <div className="text-sm font-semibold mb-2">Movement Analysis</div>
-                  <p className="text-sm text-muted-foreground">
-                    {latestSentiment.movement_analysis}
-                  </p>
-                </div>
-              )}
-              
-              {latestSentiment.data_quality && (
-                <div className="md:col-span-2 flex items-center gap-2 text-xs text-muted-foreground">
-                  <span>Data Quality:</span>
-                  <Badge variant="outline" className="text-xs">
-                    {(latestSentiment.data_quality * 100).toFixed(0)}%
-                  </Badge>
-                </div>
+              {weeklySummary.trend_verdict && (
+                <Badge className="text-sm shrink-0">{weeklySummary.trend_verdict}</Badge>
               )}
             </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {weeklySummary.summary && (
+              <p className="text-sm text-muted-foreground">{weeklySummary.summary}</p>
+            )}
+            {weeklySummary.key_drivers && (
+              <div className="pt-4 border-t">
+                <div className="text-sm font-semibold mb-2">Key Drivers</div>
+                <p className="text-sm text-muted-foreground">{weeklySummary.key_drivers}</p>
+              </div>
+            )}
+            {weeklySummary.outlook && (
+              <div className="pt-4 border-t">
+                <div className="text-sm font-semibold mb-2">Outlook</div>
+                <p className="text-sm text-muted-foreground">{weeklySummary.outlook}</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -263,12 +246,12 @@ export default function PropositionDetail() {
           <ResponsiveContainer width="100%" height={400}>
             <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.3} />
-              <XAxis 
-                dataKey="date" 
+              <XAxis
+                dataKey="date"
                 className="text-xs"
                 tick={{ fontSize: 12 }}
               />
-              <YAxis 
+              <YAxis
                 domain={[0, 100]}
                 className="text-xs"
                 tick={{ fontSize: 12 }}
@@ -317,14 +300,14 @@ export default function PropositionDetail() {
           <p className="text-sm text-muted-foreground mb-4">
             Showing {visibleCount} of {sentiments.length} day{sentiments.length !== 1 ? 's' : ''}
           </p>
-          
+
           <div className="space-y-4">
             {visibleSentiments.map((sentiment, index) => {
               const consensusValue = (sentiment.consensus_value * 100).toFixed(1);
               const attentionValue = (sentiment.attention_value * 100).toFixed(0);
-              const dateStr = new Date(sentiment.date_generated).toLocaleDateString('en-US', { 
+              const dateStr = new Date(sentiment.date_generated).toLocaleDateString('en-US', {
                 weekday: 'short',
-                month: 'short', 
+                month: 'short',
                 day: 'numeric',
                 year: 'numeric'
               });
@@ -375,7 +358,7 @@ export default function PropositionDetail() {
                         </p>
                       </div>
                     </div>
-                    
+
                     {sentiment.movement_analysis && (
                       <div className="pt-4 border-t">
                         <div className="text-sm font-semibold mb-2">Movement Analysis</div>
@@ -389,11 +372,11 @@ export default function PropositionDetail() {
               );
             })}
           </div>
-          
+
           {hasMore && (
             <div className="flex justify-center pt-4">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => setVisibleCount(prev => prev + 5)}
               >
                 Load More ({sentiments.length - visibleCount} remaining)
