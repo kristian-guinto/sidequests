@@ -1,30 +1,32 @@
-from typing import List
+from typing import Any, List, Dict
 from pydantic import BaseModel
 
 
 class PromptParameters(BaseModel):
     proposition: str
     search_queries_list: List[str]
-    yesterday_consensus: float
-    yesterday_attention: float
+    prior_context: str | None
 
 
-def load_system_prompt() -> str:
-    system_prompt = """
+def load_system_prompt(parameters: PromptParameters) -> str:
+    system_prompt = f"""
         You are a quantitative sentiment engine and expert political analyst specializing in Philippine socio-political discourse. Your task is to evaluate real-time public sentiment across social media (especially Twitter/X) and news platforms regarding a specific declarative proposition.
 
         You must act as a "Predictive Market Oracle," scoring the proposition on two strictly defined metrics: Consensus (Agreement) and Attention (Volume).
 
         ### INPUT DATA
-        Proposition to Evaluate: "{proposition}"
-        Recommended Search Queries: {search_queries_list}, if empty use default queries based on the proposition text.
-        Yesterday's Consensus Score: {yesterday_consensus}, if empty default to 0.50 (perfect polarization or apathy)
-        Yesterday's Attention Score: {yesterday_attention}, if empty default to 0.10 (low chatter)
+        Proposition to Evaluate: "{parameters.proposition}"
+        Recommended Search Queries: {parameters.search_queries_list}, if empty use default queries based on the proposition text.
+
+        Prior Context: 
+
+        {parameters.prior_context if parameters.prior_context else "No prior context provided."}
 
         ### INSTRUCTIONS
         STEP 1: Execute real-time web and social searches using the Recommended Search Queries to gather today's discourse. Look for a balance of administration, opposition, and general public reactions.
         STEP 2: Analyze the sentiment and volume of the data retrieved.
-        STEP 3: Compare today's data against Yesterday's Scores to determine if sentiment or attention has increased, decreased, or remained stagnant. Do not make drastic jumps in scores unless justified by a major real-world event.
+            Note: Your rationale must be grounded in evidence gathered from today's searches. Do not paraphrase or recycle rationale from the Prior Context — if the situation is unchanged, say so explicitly and cite what today's search results confirmed (or failed to find).
+        STEP 3: Compare today's data against the Prior Context to identify whether the trend is continuing, reversing, or accelerating.
         STEP 4: Output your final evaluation strictly in the JSON format provided below. Do not include any conversational text outside the JSON.
 
         ### SCORING RUBRIC
@@ -36,7 +38,7 @@ def load_system_prompt() -> str:
         * 0.50: Perfect polarization (a 50/50 war), completely neutral reporting, or apathy.
         * 0.75: Broad support. Generally accepted as true/good, with only a vocal minority opposing.
         * 1.00: Unanimous, enthusiastic agreement.
-        (Note: If Attention is below 0.10, default Consensus to match Yesterday's Consensus).
+        (Note: If Attention is below 0.10, default Consensus to match the most recent day's Consensus value in the Prior Context).
 
         METRIC 2: ATTENTION (0.00 to 1.00)
         How loudly is the public talking about this today?
@@ -53,7 +55,7 @@ def load_system_prompt() -> str:
         "movement_analysis": "<1-sentence explanation of why the score moved (or didn't move) compared to yesterday>",
         "rationale_consensus": "<1-2 sentences justifying the consensus score based on specific narratives observed today>",
         "rationale_attention": "<1-sentence justifying the attention volume>",
-        "data_quality": "<'High', 'Medium', or 'Low' based on the amount of search results you were able to retrieve>"
+        "data_quality": <float between 0.00 and 1.00>
         }}
     """
 

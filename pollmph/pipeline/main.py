@@ -6,6 +6,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from typing import List, Optional
 from datetime import datetime, timedelta
+import numpy as np
 
 from xai_sdk import Client
 from xai_sdk.chat import user
@@ -34,7 +35,6 @@ load_dotenv()
 
 SB_URL = os.getenv("SUPABASE_URL")
 SB_KEY = os.getenv("SUPABASE_KEY")
-SYSTEM_PROMPT = load_system_prompt()
 GROK_MODEL = "grok-4-1-fast-reasoning"
 
 
@@ -72,6 +72,74 @@ def get_yesterday_metrics(
 
     print(f"  No data for {yesterday_str}. Using defaults.")
     return {"consensus": 0.50, "attention": 0.10}
+
+
+def get_prior_context(
+    supabase_client, proposition_id: str, target_date: datetime, n_days: int = 7
+):
+    context_start_date = target_date - timedelta(days=n_days)
+    context_start_date_str = context_start_date.strftime("%Y-%m-%d")
+    target_date_str = target_date.strftime("%Y-%m-%d")
+
+    try:
+        response = (
+            supabase_client.table("sentiments")
+            .select(
+                "date_generated, consensus_value, attention_value, rationale_consensus, rationale_attention"
+            )
+            .eq("proposition_id", proposition_id)
+            .gte("date_generated", context_start_date_str)
+            .lte("date_generated", target_date_str)
+            .execute()
+        )
+
+        if response.data and len(response.data) > 0:
+            # compute consensus and attention statistics
+            avg_consensus = sum(
+                item["consensus_value"] for item in response.data
+            ) / len(response.data)
+            avg_attention = sum(
+                item["attention_value"] for item in response.data
+            ) / len(response.data)
+
+            def get_trend(values, threshold=0.01):
+                slope = np.polyfit(range(len(values)), values, 1)[0]
+                return (
+                    "increasing"
+                    if slope > threshold
+                    else "decreasing"
+                    if slope < -threshold
+                    else "stable"
+                )
+
+            trend_consensus = get_trend(
+                [item["consensus_value"] for item in response.data]
+            )
+            trend_attention = get_trend(
+                [item["attention_value"] for item in response.data]
+            )
+
+            # format as markdown table
+            context = (
+                f"Data from last {n_days} days\n\n"
+                + "Statistics:\n"
+                + f"- Average Consensus: {avg_consensus:.2f}\n"
+                + f"- Average Attention: {avg_attention:.2f}\n"
+                + f"- Consensus Trend: {trend_consensus}\n"
+                + f"- Attention Trend: {trend_attention}\n\n"
+                + "| Date | Consensus | Attention | Rationale Consensus | Rationale Attention |\n"
+                + "|------|-----------|-----------|-------------------|-------------------|"
+                + "".join(
+                    f"\n| {item['date_generated']} | {item['consensus_value']} | {item['attention_value']} | {item['rationale_consensus']} | {item['rationale_attention']} |"
+                    for item in response.data
+                )
+            )
+            return context
+    except Exception as e:
+        print(f"  Warning: Failed to fetch prior context: {e}")
+        return None
+
+    return None
 
 
 def check_existing_record(
@@ -136,23 +204,22 @@ def analyze_date(
             )
             continue
 
-        # Fetch yesterday's metrics
-        yesterday_metrics = get_yesterday_metrics(
+        # Get prior context
+        prior_context = get_prior_context(
             supabase_client, proposition.proposition_id, start_of_day
         )
 
         # Create a fresh chat for each proposition to keep context clean
         # The prompt is formatted with inputs.
 
-        query = SYSTEM_PROMPT.format(
-            **PromptParameters(
+        query = load_system_prompt(
+            PromptParameters(
                 proposition=proposition.proposition_text,
                 search_queries_list=proposition.search_queries,
-                yesterday_consensus=yesterday_metrics["consensus"],
-                yesterday_attention=yesterday_metrics["attention"],
-            ).model_dump()
+                prior_context=prior_context,
+            )
         )
-
+        print(query)
         try:
             chat = llm_client.chat.create(
                 model=GROK_MODEL,
@@ -203,7 +270,7 @@ def analyze_date(
                 **agent_response.model_dump(),
                 date_generated=start_of_day.strftime("%Y-%m-%d"),
             ).model_dump()
-
+            print(sentiment)
             results.append(sentiment)
 
         except Exception as e:
@@ -229,7 +296,10 @@ def save_results(results: List[dict]):
 
 
 def backfill(
-    start_date_str: str, end_date_str: str, proposition_ids: List[str] | None = None
+    start_date_str: str,
+    end_date_str: str,
+    proposition_ids: List[str] | None = None,
+    save_results_flag: bool = True,
 ):
     """
     Backfills analysis for a date range (inclusive).
@@ -246,7 +316,8 @@ def backfill(
         try:
             results = analyze_date(current_date, proposition_ids)
             if results:
-                save_results(results)
+                if save_results_flag:
+                    save_results(results)
             else:
                 print(f"No results generated for {current_date.strftime('%Y-%m-%d')}")
         except Exception as e:
@@ -257,10 +328,11 @@ def backfill(
         time.sleep(1)
 
 
-def run_today(proposition_ids: List[str] | None = None):
+def run_today(proposition_ids: List[str] | None = None, save_results_flag: bool = True):
     today = datetime.now()
     results = analyze_date(today, proposition_ids)
-    save_results(results)
+    if save_results_flag:
+        save_results(results)
 
 
 def main():
@@ -268,20 +340,30 @@ def main():
     parser.add_argument("--backfill-start", help="Start date for backfill (YYYY-MM-DD)")
     parser.add_argument("--backfill-end", help="End date for backfill (YYYY-MM-DD)")
     parser.add_argument("--date", help="Run for a specific single date (YYYY-MM-DD)")
+    parser.add_argument(
+        "--no-save-results",
+        action="store_true",
+        help="Whether to save results to Supabase",
+    )
 
     args = parser.parse_args()
 
     if args.backfill_start and args.backfill_end:
         print(f"Starting backfill from {args.backfill_start} to {args.backfill_end}")
-        backfill(args.backfill_start, args.backfill_end)
+        backfill(
+            args.backfill_start,
+            args.backfill_end,
+            save_results_flag=not args.no_save_results,
+        )
     elif args.date:
         print(f"Running single date analysis for {args.date}")
         d = datetime.strptime(args.date, "%Y-%m-%d")
         results = analyze_date(d)
-        save_results(results)
+        if not args.no_save_results:
+            save_results(results)
     else:
         print("No arguments provided. Running for TODAY.")
-        run_today()
+        run_today(save_results_flag=not args.no_save_results)
 
 
 if __name__ == "__main__":
