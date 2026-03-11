@@ -14,17 +14,17 @@ import { ThemeToggle } from '@/components/theme-toggle';
 const calculateMovingAverage = (data, windowSize = 7) => {
     // Ensure data is sorted by date before calculating MA
     const sortedData = [...data].sort((a, b) => new Date(a.date_generated) - new Date(b.date_generated));
-    
+
     return sortedData.map((val, idx, arr) => {
         // Create date object for formatting
         const dateObj = new Date(val.date_generated);
         const shortDate = dateObj.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
-        
-        const base = { 
-            ...val, 
+
+        const base = {
+            ...val,
             shortDate,
-            ma_consensus: val.consensus_value, 
-            ma_attention: val.attention_value 
+            ma_consensus: val.consensus_value,
+            ma_attention: val.attention_value
         };
 
         if (idx < windowSize - 1) return base;
@@ -32,7 +32,7 @@ const calculateMovingAverage = (data, windowSize = 7) => {
         const window = arr.slice(idx - windowSize + 1, idx + 1);
         const sumC = window.reduce((acc, curr) => acc + curr.consensus_value, 0);
         const sumA = window.reduce((acc, curr) => acc + curr.attention_value, 0);
-        
+
         return {
             ...base,
             ma_consensus: Number((sumC / windowSize).toFixed(3)),
@@ -51,14 +51,14 @@ const CustomTooltip = ({ active, payload, label }) => {
         const dataPoint = payload[0]?.payload;
         const maConsensus = dataPoint?.ma_consensus;
         const maAttention = dataPoint?.ma_attention;
-        
+
         const isMajority = maConsensus >= 0.5;
         const lineColor = isMajority ? 'rgb(5, 150, 105)' : 'rgb(225, 29, 72)';
 
         return (
             <div className="bg-card border shadow-xl rounded-md p-2 min-w-[160px]">
                 <div className="text-[10px] font-semibold text-foreground mb-2 pb-1.5 border-b">{label}</div>
-                
+
                 <div className="space-y-1.5">
                     {/* Main Consensus (7d MA) */}
                     <div className="flex items-center justify-between gap-3">
@@ -70,7 +70,7 @@ const CustomTooltip = ({ active, payload, label }) => {
                             {(maConsensus * 100).toFixed(1)}%
                         </span>
                     </div>
-                    
+
                     {/* Attention */}
                     <div className="flex items-center justify-between gap-3 pt-1 mt-1 border-t border-border/50">
                         <div className="flex items-center gap-1.5">
@@ -98,7 +98,7 @@ const PropositionCard = ({ proposition, onClick }) => {
     const isMajority = currentMA >= 0.5;
 
     return (
-        <Card 
+        <Card
             className="group cursor-pointer hover:border-primary/50 transition-colors duration-200 bg-muted/30"
             onClick={onClick}
         >
@@ -110,7 +110,7 @@ const PropositionCard = ({ proposition, onClick }) => {
                     Tracking since {evaluations[0].shortDate}
                 </p>
             </CardHeader>
-            
+
             <CardContent className="space-y-4">
                 {/* Metrics Row */}
                 <div className="flex items-center justify-between">
@@ -121,7 +121,7 @@ const PropositionCard = ({ proposition, onClick }) => {
                                 {(currentMA * 100).toFixed(0)}%
                             </span>
                             {delta !== 0 && (
-                                <Badge 
+                                <Badge
                                     variant="secondary"
                                     className={`h-5 text-[11px] font-semibold ${delta > 0 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400' : 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-400'}`}
                                 >
@@ -148,12 +148,12 @@ const PropositionCard = ({ proposition, onClick }) => {
                         <LineChart data={evaluations} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
                             <defs>
                                 <linearGradient id={`gradient-${proposition.id}-green`} x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="rgb(5, 150, 105)" stopOpacity={0.1}/>
-                                    <stop offset="100%" stopColor="rgb(5, 150, 105)" stopOpacity={0}/>
+                                    <stop offset="0%" stopColor="rgb(5, 150, 105)" stopOpacity={0.1} />
+                                    <stop offset="100%" stopColor="rgb(5, 150, 105)" stopOpacity={0} />
                                 </linearGradient>
                                 <linearGradient id={`gradient-${proposition.id}-red`} x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="rgb(225, 29, 72)" stopOpacity={0.1}/>
-                                    <stop offset="100%" stopColor="rgb(225, 29, 72)" stopOpacity={0}/>
+                                    <stop offset="0%" stopColor="rgb(225, 29, 72)" stopOpacity={0.1} />
+                                    <stop offset="100%" stopColor="rgb(225, 29, 72)" stopOpacity={0} />
                                 </linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.3} />
@@ -163,17 +163,17 @@ const PropositionCard = ({ proposition, onClick }) => {
                             <ReferenceLine y={0} stroke="hsl(var(--border))" strokeWidth={1} opacity={0.4} />
                             <ReferenceLine y={1} stroke="hsl(var(--border))" strokeWidth={1} opacity={0.4} />
                             <ReferenceLine y={0.5} stroke="hsl(var(--muted-foreground))" strokeWidth={1} strokeDasharray="5 5" opacity={0.5} />
-                            <Tooltip 
-                                content={<CustomTooltip />} 
-                                cursor={{ stroke: 'hsl(var(--border))', strokeWidth: 1 }} 
-                                isAnimationActive={false} 
+                            <Tooltip
+                                content={<CustomTooltip />}
+                                cursor={{ stroke: 'hsl(var(--border))', strokeWidth: 1 }}
+                                isAnimationActive={false}
                             />
                             {/* Attention line (subtle background) */}
-                            <Line 
-                                type="monotone" 
-                                dataKey="ma_attention" 
-                                stroke="hsl(var(--muted-foreground))" 
-                                strokeWidth={1.5} 
+                            <Line
+                                type="monotone"
+                                dataKey="ma_attention"
+                                stroke="hsl(var(--muted-foreground))"
+                                strokeWidth={1.5}
                                 strokeOpacity={0.5}
                                 strokeDasharray="5 5"
                                 dot={false}
@@ -181,11 +181,11 @@ const PropositionCard = ({ proposition, onClick }) => {
                                 isAnimationActive={false}
                             />
                             {/* Consensus line (main - 7d average) */}
-                            <Line 
-                                type="monotone" 
-                                dataKey="ma_consensus" 
+                            <Line
+                                type="monotone"
+                                dataKey="ma_consensus"
                                 stroke={isMajority ? 'rgb(5, 150, 105)' : 'rgb(225, 29, 72)'}
-                                strokeWidth={2.5} 
+                                strokeWidth={2.5}
                                 dot={false}
                                 activeDot={{ r: 4, stroke: 'hsl(var(--card))', strokeWidth: 2, fill: isMajority ? 'rgb(5, 150, 105)' : 'rgb(225, 29, 72)' }}
                                 fill={isMajority ? `url(#gradient-${proposition.id}-green)` : `url(#gradient-${proposition.id}-red)`}
@@ -194,7 +194,7 @@ const PropositionCard = ({ proposition, onClick }) => {
                     </ResponsiveContainer>
                 </div>
             </CardContent>
-            
+
             <CardFooter className="pt-4 border-t">
                 <div className="flex items-center justify-between w-full text-xs text-muted-foreground">
                     <span>Latest: {latest.shortDate}</span>
@@ -240,7 +240,7 @@ const PulseDashboard = () => {
 
                 // Extract proposition IDs for filtering sentiments
                 const propositionIds = propsData.map(p => p.proposition_id);
-                
+
                 const propositionMap = propsData.reduce((acc, curr) => {
                     acc[curr.proposition_id] = curr.proposition_text;
                     return acc;
@@ -273,11 +273,11 @@ const PulseDashboard = () => {
                 const formattedPropositions = Object.entries(grouped)
                     .map(([id, evaluations]) => {
                         // Use text from propositions table, fallback to ID if not found
-                        const text = propositionMap[id] || id; 
-                        
+                        const text = propositionMap[id] || id;
+
                         // Sort evaluations by date
                         evaluations.sort((a, b) => new Date(a.date_generated) - new Date(b.date_generated));
-                        
+
                         return {
                             id,
                             proposition_text: text,
@@ -308,10 +308,14 @@ const PulseDashboard = () => {
                                 <span className="text-foreground">pollm</span><span className="text-emerald-600 dark:text-emerald-400">ph</span>
                             </h1>
                             <p className="text-muted-foreground text-sm italic">poll-em PH</p>
+                            <p className="text-muted-foreground text-xs mt-2 max-w-sm">
+                                Tracks public consensus and media attention on Philippine political propositions.
+                                Scores generated by Grok (xAI) via live web and X search.
+                            </p>
                         </div>
                         <ThemeToggle />
                     </header>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {[1, 2, 3, 4].map(i => (
                             <Card key={i} className="bg-muted/30 animate-pulse">
@@ -338,7 +342,7 @@ const PulseDashboard = () => {
     }
 
     if (error) {
-         return (
+        return (
             <div className="w-full h-screen flex items-center justify-center bg-background text-destructive font-medium p-4 text-center">
                 Error: {error}
             </div>
@@ -354,6 +358,10 @@ const PulseDashboard = () => {
                             <span className="text-foreground">pollm</span><span className="text-emerald-600 dark:text-emerald-400">ph</span>
                         </h1>
                         <p className="text-muted-foreground text-sm italic">poll-em PH</p>
+                        <p className="text-muted-foreground text-xs mt-2 max-w-sm">
+                            Tracks public consensus and media attention on Philippine political propositions.
+                            Scores generated by Grok (xAI) via live web and X search.
+                        </p>
                     </div>
                     <ThemeToggle />
                 </header>
@@ -363,9 +371,9 @@ const PulseDashboard = () => {
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {propositions.map(p => (
-                            <PropositionCard 
-                                key={p.id} 
-                                proposition={p} 
+                            <PropositionCard
+                                key={p.id}
+                                proposition={p}
                                 onClick={() => navigate(`/proposition/${p.id}`)}
                             />
                         ))}
