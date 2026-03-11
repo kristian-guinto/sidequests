@@ -17,7 +17,7 @@ try:
     )
     from system_prompt import load_system_prompt, PromptParameters
     from util import get_supabase_client, get_xai_client
-    from proposition import read_propositions
+    from proposition import read_propositions, update_next_run_date
 except ImportError:
     from pipeline.models import (
         AgentResponseModel,
@@ -25,13 +25,14 @@ except ImportError:
     )
     from pipeline.system_prompt import load_system_prompt, PromptParameters
     from pipeline.util import get_supabase_client, get_xai_client
-    from pipeline.proposition import read_propositions
+    from pipeline.proposition import read_propositions, update_next_run_date
 
 load_dotenv()
 
 SB_URL = os.getenv("SUPABASE_URL")
 SB_KEY = os.getenv("SUPABASE_KEY")
 GROK_MODEL = "grok-4-1-fast-reasoning"
+MAX_DAILY_PROPOSITIONS = int(os.getenv("MAX_DAILY_PROPOSITIONS", "10"))
 
 
 def get_yesterday_metrics(
@@ -162,8 +163,43 @@ def check_existing_record(
     return False
 
 
+def get_last_run_date(
+    supabase_client, proposition_id: str, fallback: datetime
+) -> datetime:
+    """
+    Returns the datetime of the most recent sentiment record for a proposition.
+    Falls back to the provided fallback datetime if no records exist.
+    """
+    try:
+        response = (
+            supabase_client.table("sentiments")
+            .select("date_generated")
+            .eq("proposition_id", proposition_id)
+            .order("date_generated", desc=True)
+            .limit(1)
+            .execute()
+        )
+        if response.data:
+            return datetime.strptime(response.data[0]["date_generated"], "%Y-%m-%d")
+    except Exception as e:
+        print(f"  Warning: Failed to fetch last run date for {proposition_id}: {e}")
+    return fallback
+
+
+def compute_schedule_interval(attention: float) -> int:
+    """Returns days until next run based on today's attention score."""
+    if attention >= 0.5:
+        return 1
+    if attention >= 0.25:
+        return 3
+    return 7
+
+
 def analyze_date(
-    target_date: datetime, proposition_ids: List[str] | None = None
+    target_date: datetime,
+    proposition_ids: List[str] | None = None,
+    respect_schedule: bool = False,
+    update_schedule: bool = False,
 ) -> List[dict]:
     """
     Runs the analysis for a specific date.
@@ -174,12 +210,22 @@ def analyze_date(
 
     start_of_day = datetime(target_date.year, target_date.month, target_date.day)
     end_of_day = start_of_day + timedelta(days=1)
-    search_start = start_of_day - timedelta(days=1)  # Include context from day before
 
     print(f"\n=== Analyzing for date: {start_of_day.date()} ===")
 
     # Read propositions fresh from database
-    propositions = read_propositions(supabase_client)
+    propositions = read_propositions(supabase_client, respect_schedule=respect_schedule)
+
+    # Enforce daily budget: bump overflow propositions to tomorrow
+    if update_schedule and not proposition_ids:
+        tomorrow = (start_of_day + timedelta(days=1)).date()
+        budget_overflow = propositions[MAX_DAILY_PROPOSITIONS:]
+        propositions = propositions[:MAX_DAILY_PROPOSITIONS]
+        for p in budget_overflow:
+            print(
+                f"  Budget exceeded: bumping {p.proposition_id} -> next_run_date={tomorrow}"
+            )
+            update_next_run_date(supabase_client, p.proposition_id, tomorrow)
 
     results = []
 
@@ -199,6 +245,13 @@ def analyze_date(
                 f"  Skipping {proposition.proposition_id} for {start_of_day.strftime('%Y-%m-%d')} - Record already exists."
             )
             continue
+
+        # Compute search window from last run date so gaps are fully covered
+        yesterday = start_of_day - timedelta(days=1)
+        search_start = get_last_run_date(
+            supabase_client, proposition.proposition_id, fallback=yesterday
+        )
+        print(f"  Search window: {search_start.date()} -> {end_of_day.date()}")
 
         # Get prior context
         prior_context = get_prior_context(
@@ -271,6 +324,17 @@ def analyze_date(
 
             results.append(sentiment)
 
+            if update_schedule:
+                interval = compute_schedule_interval(agent_response.attention_value)
+                next_run = (start_of_day + timedelta(days=interval)).date()
+                update_next_run_date(
+                    supabase_client, proposition.proposition_id, next_run
+                )
+                print(
+                    f"  Next run for {proposition.proposition_id}: {next_run} "
+                    f"(interval={interval}d, attention={agent_response.attention_value:.2f})"
+                )
+
         except Exception as e:
             print(f"  ERROR processing {proposition.proposition_id}: {e}")
             # print(f"  Raw content: {accumulated_content}")
@@ -328,7 +392,9 @@ def backfill(
 
 def run_today(proposition_ids: List[str] | None = None, save_results_flag: bool = True):
     today = datetime.now()
-    results = analyze_date(today, proposition_ids)
+    results = analyze_date(
+        today, proposition_ids, respect_schedule=True, update_schedule=True
+    )
     if save_results_flag:
         save_results(results)
 
