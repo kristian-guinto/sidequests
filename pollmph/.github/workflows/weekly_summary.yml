@@ -25,4 +25,4 @@ jobs:
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
         run: |
-          uv run pipeline/scripts/weekly_summary.py --save
+          uv run pollmph weekly-summary
