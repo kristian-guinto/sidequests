@@ -36,8 +36,8 @@ class ContextSummaryResponse(BaseModel):
 
 class WeeklySummaryModel(ContextSummaryResponse):
     proposition_id: str
-    week_start: str
-    week_end: str
+    week_start: date
+    week_end: date
 
 
 class AttentionEvaluationResponse(BaseModel):
