@@ -56,6 +56,18 @@ def get_gemini_adapter(model: str):
     return GeminiAdapter(client=get_gemini_client(), model=model)
 
 
+def get_ollama_client(host: str = "http://localhost:11434"):
+    from ollama import Client as OllamaClient
+
+    return OllamaClient(host=host)
+
+
+def get_ollama_adapter(model: str, host: str = "http://localhost:11434"):
+    from pollmph.adapters.ollama import OllamaAdapter
+
+    return OllamaAdapter(client=get_ollama_client(host=host), model=model)
+
+
 def get_mock_adapter(
     consensus: float = 0.65,
     attention: float = 0.45,

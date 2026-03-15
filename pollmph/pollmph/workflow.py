@@ -128,7 +128,12 @@ def run_sentiment_on_date(
             )
 
 
-def run_today(daily_limit: int = 5, adapter: LLMAdapter | None = None):
+def run_today(
+    daily_limit: int = 5,
+    adapter: LLMAdapter | None = None,
+    no_db: bool = False,
+    verbose: bool = False,
+):
     today = datetime.now()
 
     # get propositions that are due for sentiment analysis today
@@ -146,7 +151,12 @@ def run_today(daily_limit: int = 5, adapter: LLMAdapter | None = None):
 
     proposition_ids = [p.proposition_id for p in propositions]
     run_sentiment_on_date(
-        today, proposition_ids=proposition_ids, update_next_run=True, adapter=adapter
+        today,
+        proposition_ids=proposition_ids,
+        update_next_run=True,
+        adapter=adapter,
+        write_to_db=not no_db,
+        verbose=verbose,
     )
 
 
@@ -154,6 +164,8 @@ def run_backfill_sentiment(
     proposition_ids: list[str] | None = None,
     days_back: int = 7,
     adapter: LLMAdapter | None = None,
+    no_db: bool = False,
+    verbose: bool = False,
 ):
     today = datetime.now()
     for i in range(days_back):
@@ -165,6 +177,8 @@ def run_backfill_sentiment(
             proposition_ids=proposition_ids,
             update_next_run=False,
             adapter=adapter,
+            write_to_db=not no_db,
+            verbose=verbose,
         )
 
 
@@ -172,6 +186,7 @@ def run_weekly_summary(
     target_date: datetime,
     proposition_ids: list[str] | None = None,
     verbose: bool = False,
+    write_to_db: bool = True,
     adapter: LLMAdapter | None = None,
 ):
     llm_adapter = adapter or get_xai_adapter(model="grok-4.1-fast-reasoning")
@@ -224,17 +239,18 @@ def run_weekly_summary(
             )
 
             # write to database
-            if create_weekly_summary(
-                sb_client,
-                summary,
-            ):
-                print(
-                    f"Weekly summary created for proposition {proposition.proposition_id} from {week_start.strftime('%Y-%m-%d')} to {week_end.strftime('%Y-%m-%d')}."
-                )
-            else:
-                print(
-                    f"Failed to create weekly summary for proposition {proposition.proposition_id} from {week_start.strftime('%Y-%m-%d')} to {week_end.strftime('%Y-%m-%d')}."
-                )
+            if write_to_db:
+                if create_weekly_summary(
+                    sb_client,
+                    summary,
+                ):
+                    print(
+                        f"Weekly summary created for proposition {proposition.proposition_id} from {week_start.strftime('%Y-%m-%d')} to {week_end.strftime('%Y-%m-%d')}."
+                    )
+                else:
+                    print(
+                        f"Failed to create weekly summary for proposition {proposition.proposition_id} from {week_start.strftime('%Y-%m-%d')} to {week_end.strftime('%Y-%m-%d')}."
+                    )
 
         except Exception as e:
             print(

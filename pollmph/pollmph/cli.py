@@ -1,17 +1,28 @@
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated, Optional, Literal
 
 import typer
 
-from pollmph.util import get_gemini_adapter
+from pollmph.util import (
+    get_gemini_adapter,
+    get_ollama_adapter,
+    get_xai_adapter,
+    get_mock_adapter,
+)
+
+Adapter = Literal["mock", "grok", "gemini", "local"]
+adapter_map = {
+    "mock": lambda: get_mock_adapter(),
+    "grok": lambda: get_xai_adapter(model="grok-4-1-fast-reasoning"),
+    "gemini": lambda: get_gemini_adapter(model="gemini-2.5-flash"),
+    "local": lambda: get_ollama_adapter(model="gemma3n"),
+}
 
 app = typer.Typer(name="pollmph", help="Philippine political sentiment tracker.")
-
-_mock_opt = typer.Option(
-    "--mock", help="Use mock adapter instead of real LLM (no API cost)."
-)
+_no_db = typer.Option("--no-db", help="Whether to write results to the database.")
+_verbose = typer.Option("--verbose", "-v", help="Stream LLM output to terminal.")
 
 
 @app.command()
@@ -19,17 +30,16 @@ def run_today(
     limit: Annotated[
         int, typer.Option("--limit", "-l", help="Max propositions to process.")
     ] = 5,
-    mock: Annotated[bool, _mock_opt] = False,
+    llm: Annotated[Adapter, typer.Option("--llm", help="LLM adapter to use.")] = "mock",
+    no_db: Annotated[bool, _no_db] = False,
+    verbose: Annotated[bool, _verbose] = False,
 ):
     """Run sentiment analysis for today's scheduled propositions."""
     from pollmph.workflow import run_today as _run_today
-    from pollmph.util import get_mock_adapter
 
-    if mock:
-        adapter = get_mock_adapter()
-    else:
-        adapter = get_gemini_adapter(model="gemini-2.5-pro")
-    _run_today(daily_limit=limit, adapter=adapter)
+    adapter = adapter_map[llm]()
+
+    _run_today(daily_limit=limit, adapter=adapter, no_db=no_db, verbose=verbose)
 
 
 @app.command()
@@ -41,16 +51,21 @@ def backfill(
     days_back: Annotated[
         int, typer.Option("--days-back", help="Number of past days to backfill.")
     ] = 7,
-    mock: Annotated[bool, _mock_opt] = False,
+    llm: Annotated[Adapter, typer.Option("--llm", help="LLM adapter to use.")] = "mock",
+    no_db: Annotated[bool, _no_db] = False,
+    verbose: Annotated[bool, _verbose] = False,
 ):
     """Backfill sentiment for one or more propositions over past N days."""
     from pollmph.workflow import run_backfill_sentiment
-    from pollmph.util import get_mock_adapter
+
+    adapter = adapter_map[llm]()
 
     run_backfill_sentiment(
         proposition_ids=ids or None,
         days_back=days_back,
-        adapter=get_mock_adapter() if mock else None,
+        adapter=adapter,
+        no_db=no_db,
+        verbose=verbose,
     )
 
 
@@ -60,20 +75,21 @@ def weekly_summary(
         Optional[list[str]],
         typer.Option("--id", help="Proposition ID to summarise. Repeatable."),
     ] = None,
-    verbose: Annotated[
-        bool, typer.Option("--verbose", "-v", help="Stream LLM output to terminal.")
-    ] = False,
-    mock: Annotated[bool, _mock_opt] = False,
+    no_db: Annotated[bool, _no_db] = False,
+    verbose: Annotated[bool, _verbose] = False,
+    llm: Annotated[Adapter, typer.Option("--llm", help="LLM adapter to use.")] = "mock",
 ):
     """Generate weekly narrative summaries for propositions."""
     from pollmph.workflow import run_weekly_summary
-    from pollmph.util import get_mock_adapter
+
+    adapter = adapter_map[llm]()
 
     run_weekly_summary(
         target_date=datetime.now(),
         proposition_ids=ids or None,
         verbose=verbose,
-        adapter=get_mock_adapter() if mock else None,
+        adapter=adapter,
+        write_to_db=not no_db,
     )
 
 
@@ -89,7 +105,9 @@ def add(
             "--backfill-days", help="Days of sentiment to backfill after adding."
         ),
     ] = None,
-    mock: Annotated[bool, _mock_opt] = False,
+    llm: Annotated[
+        Adapter, typer.Option("--llm", help="LLM adapter to use for backfill.")
+    ] = "mock",
 ):
     """Add a new proposition to the database."""
     from pollmph.db import create_proposition
@@ -122,12 +140,13 @@ def add(
 
     if backfill_days:
         from pollmph.workflow import run_backfill_sentiment
-        from pollmph.util import get_mock_adapter
+
+        adapter = adapter_map[llm]()
 
         run_backfill_sentiment(
             proposition_ids=[proposition.proposition_id],
             days_back=backfill_days,
-            adapter=get_mock_adapter() if mock else None,
+            adapter=adapter,
         )
 
 
@@ -148,22 +167,19 @@ def evaluate(
     verbose: Annotated[
         bool, typer.Option("--verbose", "-v", help="Stream LLM output to terminal.")
     ] = False,
-    mock: Annotated[bool, _mock_opt] = False,
+    llm: Annotated[
+        Adapter, typer.Option("--llm", help="LLM adapter to use for backfill.")
+    ] = "mock",
 ):
     """Evaluate whether a proposition has enough public attention to track."""
     from pollmph.task import EvaluatePropositionTask
-    from pollmph.util import get_xai_adapter, get_mock_evaluate_adapter
 
     if not text:
         text = typer.prompt("Proposition text")
     if not id:
         id = typer.prompt("Proposition ID")
 
-    adapter = (
-        get_mock_evaluate_adapter()
-        if mock
-        else get_xai_adapter(model="grok-4-1-fast-reasoning")
-    )
+    adapter = adapter_map[llm]()
     task = EvaluatePropositionTask(adapter=adapter, verbose=verbose)
     _, result = task.run(proposition_text=text)
 
