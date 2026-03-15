@@ -26,4 +26,4 @@ jobs:
           XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          uv run pollmph weekly-summary --llm gemini
+          uv run pollmph weekly-summary --llm grok
