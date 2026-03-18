@@ -1,0 +1,60 @@
+[project]
+name = "nem-battery"
+version = "0.1.0"
+description = "AEMO NEM data client for Australian battery storage analysis"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "httpx[http2]>=0.27",
+    "typer>=0.9",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project.scripts]
+nem-battery = "nem_battery.cli:main"
+
+[project.optional-dependencies]
+dataframes = ["polars>=1.0"]
+pipeline = [
+    "duckdb>=0.10,<1.5",   # MotherDuck requires duckdb <1.5; raise cap when support lands
+    "python-dotenv>=1.0",
+]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.23",
+    "respx>=0.21",
+    "ruff>=0.4",
+    "mypy>=1.10",
+]
+
+[tool.ruff]
+line-length = 99
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "ANN"]
+
+[tool.mypy]
+strict = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+# ---------------------------------------------------------------------------
+# nem-battery pipeline targets
+#
+# Named connection profiles used by all pipeline CLI commands.
+# Switch between them with --target / -t (default: local).
+#
+# local   – DuckDB file in the working directory, no extra setup needed.
+# remote  – MotherDuck cloud; set MOTHERDUCK_TOKEN environment variable
+#           (or place it in a .env file alongside pyproject.toml).
+# ---------------------------------------------------------------------------
+
+[tool.nem-battery.targets.local]
+url = "nem_battery.db"
+
+[tool.nem-battery.targets.remote]
+url = "md:nem_battery"
