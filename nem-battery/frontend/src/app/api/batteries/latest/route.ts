@@ -9,6 +9,7 @@ export async function GET() {
     return NextResponse.json(data);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
+    console.error("[api] /api/batteries/latest failed", { error: message });
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

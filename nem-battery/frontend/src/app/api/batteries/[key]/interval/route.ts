@@ -27,6 +27,11 @@ export async function GET(
     return NextResponse.json(data);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
+    console.error("[api] /api/batteries/[key]/interval failed", {
+      key,
+      date,
+      error: message,
+    });
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

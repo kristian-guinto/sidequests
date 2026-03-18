@@ -9,28 +9,71 @@
  * the Python pipeline in pipeline.py::connect_target().
  */
 
-import { Database } from "duckdb-async";
 import path from "path";
 import type { BatteryDailyRow, BatteryIntervalRow } from "./types";
+import type { DuckDBConnection } from "@duckdb/node-api";
+
+function redactUrl(url: string): string {
+  return url.replace(/(motherduck_token=)[^&]+/i, "$1<redacted>");
+}
+
+function resolveHomeDirectory(): string {
+  const home = process.env.HOME?.trim();
+  if (home) return home;
+  return "/tmp";
+}
+
+function ensureProcessHome(homeDirectory: string): void {
+  if (!process.env.HOME || process.env.HOME.trim() === "") {
+    process.env.HOME = homeDirectory;
+  }
+}
 
 function buildUrl(): string {
   let url =
     process.env.DATABASE_URL ?? path.resolve(process.cwd(), "../nem_battery.db");
   if (url.startsWith("md:") && !url.includes("motherduck_token")) {
     const token = process.env.MOTHERDUCK_TOKEN;
-    if (token) {
-      const sep = url.includes("?") ? "&" : "?";
-      url = `${url}${sep}motherduck_token=${token}`;
+    if (!token) {
+      throw new Error("MOTHERDUCK_TOKEN is required when DATABASE_URL starts with md:");
     }
+    const sep = url.includes("?") ? "&" : "?";
+    url = `${url}${sep}motherduck_token=${encodeURIComponent(token)}`;
   }
   return url;
 }
 
-let _db: Database | null = null;
+let _db: DuckDBConnection | null = null;
 
-async function getDb(): Promise<Database> {
+async function getDb(): Promise<DuckDBConnection> {
   if (!_db) {
-    _db = await Database.create(buildUrl());
+    const url = buildUrl();
+    const homeDirectory = resolveHomeDirectory();
+    ensureProcessHome(homeDirectory);
+    // Load native bindings lazily so build analysis can import this module
+    // without immediately attempting to dlopen native binaries.
+    try {
+      const { DuckDBInstance } = await import("@duckdb/node-api");
+      const instance = await DuckDBInstance.create(url);
+      _db = await instance.connect();
+      console.info("[db] connected", {
+        databaseUrl: redactUrl(url),
+        isMotherDuck: url.startsWith("md:"),
+        hasMotherDuckToken: Boolean(process.env.MOTHERDUCK_TOKEN),
+        processHome: process.env.HOME,
+        homeDirectory,
+      });
+    } catch (err: unknown) {
+      console.error("[db] failed to initialize", {
+        databaseUrl: redactUrl(url),
+        isMotherDuck: url.startsWith("md:"),
+        hasMotherDuckToken: Boolean(process.env.MOTHERDUCK_TOKEN),
+        processHome: process.env.HOME,
+        homeDirectory,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      throw err;
+    }
   }
   return _db;
 }
@@ -65,12 +108,15 @@ function normalizeRow(row: Record<string, unknown>): Record<string, unknown> {
 async function query<T>(sql: string, ...params: any[]): Promise<T[]> {
   const db = await getDb();
   try {
-    const rows = await db.all(sql, ...params);
-    return rows.map((r) =>
-      normalizeRow(r as Record<string, unknown>)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ) as any as T[];
+    const result = await db.runAndReadAll(sql, params);
+    const rows = result.getRowObjectsJS();
+    return rows.map((r) => normalizeRow(r as Record<string, unknown>)) as any as T[];
   } catch (err: unknown) {
+    console.error("[db] query failed", {
+      sqlPreview: sql.replace(/\s+/g, " ").trim().slice(0, 120),
+      paramsCount: params.length,
+      error: err instanceof Error ? err.message : String(err),
+    });
     if (err instanceof Error && err.message.toLowerCase().includes("does not exist")) {
       return [];
     }
