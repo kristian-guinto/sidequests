@@ -11,6 +11,7 @@
 
 import path from "path";
 import type { BatteryDailyRow, BatteryIntervalRow } from "./types";
+import type { StrategyPoint } from "./strategy-types";
 import type { DuckDBConnection } from "@duckdb/node-api";
 
 function redactUrl(url: string): string {
@@ -112,15 +113,18 @@ async function query<T>(sql: string, ...params: any[]): Promise<T[]> {
     const rows = result.getRowObjectsJS();
     return rows.map((r) => normalizeRow(r as Record<string, unknown>)) as any as T[];
   } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err)
+    const isExpectedMissing = msg.toLowerCase().includes("does not exist")
+    if (isExpectedMissing) {
+      console.warn("[db] table not found, returning []:", sql.replace(/\s+/g, " ").trim().slice(0, 80))
+      return []
+    }
     console.error("[db] query failed", {
       sqlPreview: sql.replace(/\s+/g, " ").trim().slice(0, 120),
       paramsCount: params.length,
-      error: err instanceof Error ? err.message : String(err),
-    });
-    if (err instanceof Error && err.message.toLowerCase().includes("does not exist")) {
-      return [];
-    }
-    throw err;
+      error: msg,
+    })
+    throw err
   }
 }
 
@@ -179,4 +183,36 @@ export async function getAvailableDates(key: string): Promise<string[]> {
     key
   );
   return rows.map((r) => r.date);
+}
+
+/** All 3-D UMAP embeddings from battery_strategy_embedding, most recent first. */
+export async function getStrategyEmbeddings(): Promise<StrategyPoint[]> {
+  const rows = await query<{
+    trading_day: string
+    battery_key: string
+    x: number
+    y: number
+    z: number
+    cluster_id: number
+    daily_revenue: number | null
+  }>(
+    `SELECT
+       trading_day::VARCHAR AS trading_day,
+       battery_key,
+       x, y, z,
+       cluster_id,
+       daily_revenue
+     FROM battery_strategy_embedding
+     ORDER BY trading_day DESC, battery_key`
+  );
+  return rows.map((r) => ({
+    id: `${r.battery_key}_${r.trading_day}`,
+    battery_key: r.battery_key,
+    date: r.trading_day,
+    x: Number(r.x),
+    y: Number(r.y),
+    z: Number(r.z),
+    cluster_id: r.cluster_id ?? -1,
+    daily_revenue: r.daily_revenue ?? 0,
+  }));
 }

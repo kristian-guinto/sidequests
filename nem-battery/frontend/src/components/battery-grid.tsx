@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { RefreshCw } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { RefreshCw, Orbit } from "lucide-react";
+import Link from "next/link";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { BatteryCard } from "@/components/battery-card";
 import { KNOWN_BATTERIES, type BatteryIntervalRow } from "@/lib/types";
@@ -66,6 +68,13 @@ export function BatteryGrid() {
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
               Refresh
             </Button>
+            <Link
+              href="/strategy"
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}
+            >
+              <Orbit className="h-3.5 w-3.5" />
+              Strategy Map
+            </Link>
             <ThemeToggle />
           </div>
         </div>
