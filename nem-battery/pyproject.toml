@@ -29,6 +29,15 @@ dev = [
     "ruff>=0.4",
     "mypy>=1.10",
 ]
+dataframe = [
+    "numpy>=2.4.3",
+    "pandas>=3.0.1",
+]
+ml = [
+    "hdbscan>=0.8.41",
+    "scikit-learn>=1.8.0",
+    "umap-learn>=0.5.11",
+]
 
 [tool.ruff]
 line-length = 99
@@ -58,3 +67,9 @@ url = "nem_battery.db"
 
 [tool.nem-battery.targets.remote]
 url = "md:nem_battery"
+
+[dependency-groups]
+dev = [
+    "jupyter>=1.1.1",
+    "plotly>=6.6.0",
+]

@@ -144,8 +144,10 @@ is required.
 
 > **Historical data note:** `Next_Day_Dispatch/` contains unit solutions only (no prices).
 > `Archive/DispatchIS_Reports/` contains prices only (no unit solutions). The
-> `fetch_next_day_dispatch()` function fetches both concurrently and joins on
-> settlement timestamp automatically.
+> `fetch_next_day_dispatch()` function fetches unit solutions for the requested
+> trading day plus prices from archive files for both calendar day `D` and `D+1`,
+> then joins on settlement timestamp. If the overlap is incomplete, it returns
+> partial data and emits a warning.
 
 ### NEM settlement vs spot price
 
