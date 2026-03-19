@@ -18,9 +18,10 @@ from __future__ import annotations
 
 import io
 import re
+import warnings
 import zipfile
 from collections import defaultdict
-from datetime import date
+from datetime import date, timedelta
 
 import httpx
 
@@ -33,6 +34,7 @@ from nem_battery.types import DispatchDay, DispatchInterval
 
 _UNIT_SOLUTION_TABLES = {"UNIT_SOLUTION"}
 _PRICE_TABLES = {"PRICE"}
+_EXPECTED_INTERVALS_PER_TRADING_DAY = 288
 
 # Filename pattern for Next Day Dispatch
 _NEXT_DAY_FILE_RE = re.compile(r"PUBLIC_NEXT_DAY_DISPATCH_(\d{8})_\d+\.zip", re.IGNORECASE)
@@ -85,6 +87,18 @@ async def fetch_next_day_dispatch(
             )
         )
 
+    if not intervals:
+        raise ValueError(f"No matching intervals assembled for trading day {day}")
+
+    if len(intervals) < _EXPECTED_INTERVALS_PER_TRADING_DAY:
+        warnings.warn(
+            "Partial trading day assembled for "
+            f"{day}: expected {_EXPECTED_INTERVALS_PER_TRADING_DAY} intervals, "
+            f"got {len(intervals)} "
+            f"({intervals[0].settlement_date} to {intervals[-1].settlement_date}).",
+            stacklevel=2,
+        )
+
     return DispatchDay(date=day, intervals=intervals)
 
 
@@ -107,13 +121,31 @@ async def _fetch_unit_solutions(
     return _parse_unit_solutions(zip_bytes)
 
 
-async def _fetch_prices(
-    day: date, client: httpx.AsyncClient | None
-) -> dict[str, dict[str, any]]:  # type: ignore[type-arg]
-    """Fetch prices from Archive DispatchIS daily bundle, grouped by SETTLEMENTDATE."""
-    url = _client.archive_dispatch_is_url(day)
-    zip_bytes = await _client.fetch_zip(url, client=client)
-    return _parse_archive_prices(zip_bytes)
+async def _fetch_prices(day: date, client: httpx.AsyncClient | None) -> dict[str, dict[str, any]]:  # type: ignore[type-arg]
+    """Fetch prices from day and day+1 archive bundles, grouped by SETTLEMENTDATE."""
+    import asyncio
+
+    url_day = _client.archive_dispatch_is_url(day)
+    url_next = _client.archive_dispatch_is_url(day + timedelta(days=1))
+
+    day_task = asyncio.create_task(_client.fetch_zip(url_day, client=client))
+    next_task = asyncio.create_task(_fetch_zip_optional(url_next, client=client))
+    day_zip_bytes, next_zip_bytes = await asyncio.gather(day_task, next_task)
+
+    prices = _parse_archive_prices(day_zip_bytes)
+    if next_zip_bytes is not None:
+        prices.update(_parse_archive_prices(next_zip_bytes))
+    return prices
+
+
+async def _fetch_zip_optional(url: str, client: httpx.AsyncClient | None) -> bytes | None:
+    """Fetch ZIP bytes, returning None when the file is not available yet (HTTP 404)."""
+    try:
+        return await _client.fetch_zip(url, client=client)
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 404:
+            return None
+        raise
 
 
 def _parse_unit_solutions(zip_bytes: bytes) -> dict[str, dict]:
