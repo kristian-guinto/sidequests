@@ -303,9 +303,14 @@ def _price_rows(interval: DispatchInterval) -> list[tuple]:
     return rows
 
 
-def _revenue_interval_rows(interval: DispatchInterval) -> list[tuple]:
+def _revenue_interval_rows(
+    interval: DispatchInterval,
+    battery_keys: set[str] | None = None,
+) -> list[tuple]:
     rows = []
     for key, battery in KNOWN_BATTERIES.items():
+        if battery_keys is not None and key not in battery_keys:
+            continue
         if battery.region not in interval.prices:
             continue
         rev = calculate_revenue(battery, interval)
@@ -337,9 +342,14 @@ def _revenue_interval_rows(interval: DispatchInterval) -> list[tuple]:
     return rows
 
 
-def _revenue_daily_rows(dispatch_day: DispatchDay) -> list[tuple]:
+def _revenue_daily_rows(
+    dispatch_day: DispatchDay,
+    battery_keys: set[str] | None = None,
+) -> list[tuple]:
     rows = []
     for key, battery in KNOWN_BATTERIES.items():
+        if battery_keys is not None and key not in battery_keys:
+            continue
         rev = calculate_daily_revenue(battery, dispatch_day)
         fcas_by_svc = {
             svc: sum(i.fcas_revenue.get(svc, 0.0) for i in rev.intervals)
@@ -387,17 +397,31 @@ def _revenue_daily_rows(dispatch_day: DispatchDay) -> list[tuple]:
 def ingest_interval(
     conn: _duckdb_mod.DuckDBPyConnection,
     interval: DispatchInterval,
+    battery_keys: set[str] | None = None,
+    force: bool = False,
 ) -> tuple[int, int]:
     """Insert one DispatchInterval into dispatch_prices and battery_revenue_interval.
 
-    Rows already present (same primary key) are skipped silently
-    (ON CONFLICT DO NOTHING).
+    Args:
+        battery_keys: If set, only process these battery keys.
+        force:        If True, delete existing rows for the given batteries before
+                      inserting so that updated revenue figures replace stale data.
+                      When battery_keys is None and force is True, all batteries
+                      for this settlement_date are replaced.
 
     Returns:
         (prices_attempted, revenue_attempted) row counts.
     """
     price_rows = _price_rows(interval)
-    revenue_rows = _revenue_interval_rows(interval)
+    revenue_rows = _revenue_interval_rows(interval, battery_keys)
+    if force and revenue_rows:
+        keys_to_delete = battery_keys or set(KNOWN_BATTERIES)
+        placeholders = ", ".join(["?"] * len(keys_to_delete))
+        conn.execute(
+            f"DELETE FROM battery_revenue_interval "
+            f"WHERE settlement_date = ? AND battery_key IN ({placeholders})",
+            [interval.settlement_date, *keys_to_delete],
+        )
     if price_rows:
         conn.executemany(_INSERT_PRICES, price_rows)
     if revenue_rows:
@@ -408,15 +432,28 @@ def ingest_interval(
 def ingest_daily_summary(
     conn: _duckdb_mod.DuckDBPyConnection,
     dispatch_day: DispatchDay,
+    battery_keys: set[str] | None = None,
+    force: bool = False,
 ) -> int:
     """Insert full-day aggregated revenue rows into battery_revenue_daily.
 
-    One row per battery per day (ON CONFLICT DO NOTHING).
+    Args:
+        battery_keys: If set, only process these battery keys.
+        force:        If True, delete existing rows for the given batteries before
+                      inserting.
 
     Returns:
         Number of rows attempted.
     """
-    rows = _revenue_daily_rows(dispatch_day)
+    rows = _revenue_daily_rows(dispatch_day, battery_keys)
+    if force and rows:
+        keys_to_delete = battery_keys or set(KNOWN_BATTERIES)
+        placeholders = ", ".join(["?"] * len(keys_to_delete))
+        conn.execute(
+            f"DELETE FROM battery_revenue_daily "
+            f"WHERE date = ? AND battery_key IN ({placeholders})",
+            [dispatch_day.date, *keys_to_delete],
+        )
     if rows:
         conn.executemany(_INSERT_DAILY, rows)
     return len(rows)
@@ -445,15 +482,22 @@ async def run_ingest_interval(target: str = "local") -> None:
     print(f"Ingested {dt}  prices={n_p}  revenue_interval={n_r}")
 
 
-async def run_ingest_day(day: date, target: str = "local") -> None:
+async def run_ingest_day(
+    day: date,
+    target: str = "local",
+    battery_keys: set[str] | None = None,
+    force: bool = False,
+) -> None:
     """Fetch a full historical trading day and persist all intervals plus daily summary.
 
     Populates both ``battery_revenue_interval`` (one row per 5-min interval
     per battery) and ``battery_revenue_daily`` (one aggregated row per battery).
 
     Args:
-        day:    Historical trading day (must be at least yesterday AEST).
-        target: Database target name from pyproject.toml (default: ``"local"``).
+        day:          Historical trading day (must be at least yesterday AEST).
+        target:       Database target name from pyproject.toml (default: ``"local"``).
+        battery_keys: If set, only process these battery keys.
+        force:        If True, delete and replace existing rows (upsert behaviour).
     """
     print(f"Fetching Next Day Dispatch for {day}…")
     dispatch_day = await fetch_next_day_dispatch(day)
@@ -461,13 +505,14 @@ async def run_ingest_day(day: date, target: str = "local") -> None:
     ensure_schema(conn)
     total_p = total_r = 0
     for interval in dispatch_day.intervals:
-        n_p, n_r = ingest_interval(conn, interval)
+        n_p, n_r = ingest_interval(conn, interval, battery_keys=battery_keys, force=force)
         total_p += n_p
         total_r += n_r
-    n_daily = ingest_daily_summary(conn, dispatch_day)
+    n_daily = ingest_daily_summary(conn, dispatch_day, battery_keys=battery_keys, force=force)
     conn.close()
+    label = f" (batteries: {', '.join(sorted(battery_keys))})" if battery_keys else ""
     print(
-        f"Ingested {day}  intervals={len(dispatch_day.intervals)}  "
+        f"Ingested {day}{label}  intervals={len(dispatch_day.intervals)}  "
         f"prices={total_p}  revenue_interval={total_r}  revenue_daily={n_daily}"
     )
 
@@ -476,6 +521,8 @@ async def run_backfill(
     start: date,
     end: date,
     target: str = "local",
+    battery_keys: set[str] | None = None,
+    force: bool = False,
 ) -> None:
     """Ingest every trading day in [start, end] inclusive.
 
@@ -483,14 +530,16 @@ async def run_backfill(
     so the rest of the range still completes.
 
     Args:
-        start:  First trading day to ingest.
-        end:    Last trading day to ingest (inclusive).
-        target: Database target name from pyproject.toml (default: ``"local"``).
+        start:        First trading day to ingest.
+        end:          Last trading day to ingest (inclusive).
+        target:       Database target name from pyproject.toml (default: ``"local"``).
+        battery_keys: If set, only process these battery keys.
+        force:        If True, delete and replace existing rows (upsert behaviour).
     """
     day = start
     while day <= end:
         try:
-            await run_ingest_day(day, target)
+            await run_ingest_day(day, target, battery_keys=battery_keys, force=force)
         except Exception as exc:  # noqa: BLE001
             print(f"  skip {day}: {exc}")
         day += timedelta(days=1)

@@ -382,6 +382,23 @@ def cmd_backfill(
         str,
         typer.Option("--target", "-t", metavar="NAME", help=_TARGET_HELP),
     ] = "local",
+    battery: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--battery",
+            "-b",
+            metavar="KEY",
+            help="Only process this battery (repeat for multiple). Default: all batteries.",
+        ),
+    ] = None,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            "-f",
+            help="Delete and replace existing rows (upsert). Required to correct previously ingested data.",
+        ),
+    ] = False,
 ) -> None:
     """Ingest a date range into DB (pipeline)."""
     from nem_battery import pipeline
@@ -401,7 +418,15 @@ def cmd_backfill(
             err=True,
         )
         raise typer.Exit(code=1)
-    asyncio.run(pipeline.run_backfill(start_date, end_date, target))
+    if battery:
+        unknown = set(battery) - set(KNOWN_BATTERIES)
+        if unknown:
+            typer.echo(f"error: unknown battery keys: {', '.join(sorted(unknown))}", err=True)
+            raise typer.Exit(code=1)
+    battery_keys = set(battery) if battery else None
+    asyncio.run(
+        pipeline.run_backfill(start_date, end_date, target, battery_keys=battery_keys, force=force)
+    )
 
 
 def _db_label(target: str) -> str:
