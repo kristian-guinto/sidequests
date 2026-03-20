@@ -252,6 +252,36 @@ def prepare_interval_data(df: pd.DataFrame) -> pd.DataFrame:
     )
 
 
+def _opportunity_capture(
+    rrp: np.ndarray,
+    discharge: np.ndarray,
+    charge: np.ndarray,
+    actual_energy_revenue: float,
+    actual_energy_cost: float,
+) -> float:
+    """Fraction of theoretical maximum energy net actually captured.
+
+    Computes the best possible energy net if the actual dispatch volumes were
+    re-timed to optimal price moments: highest discharge MWs paired with
+    highest RRPs, highest charge MWs paired with lowest (most negative) RRPs.
+    Result is clamped to [0, 1].
+    """
+    dis_mws = np.sort(discharge[discharge > 0.0])[::-1]
+    chg_mws = np.sort(charge[charge > 0.0])[::-1]
+    n_dis = len(dis_mws)
+    n_chg = len(chg_mws)
+    if n_dis == 0 and n_chg == 0:
+        return 0.0
+    top_rrp = np.sort(rrp)[::-1]
+    bot_rrp = np.sort(rrp)
+    opt_dis = float(np.dot(dis_mws, top_rrp[:n_dis])) * INTERVAL_HOURS if n_dis > 0 else 0.0
+    opt_chg = float(np.dot(chg_mws, bot_rrp[:n_chg])) * INTERVAL_HOURS if n_chg > 0 else 0.0
+    theoretical_max = opt_dis - opt_chg
+    if theoretical_max <= EPSILON:
+        return 0.0
+    actual_energy_net = actual_energy_revenue - actual_energy_cost
+    return float(np.clip(actual_energy_net / theoretical_max, 0.0, 1.0))
+
 
 def _price_response_speed(
     rrp: np.ndarray,
@@ -317,7 +347,9 @@ def _day_feature_row(
     interval_net = day["net"].to_numpy(dtype=float)
     times = day["settlement_date"]
 
-    energy_value = abs(float((day["energy_revenue"] - day["energy_cost"]).sum()))
+    actual_energy_revenue = float(day["energy_revenue"].sum())
+    actual_energy_cost = float(day["energy_cost"].sum())
+    energy_value = abs(actual_energy_revenue - actual_energy_cost)
     total_fcas = float(day["total_fcas"].sum())
     day_net = float(day["net"].sum())
     raise_contingency = float(day[["raise6sec", "raise60sec", "raise5min"]].sum().sum())
@@ -421,6 +453,10 @@ def _day_feature_row(
             total_charge,
         ),
         "price_response_speed": _price_response_speed(rrp, discharge, charge),
+        "net": day_net,
+        "opportunity_capture": _opportunity_capture(
+            rrp, discharge, charge, actual_energy_revenue, actual_energy_cost
+        ),
     }
 
 
@@ -480,12 +516,16 @@ def train_strategy_model(
     viz2["x"] = embedding_2d[:, 0]
     viz2["y"] = embedding_2d[:, 1]
     viz2["cluster"] = labels.astype(str)
+    viz2["net_revenue"] = features["net"]
+    viz2["opportunity_capture"] = features["opportunity_capture"]
 
     viz3 = features[meta_columns].copy()
     viz3["x"] = embedding_3d[:, 0]
     viz3["y"] = embedding_3d[:, 1]
     viz3["z"] = embedding_3d[:, 2]
     viz3["cluster"] = labels.astype(str)
+    viz3["net_revenue"] = features["net"]
+    viz3["opportunity_capture"] = features["opportunity_capture"]
 
     cluster_summary = (
         features.assign(cluster=labels.astype(str))
