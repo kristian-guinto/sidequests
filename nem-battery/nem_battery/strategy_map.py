@@ -59,6 +59,7 @@ FEATURE_COLUMNS = [
     "morning_peak_weight",
     "solar_soak_charge_weight",
     "overnight_charge_weight",
+    "price_response_speed",
 ]
 
 
@@ -251,6 +252,54 @@ def prepare_interval_data(df: pd.DataFrame) -> pd.DataFrame:
     )
 
 
+
+def _price_response_speed(
+    rrp: np.ndarray,
+    discharge: np.ndarray,
+    charge: np.ndarray,
+    max_lag: int = 3,
+) -> float:
+    """Magnitude-weighted speed of battery response to significant price moves.
+
+    For each interval in the top-quartile of |Δrrp|, find the lag (0..max_lag)
+    to the battery's first matching dispatch: discharge after an upward spike,
+    charge after a downward crash. Unmatched events score lag = max_lag + 1.
+
+    Returns a value in (0, 1]: 1.0 = always instant, ~0.2 = always misses.
+    """
+    delta_rrp = np.abs(np.diff(rrp, prepend=rrp[0] if len(rrp) else 0.0))
+    if len(delta_rrp) == 0 or delta_rrp.max() <= 0.0:
+        return 0.0
+
+    threshold = np.percentile(delta_rrp, 75)
+    spike_indices = np.where(delta_rrp >= threshold)[0]
+    if len(spike_indices) == 0:
+        return 0.0
+
+    # For positive Δrrp expect discharge; for negative Δrrp expect charge.
+    rrp_diff = np.diff(rrp, prepend=rrp[0] if len(rrp) else 0.0)
+    weights: list[float] = []
+    scores: list[float] = []
+    for t in spike_indices:
+        mag = float(delta_rrp[t])
+        expect_discharge = rrp_diff[t] > 0.0
+        found_lag = max_lag + 1
+        for lag in range(max_lag + 1):
+            idx = t + lag
+            if idx >= len(rrp):
+                break
+            if expect_discharge and discharge[idx] > 0.0:
+                found_lag = lag
+                break
+            if not expect_discharge and charge[idx] > 0.0:
+                found_lag = lag
+                break
+        weights.append(mag)
+        scores.append(1.0 / (1.0 + found_lag))
+
+    return float(np.average(scores, weights=weights)) if weights else 0.0
+
+
 def _day_feature_row(
     battery_key: str,
     trading_day: pd.Timestamp,
@@ -371,6 +420,7 @@ def _day_feature_row(
             float(day.loc[overnight_mask, "charge_mw"].sum()),
             total_charge,
         ),
+        "price_response_speed": _price_response_speed(rrp, discharge, charge),
     }
 
 
