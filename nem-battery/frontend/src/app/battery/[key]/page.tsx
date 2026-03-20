@@ -17,7 +17,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { DailyRevenueChart } from "@/components/daily-revenue-chart";
-import { IntervalChart } from "@/components/interval-chart";
+import { IntervalChart, IntervalPowerChart } from "@/components/interval-chart";
 import { KNOWN_BATTERIES, type BatteryDailyRow, type BatteryIntervalRow } from "@/lib/types";
 
 function fmtDollar(v: number): string {
@@ -216,53 +216,78 @@ export default function BatteryDetailPage() {
 
           {/* Intervals tab */}
           <TabsContent value="intervals" className="space-y-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between gap-4 flex-wrap">
-                  <CardTitle className="text-sm font-medium">
-                    5-min Intervals — Net Revenue &amp; RRP
-                  </CardTitle>
-                  <div className="flex items-center gap-2">
-                    {availableDates.length > 0 ? (
-                      <Select value={selectedDate} onValueChange={(v) => v && setSelectedDate(v)}>
-                        <SelectTrigger className="h-8 w-[148px] text-xs">
-                          <SelectValue placeholder="Select date" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {availableDates.map((d) => (
-                            <SelectItem key={d} value={d} className="text-xs">
-                              {d}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+            {/* Date selector + refresh */}
+            <div className="flex items-center gap-2">
+              {availableDates.length > 0 ? (
+                <Select value={selectedDate} onValueChange={(v) => v && setSelectedDate(v)}>
+                  <SelectTrigger className="h-8 w-[148px] text-xs">
+                    <SelectValue placeholder="Select date" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableDates.map((d) => (
+                      <SelectItem key={d} value={d} className="text-xs">
+                        {d}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <span className="text-xs text-muted-foreground">No dates available</span>
+              )}
+              {selectedDate && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => loadIntervals(selectedDate)}
+                  disabled={intervalLoading}
+                  className="h-7 gap-1 text-xs"
+                >
+                  <RefreshCw className={`h-3 w-3 ${intervalLoading ? "animate-spin" : ""}`} />
+                </Button>
+              )}
+            </div>
+
+            {/* Sub-tabs: Revenue vs Power */}
+            <Tabs defaultValue="revenue">
+              <TabsList className="mb-4">
+                <TabsTrigger value="revenue">Revenue &amp; Price</TabsTrigger>
+                <TabsTrigger value="power">Power &amp; Throughput</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="revenue">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium">Net Revenue &amp; RRP — 5-min intervals</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {intervalLoading ? (
+                      <div className="flex h-[280px] items-center justify-center text-sm text-muted-foreground">
+                        Loading…
+                      </div>
                     ) : (
-                      <span className="text-xs text-muted-foreground">No dates available</span>
+                      <IntervalChart rows={intervalRows} />
                     )}
-                    {selectedDate && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => loadIntervals(selectedDate)}
-                        disabled={intervalLoading}
-                        className="h-7 gap-1 text-xs"
-                      >
-                        <RefreshCw className={`h-3 w-3 ${intervalLoading ? "animate-spin" : ""}`} />
-                      </Button>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="power">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium">Charge / Discharge &amp; Daily Throughput</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {intervalLoading ? (
+                      <div className="flex h-[280px] items-center justify-center text-sm text-muted-foreground">
+                        Loading…
+                      </div>
+                    ) : (
+                      <IntervalPowerChart rows={intervalRows} />
                     )}
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {intervalLoading ? (
-                  <div className="flex h-[280px] items-center justify-center text-sm text-muted-foreground">
-                    Loading…
-                  </div>
-                ) : (
-                  <IntervalChart rows={intervalRows} />
-                )}
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
 
             {intervalRows.length > 0 && (
               <Card>
