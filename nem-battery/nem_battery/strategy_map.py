@@ -559,6 +559,136 @@ def save_outputs(artifacts: StrategyArtifacts, output_dir: str | Path) -> None:
     figure_3d.write_html(destination / "strategy_map_3d.html")
 
 
+def plot_cluster_battery_count(artifacts: StrategyArtifacts, pct: bool = True) -> None:
+    embedding_df = artifacts.embedding_3d
+
+    cluster_battery_counts = embedding_df.pivot_table(
+        index="battery_name",
+        columns="cluster",
+        values="trading_day",
+        aggfunc="count",
+        fill_value=0,
+    ).astype(int)
+
+    if pct:
+        cluster_battery_counts = (
+            cluster_battery_counts.div(cluster_battery_counts.sum(axis=1), axis=0) * 100
+        ).round(2)
+
+    fig = px.imshow(
+        cluster_battery_counts,
+        text_auto=True,
+        labels={"x": "Cluster ID", "y": "Battery", "color": "Day count"},
+        color_continuous_scale="Blues",
+        aspect="auto",
+    )
+
+    title = (
+        "Battery Participation by Cluster (Percentage)"
+        if pct
+        else "Battery Participation by Cluster (Count)"
+    )
+
+    fig.update_layout(
+        title=title,
+        xaxis_tickangle=0,
+    )
+
+    fig.show()
+
+
+def plot_cluster_feature_means(artifacts: StrategyArtifacts) -> None:
+    cluster_summary = artifacts.cluster_summary.sort_values("cluster")
+    feature_cols = [col for col in FEATURE_COLUMNS if col in cluster_summary.columns]
+
+    cluster_feature_means = cluster_summary.set_index("cluster")[feature_cols]
+    relative_values = (cluster_feature_means / (cluster_feature_means.sum(axis=0) + EPSILON)).T
+    absolute_values = cluster_feature_means.T
+
+    fig = px.imshow(
+        relative_values,
+        x=relative_values.columns.astype(str),
+        y=relative_values.index,
+        labels={"x": "Cluster", "y": "Feature", "color": "Relative Value"},
+        color_continuous_scale="Blues",
+        aspect="auto",
+    )
+
+    fig.update_traces(
+        customdata=absolute_values.to_numpy(dtype=float).reshape(*absolute_values.shape, 1),
+        hovertemplate=(
+            "Feature: %{y}<br>"
+            "Cluster: %{x}<br>"
+            "Relative Value: %{z:.4f}<br>"
+            "Mean Value: %{customdata[0]:.4f}<extra></extra>"
+        ),
+    )
+
+    fig.update_layout(
+        title="Cluster Feature Means (Relative)",
+        xaxis_tickangle=0,
+    )
+
+    fig.show()
+
+
+def plot_cluster_revenue(artifacts: StrategyArtifacts) -> None:
+    embedding_df = artifacts.embedding_3d
+    mwh_capacity_map = {v.name: v.mwh_capacity for k, v in KNOWN_BATTERIES.items()}
+
+    embedding_df["net_revenue_per_mwh"] = embedding_df.apply(
+        lambda row: row["net_revenue"] / mwh_capacity_map.get(row["battery_name"], 1), axis=1
+    )
+    cluster_revenue = embedding_df.groupby("cluster")[["net_revenue", "net_revenue_per_mwh"]].agg(
+        ["min", "mean", "max"]
+    )
+
+    fig = px.bar(
+        cluster_revenue,
+        x="cluster",
+        y="net_revenue",
+        labels={"cluster": "Cluster", "net_revenue": "Average Daily Revenue"},
+        title="Average Daily Revenue by Cluster",
+        color="net_revenue",
+        color_continuous_scale="Blues",
+    )
+
+    fig.update_layout(
+        xaxis_tickangle=0,
+    )
+
+    fig.show()
+
+
+def plot_opportunity_capture(artifacts: StrategyArtifacts) -> None:
+    """2D strategy map coloured by opportunity capture rate.
+
+    Opportunity capture is the fraction of theoretical maximum energy net
+    actually achieved (0 = no value captured, 1 = perfect timing).  Unlike
+    cluster or net_revenue, this is a normalised efficiency metric that
+    compares batteries of different sizes on an equal footing.
+    """
+    embedding_df = artifacts.embedding_2d.copy()
+    fig = px.scatter(
+        embedding_df,
+        x="x",
+        y="y",
+        color="opportunity_capture",
+        symbol="battery_key",
+        hover_data=["battery_name", "region", "trading_day", "net_revenue", "opportunity_capture"],
+        color_continuous_scale="RdYlGn",
+        range_color=[0.0, 1.0],
+        labels={
+            "opportunity_capture": "Opportunity Capture",
+            "x": "UMAP-1",
+            "y": "UMAP-2",
+        },
+        title="Strategy Map: Opportunity Capture Rate",
+    )
+    fig.update_layout(coloraxis_colorbar_tickformat=".0%")
+    fig.show()
+
+
 def run_pipeline(
     target: str,
     output_dir: str | Path,
