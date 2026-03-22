@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "sync:batteries": "python3 ../scripts/export_frontend_battery_meta.py --out ./src/lib/known-batteries.generated.ts",
+    "predev": "npm run sync:batteries",
     "dev": "next dev",
+    "prebuild": "npm run sync:batteries",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint"

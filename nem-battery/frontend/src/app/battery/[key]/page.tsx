@@ -592,7 +592,7 @@ export default function BatteryDetailPage() {
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-medium">
-                      Net Revenue &amp; RRP — 5-min intervals
+                      Interval Revenue, Cumulative Revenue &amp; RRP — 5-min intervals
                     </CardTitle>
                   </CardHeader>
                   <CardContent>

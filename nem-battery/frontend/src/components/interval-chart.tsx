@@ -28,17 +28,22 @@ function fmtDollar(v: number): string {
 }
 
 // ---------------------------------------------------------------------------
-// IntervalChart — Net revenue bars + RRP line
+// IntervalChart — Interval revenue bars + cumulative revenue + RRP line
 // ---------------------------------------------------------------------------
 
 type RevenueRow = BatteryIntervalRow & { time: string };
+type RevenueChartRow = RevenueRow & {
+  cumulative_revenue: number;
+  cumulative_revenue_pos: number;
+  cumulative_revenue_neg: number;
+};
 
 function RevenueTooltip({
   active,
   payload,
 }: {
   active?: boolean;
-  payload?: { payload?: RevenueRow }[];
+  payload?: { payload?: RevenueChartRow }[];
 }) {
   if (!active || !payload?.length) return null;
   const d = payload[0]?.payload;
@@ -50,6 +55,10 @@ function RevenueTooltip({
         <span>Net</span>
         <span className={`text-right font-mono ${d.net >= 0 ? "text-green-500" : "text-red-500"}`}>
           {fmtDollar(d.net)}
+        </span>
+        <span>Cumulative</span>
+        <span className={`text-right font-mono ${d.cumulative_revenue >= 0 ? "text-green-500" : "text-red-500"}`}>
+          {fmtDollar(d.cumulative_revenue)}
         </span>
         <span>RRP</span>
         <span className="text-right font-mono">${d.rrp.toFixed(2)}/MWh</span>
@@ -69,7 +78,18 @@ interface Props {
 }
 
 export function IntervalChart({ rows }: Props) {
-  const data: RevenueRow[] = rows.map((r) => ({ ...r, time: toTime(r.settlement_date) }));
+  const data: RevenueChartRow[] = rows.reduce<RevenueChartRow[]>((acc, r) => {
+    const previous = acc[acc.length - 1];
+    const cumulative = (previous?.cumulative_revenue ?? 0) + r.net;
+    acc.push({
+      ...r,
+      time: toTime(r.settlement_date),
+      cumulative_revenue: cumulative,
+      cumulative_revenue_pos: Math.max(cumulative, 0),
+      cumulative_revenue_neg: Math.min(cumulative, 0),
+    });
+    return acc;
+  }, []);
 
   if (data.length === 0) {
     return (
@@ -90,7 +110,7 @@ export function IntervalChart({ rows }: Props) {
           interval={Math.floor(data.length / 8)}
         />
         <YAxis
-          yAxisId="net"
+          yAxisId="cum"
           orientation="left"
           tickFormatter={(v: number) => `$${v.toFixed(0)}`}
           tick={{ fontSize: 10 }}
@@ -107,24 +127,55 @@ export function IntervalChart({ rows }: Props) {
           axisLine={false}
           width={56}
         />
+        <YAxis yAxisId="net" hide />
         <Tooltip content={<RevenueTooltip />} />
         <ReferenceLine yAxisId="net" y={0} stroke="currentColor" strokeOpacity={0.2} />
-        <Bar yAxisId="net" dataKey="net" radius={[1, 1, 0, 0]} maxBarSize={8}>
+        <ReferenceLine yAxisId="cum" y={0} stroke="currentColor" strokeOpacity={0.2} />
+        <Bar yAxisId="net" dataKey="net" radius={[1, 1, 0, 0]} maxBarSize={6}>
           {data.map((entry, index) => (
             <Cell
               key={`cell-${index}`}
               fill={entry.net >= 0 ? "rgb(34 197 94)" : "rgb(239 68 68)"}
-              fillOpacity={0.8}
+              fillOpacity={0.45}
             />
           ))}
         </Bar>
+        <Area
+          yAxisId="cum"
+          dataKey="cumulative_revenue_pos"
+          type="monotone"
+          fill="rgb(34 197 94)"
+          fillOpacity={0.12}
+          stroke="none"
+          isAnimationActive={false}
+        />
+        <Area
+          yAxisId="cum"
+          dataKey="cumulative_revenue_neg"
+          type="monotone"
+          fill="rgb(239 68 68)"
+          fillOpacity={0.12}
+          stroke="none"
+          isAnimationActive={false}
+        />
+        <Line
+          yAxisId="cum"
+          dataKey="cumulative_revenue"
+          type="monotone"
+          stroke="hsl(var(--foreground))"
+          strokeWidth={1.75}
+          dot={false}
+          isAnimationActive={false}
+        />
         <Line
           yAxisId="rrp"
           dataKey="rrp"
           type="monotone"
           stroke="rgb(99 102 241)"
-          strokeWidth={1.5}
+          strokeWidth={1.25}
+          strokeOpacity={0.85}
           dot={false}
+          isAnimationActive={false}
         />
       </ComposedChart>
     </ResponsiveContainer>
@@ -167,16 +218,17 @@ function PowerTooltip({
 }
 
 export function IntervalPowerChart({ rows }: Props) {
-  let cumMwh = 0;
-  const data: PowerRow[] = rows.map((r) => {
-    cumMwh += (r.charge_mw - r.discharge_mw) * (5 / 60);
-    return {
+  const data: PowerRow[] = rows.reduce<PowerRow[]>((acc, r) => {
+    const previous = acc[acc.length - 1];
+    const cumulativeMwh = (previous?.cumulative_mwh ?? 0) + (r.charge_mw - r.discharge_mw) * (5 / 60);
+    acc.push({
       ...r,
       time: toTime(r.settlement_date),
       charge_mw_neg: -r.charge_mw,
-      cumulative_mwh: cumMwh,
-    };
-  });
+      cumulative_mwh: cumulativeMwh,
+    });
+    return acc;
+  }, []);
 
   if (data.length === 0) {
     return (
