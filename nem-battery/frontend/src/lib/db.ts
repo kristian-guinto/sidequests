@@ -173,14 +173,13 @@ export async function getIntervalsForDay(
   );
 }
 
-/** Distinct dates available for a battery in the interval table (last 30 days). */
+/** Distinct dates available for a battery in the interval table. */
 export async function getAvailableDates(key: string): Promise<string[]> {
   const rows = await query<{ date: string }>(
     `SELECT DISTINCT settlement_date::DATE::VARCHAR AS date
      FROM battery_revenue_interval
      WHERE battery_key = ?
-     ORDER BY date DESC
-     LIMIT 30`,
+     ORDER BY date DESC`,
     key
   );
   return rows.map((r) => r.date);

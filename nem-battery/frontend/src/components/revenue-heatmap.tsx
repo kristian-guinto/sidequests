@@ -37,6 +37,7 @@ interface Props {
 
 export function RevenueHeatmap({ rows, onDayClick }: Props) {
   const [hoveredDate, setHoveredDate] = useState<string | null>(null);
+  const [hoverPosition, setHoverPosition] = useState<{ x: number; y: number } | null>(null);
 
   const { byDate, maxNet, months } = useMemo(() => {
     const byDate: Record<string, number> = {};
@@ -76,30 +77,6 @@ export function RevenueHeatmap({ rows, onDayClick }: Props) {
 
   return (
     <div className="space-y-4">
-      {/* Hover info */}
-      <div className="h-5">
-        {hoveredDate ? (
-          <p className="text-xs">
-            <span className="font-medium text-foreground">{hoveredDate}</span>
-            {hoveredNet !== undefined ? (
-              <span
-                className={`ml-2 font-mono ${hoveredNet >= 0 ? "text-green-500" : "text-red-500"
-                  }`}
-              >
-                {fmtRevenue(hoveredNet)}
-              </span>
-            ) : (
-              <span className="ml-2 text-muted-foreground">No data</span>
-            )}
-            {hoveredNet !== undefined && onDayClick && (
-              <span className="ml-2 text-muted-foreground text-xs">
-                — click to view intervals
-              </span>
-            )}
-          </p>
-        ) : null}
-      </div>
-
       {/* Month grids */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-5">
         {months.map(({ year, month }) => {
@@ -138,8 +115,17 @@ export function RevenueHeatmap({ rows, onDayClick }: Props) {
                   return (
                     <div
                       key={dateStr}
-                      onMouseEnter={() => setHoveredDate(dateStr)}
-                      onMouseLeave={() => setHoveredDate(null)}
+                      onMouseEnter={(event) => {
+                        setHoveredDate(dateStr);
+                        setHoverPosition({ x: event.clientX, y: event.clientY });
+                      }}
+                      onMouseMove={(event) => {
+                        setHoverPosition({ x: event.clientX, y: event.clientY });
+                      }}
+                      onMouseLeave={() => {
+                        setHoveredDate(null);
+                        setHoverPosition(null);
+                      }}
                       onClick={() => isClickable && onDayClick(dateStr)}
                       style={{ backgroundColor: getCellColor(net, maxNet) }}
                       className={`aspect-square rounded-[2px] transition-transform ${isClickable ? "cursor-pointer hover:scale-110" : ""
@@ -152,6 +138,29 @@ export function RevenueHeatmap({ rows, onDayClick }: Props) {
           );
         })}
       </div>
+
+      {hoveredDate && hoverPosition && (
+        <div
+          className="pointer-events-none fixed z-50 rounded-md border bg-card px-2 py-1.5 text-xs shadow-md"
+          style={{ left: hoverPosition.x + 12, top: hoverPosition.y + 12 }}
+        >
+          <p>
+            <span className="font-medium text-foreground">{hoveredDate}</span>
+            {hoveredNet !== undefined ? (
+              <span
+                className={`ml-2 font-mono ${hoveredNet >= 0 ? "text-green-500" : "text-red-500"}`}
+              >
+                {fmtRevenue(hoveredNet)}
+              </span>
+            ) : (
+              <span className="ml-2 text-muted-foreground">No data</span>
+            )}
+            {hoveredNet !== undefined && onDayClick && (
+              <span className="ml-2 text-muted-foreground">click to view intervals</span>
+            )}
+          </p>
+        </div>
+      )}
 
       {/* Legend */}
       <div className="flex items-center gap-2 text-xs text-muted-foreground">

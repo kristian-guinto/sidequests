@@ -159,9 +159,11 @@ export default function BatteryDetailPage() {
     if (res.ok) {
       const dates: string[] = await res.json();
       setAvailableDates(dates);
-      if (dates.length > 0 && !selectedDate) setSelectedDate(dates[0]);
+      if (dates.length > 0) {
+        setSelectedDate((prev) => prev || dates[0]);
+      }
     }
-  }, [batteryKey, selectedDate]);
+  }, [batteryKey]);
 
   // Fetch stats once on mount; loadDates is independent of range
   useEffect(() => {
@@ -334,17 +336,21 @@ export default function BatteryDetailPage() {
         );
       }
       setSelectedDate(date);
+
+      // If selection comes from outside the interval date list (e.g. heatmap),
+      // keep it visible in the strip so the highlighted day matches the chart.
+      setAvailableDates((prev) => (prev.includes(date) ? prev : [...prev, date]));
     },
     [selectedDate, selectedDateIndex, sortedDates]
   );
 
   const maxVisibleDates = 5;
   const halfWindow = Math.floor(maxVisibleDates / 2);
-  let windowStart = Math.max(0, selectedDateIndex - halfWindow);
-  let windowEnd = Math.min(sortedDates.length, windowStart + maxVisibleDates);
-  if (windowEnd - windowStart < maxVisibleDates) {
-    windowStart = Math.max(0, windowEnd - maxVisibleDates);
-  }
+  const windowSize = Math.min(maxVisibleDates, sortedDates.length);
+  const maxStart = Math.max(0, sortedDates.length - windowSize);
+  const centeredStart = selectedDateIndex >= 0 ? selectedDateIndex - halfWindow : 0;
+  const windowStart = Math.min(Math.max(0, centeredStart), maxStart);
+  const windowEnd = windowStart + windowSize;
   const visibleDates =
     selectedDateIndex >= 0
       ? sortedDates.slice(windowStart, windowEnd)
@@ -443,7 +449,7 @@ export default function BatteryDetailPage() {
                   <RevenueHeatmap
                     rows={dailyRows}
                     onDayClick={(date) => {
-                      setSelectedDate(date);
+                      handleSelectDate(date);
                       setActiveTab("intervals");
                     }}
                   />
@@ -516,9 +522,9 @@ export default function BatteryDetailPage() {
           {/* Intervals tab */}
           <TabsContent value="intervals" className="space-y-4">
             {/* Date navigator */}
-            <div className="rounded-lg border bg-card p-2">
+            <div className="rounded-lg border bg-card p-2 min-h-[4.5rem] flex items-center">
               {availableDates.length > 0 ? (
-                <div className="overflow-x-auto">
+                <div className="w-full overflow-x-auto pb-1">
                   <div
                     key={selectedDate || "initial-date-strip"}
                     className={`flex min-w-full items-center justify-center gap-1.5 ${dateStripAnimClass}`}
@@ -555,9 +561,10 @@ export default function BatteryDetailPage() {
 
                     {selectedDate && !visibleDates.includes(selectedDate) && (
                       <Button
-                        variant="outline"
+                        variant="default"
                         size="sm"
-                        className="h-auto px-2 py-1 text-xs"
+                        className="h-auto px-2 py-1 text-xs font-semibold"
+                        aria-current="date"
                         onClick={() => handleSelectDate(selectedDate)}
                       >
                         <span className="flex flex-col items-center text-center leading-tight">
