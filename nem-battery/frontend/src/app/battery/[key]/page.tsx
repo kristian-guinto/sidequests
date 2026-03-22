@@ -7,13 +7,6 @@ import { ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { MonthlyRevenueChart } from "@/components/monthly-revenue-chart";
@@ -54,6 +47,11 @@ function fmtDate(s: string): string {
     month: "short",
     year: "numeric",
   });
+}
+
+function fmtWeekday(s: string): string {
+  const d = new Date(s + "T00:00:00");
+  return d.toLocaleDateString("en-AU", { weekday: "long" });
 }
 
 const FCAS_SERVICES: { key: keyof BatteryDailyRow; label: string }[] = [
@@ -153,6 +151,7 @@ export default function BatteryDetailPage() {
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [intervalRows, setIntervalRows] = useState<BatteryIntervalRow[]>([]);
   const [intervalLoading, setIntervalLoading] = useState(false);
+  const [dateStripAnimClass, setDateStripAnimClass] = useState("animate-date-strip-left");
 
   const loadDates = useCallback(async () => {
     if (!batteryKey) return;
@@ -271,19 +270,85 @@ export default function BatteryDetailPage() {
       : 0;
 
   const fmtRank = (rank: number) => (rank > 0 ? `#${rank}` : "—");
-  const rankSubtext = rankedCount > 0 ? `out of ${rankedCount}` : undefined;
+  const fmtRankSubtext = (rank: number, total: number) =>
+    rank > 0 && total > 0 ? `${fmtRank(rank)} of ${total}` : "No ranking yet";
+
+  const rankedByPower = Object.entries(KNOWN_BATTERIES)
+    .filter(([, b]) => b.mw != null && b.mw > 0)
+    .sort(([, a], [, b]) => (b.mw ?? 0) - (a.mw ?? 0));
+
+  const rankedByEnergy = Object.entries(KNOWN_BATTERIES)
+    .filter(([, b]) => b.mwh != null && b.mwh > 0)
+    .sort(([, a], [, b]) => (b.mwh ?? 0) - (a.mwh ?? 0));
+
+  const powerRank = rankedByPower.findIndex(([key]) => key === batteryKey) + 1;
+  const energyRank = rankedByEnergy.findIndex(([key]) => key === batteryKey) + 1;
+
+  const efficiencyPerMwh =
+    meta.mwh != null && meta.mwh > 0 && stats != null
+      ? stats.avg_daily_revenue / meta.mwh
+      : null;
 
   const efficiencyValue =
-    meta.mwh != null && meta.mwh > 0 && stats != null
-      ? fmtStat(stats.avg_daily_revenue / meta.mwh)
+    efficiencyPerMwh != null
+      ? fmtStat(efficiencyPerMwh)
       : "—";
 
-  const statCards: { label: string; value: string; subtext?: string }[] = [
-    { label: "All-time", value: fmtStat(stats?.total_revenue ?? 0) },
-    { label: "Daily / MWh", value: efficiencyValue },
-    { label: "Revenue rank", value: fmtRank(revenueRank), subtext: rankSubtext },
-    { label: "Efficiency rank", value: fmtRank(efficiencyRank), subtext: rankSubtext },
+  const summaryLoading = stats == null;
+
+  const statCards: { label: string; value: string; subtext: string }[] = [
+    {
+      label: "All-time revenue",
+      value: fmtStat(stats?.total_revenue ?? 0),
+      subtext: fmtRankSubtext(revenueRank, rankedCount),
+    },
+    {
+      label: "Revenue efficiency",
+      value: efficiencyValue,
+      subtext: fmtRankSubtext(efficiencyRank, rankedCount),
+    },
+    {
+      label: "Power capacity",
+      value: meta.mw != null ? `${meta.mw} MW` : "—",
+      subtext: fmtRankSubtext(powerRank, rankedByPower.length),
+    },
+    {
+      label: "Energy capacity",
+      value: meta.mwh != null ? `${meta.mwh} MWh` : "—",
+      subtext: fmtRankSubtext(energyRank, rankedByEnergy.length),
+    },
   ];
+
+  const sortedDates = [...availableDates].sort((a, b) => a.localeCompare(b));
+  const selectedDateIndex = sortedDates.findIndex((d) => d === selectedDate);
+
+  const handleSelectDate = useCallback(
+    (date: string) => {
+      if (!date || date === selectedDate) return;
+      const nextIndex = sortedDates.findIndex((d) => d === date);
+      if (selectedDateIndex >= 0 && nextIndex >= 0) {
+        setDateStripAnimClass(
+          nextIndex > selectedDateIndex
+            ? "animate-date-strip-left"
+            : "animate-date-strip-right"
+        );
+      }
+      setSelectedDate(date);
+    },
+    [selectedDate, selectedDateIndex, sortedDates]
+  );
+
+  const maxVisibleDates = 5;
+  const halfWindow = Math.floor(maxVisibleDates / 2);
+  let windowStart = Math.max(0, selectedDateIndex - halfWindow);
+  let windowEnd = Math.min(sortedDates.length, windowStart + maxVisibleDates);
+  if (windowEnd - windowStart < maxVisibleDates) {
+    windowStart = Math.max(0, windowEnd - maxVisibleDates);
+  }
+  const visibleDates =
+    selectedDateIndex >= 0
+      ? sortedDates.slice(windowStart, windowEnd)
+      : sortedDates.slice(0, maxVisibleDates);
 
   return (
     <div className="min-h-screen bg-background">
@@ -315,27 +380,27 @@ export default function BatteryDetailPage() {
 
       {/* Content */}
       <main className="mx-auto max-w-5xl px-4 py-6">
-        {/* Stats row */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-          {statCards.map(({ label, value, subtext }) => (
-            <Card key={label}>
-              <CardContent className="pt-4 pb-3">
-                <p className="text-xs text-muted-foreground">{label}</p>
-                <p
-                  className={`text-lg font-mono font-semibold tabular-nums ${dailyLoading ? "opacity-40" : ""
-                    }`}
+        {/* Summary card */}
+        <Card className="mb-6">
+          <CardContent className="p-0">
+            <div className="grid grid-cols-2 sm:grid-cols-4">
+              {statCards.map(({ label, value, subtext }) => (
+                <div
+                  key={label}
+                  className="border-b border-border/60 p-4 odd:border-r sm:border-r sm:[&:nth-child(4n)]:border-r-0 sm:[&:nth-last-child(-n+4)]:border-b-0 [&:nth-last-child(-n+2)]:border-b-0"
                 >
-                  {value}
-                  {subtext && (
-                    <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                      {subtext}
-                    </span>
-                  )}
-                </p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                  <p
+                    className={`mt-1 text-lg font-mono font-semibold tabular-nums ${summaryLoading ? "opacity-40" : ""}`}
+                  >
+                    {value}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">{subtext}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-6">
@@ -450,23 +515,61 @@ export default function BatteryDetailPage() {
 
           {/* Intervals tab */}
           <TabsContent value="intervals" className="space-y-4">
-            {/* Date selector */}
-            <div className="flex items-center gap-2">
+            {/* Date navigator */}
+            <div className="rounded-lg border bg-card p-2">
               {availableDates.length > 0 ? (
-                <Select value={selectedDate} onValueChange={(v) => v && setSelectedDate(v)}>
-                  <SelectTrigger className="h-8 w-[148px] text-xs">
-                    <SelectValue placeholder="Select date" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableDates.map((d) => (
-                      <SelectItem key={d} value={d} className="text-xs">
-                        {d}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="overflow-x-auto">
+                  <div
+                    key={selectedDate || "initial-date-strip"}
+                    className={`flex min-w-full items-center justify-center gap-1.5 ${dateStripAnimClass}`}
+                  >
+                    {visibleDates.map((date) =>
+                      date === selectedDate ? (
+                        <Button
+                          key={date}
+                          variant="default"
+                          size="sm"
+                          className="h-auto px-2 py-1 text-xs font-semibold"
+                          aria-current="date"
+                        >
+                          <span className="flex flex-col items-center text-center leading-tight">
+                            <span>{date}</span>
+                            <span className="text-[10px] font-medium opacity-90">{fmtWeekday(date)}</span>
+                          </span>
+                        </Button>
+                      ) : (
+                        <Button
+                          key={date}
+                          variant="ghost"
+                          size="sm"
+                          className="h-auto px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+                          onClick={() => handleSelectDate(date)}
+                        >
+                          <span className="flex flex-col items-center text-center leading-tight">
+                            <span>{date}</span>
+                            <span className="text-[10px] opacity-80">{fmtWeekday(date)}</span>
+                          </span>
+                        </Button>
+                      )
+                    )}
+
+                    {selectedDate && !visibleDates.includes(selectedDate) && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-auto px-2 py-1 text-xs"
+                        onClick={() => handleSelectDate(selectedDate)}
+                      >
+                        <span className="flex flex-col items-center text-center leading-tight">
+                          <span>{selectedDate}</span>
+                          <span className="text-[10px] opacity-80">{fmtWeekday(selectedDate)}</span>
+                        </span>
+                      </Button>
+                    )}
+                  </div>
+                </div>
               ) : (
-                <span className="text-xs text-muted-foreground">No dates available</span>
+                <span className="px-1 text-xs text-muted-foreground">No dates available</span>
               )}
             </div>
 

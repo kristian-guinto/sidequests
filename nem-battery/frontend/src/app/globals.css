@@ -130,3 +130,37 @@
     @apply font-sans;
   }
 }
+
+@layer utilities {
+  @keyframes date-strip-enter-left {
+    from {
+      opacity: 0.45;
+      transform: translateX(14px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes date-strip-enter-right {
+    from {
+      opacity: 0.45;
+      transform: translateX(-14px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .animate-date-strip-left {
+    animation: date-strip-enter-left 180ms ease-out;
+  }
+
+  .animate-date-strip-right {
+    animation: date-strip-enter-right 180ms ease-out;
+  }
+}
