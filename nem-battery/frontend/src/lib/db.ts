@@ -10,7 +10,8 @@
  */
 
 import path from "path";
-import type { BatteryDailyRow, BatteryIntervalRow } from "./types";
+import type { BatteryDailyRow, BatteryIntervalRow, BatterySummaryRow, BatteryMonthlyRow, BatteryStatsRow, BatteryOracleRow } from "./types";
+import { KNOWN_BATTERIES } from "./types";
 import type { StrategyPoint } from "./strategy-types";
 import type { DuckDBConnection } from "@duckdb/node-api";
 
@@ -143,16 +144,16 @@ export async function getLatestIntervals(): Promise<BatteryIntervalRow[]> {
   `);
 }
 
-/** Daily summary rows for one battery, most recent first. */
-export async function getDailyRevenue(key: string, days = 30): Promise<BatteryDailyRow[]> {
+/** Daily summary rows for one battery, most recent first. Omit days for all history. */
+export async function getDailyRevenue(key: string, days?: number): Promise<BatteryDailyRow[]> {
+  const limit = days != null ? `LIMIT ${days}` : "";
   return query<BatteryDailyRow>(
     `SELECT *
      FROM battery_revenue_daily
      WHERE battery_key = ?
      ORDER BY date DESC
-     LIMIT ?`,
-    key,
-    days
+     ${limit}`,
+    key
   );
 }
 
@@ -185,6 +186,110 @@ export async function getAvailableDates(key: string): Promise<string[]> {
   return rows.map((r) => r.date);
 }
 
+/** Analytics summary for all batteries: all-time totals + 30-day sparkline. */
+export async function getBatterySummaries(): Promise<BatterySummaryRow[]> {
+  const [statsRows, sparklineRows] = await Promise.all([
+    query<{
+      battery_key: string;
+      total_revenue: number;
+      avg_monthly_revenue: number;
+      fcas_share_pct: number;
+      avg_daily_revenue: number;
+    }>(`
+      SELECT
+        battery_key,
+        COALESCE(SUM(net), 0) AS total_revenue,
+        COALESCE(
+          SUM(net) / NULLIF(COUNT(DISTINCT DATE_TRUNC('month', date)), 0),
+          0
+        ) AS avg_monthly_revenue,
+        CASE
+          WHEN SUM(net) > 0
+          THEN 100.0 * COALESCE(SUM(total_fcas_revenue), 0) / NULLIF(SUM(net), 0)
+          ELSE 0
+        END AS fcas_share_pct,
+        COALESCE(AVG(net), 0) AS avg_daily_revenue
+      FROM battery_revenue_daily
+      GROUP BY battery_key
+    `),
+    query<{ battery_key: string; month: string; net_energy: number; fcas: number }>(`
+      SELECT
+        battery_key,
+        LEFT(CAST(date AS VARCHAR), 7) AS month,
+        SUM(net_energy) AS net_energy,
+        SUM(total_fcas_revenue) AS fcas
+      FROM battery_revenue_daily
+      GROUP BY battery_key, LEFT(CAST(date AS VARCHAR), 7)
+      ORDER BY battery_key, month
+    `),
+  ]);
+
+  const sparklineByKey: Record<string, { month: string; net_energy: number; fcas: number }[]> = {};
+  for (const r of sparklineRows) {
+    if (!sparklineByKey[r.battery_key]) sparklineByKey[r.battery_key] = [];
+    sparklineByKey[r.battery_key].push({ month: r.month, net_energy: r.net_energy, fcas: r.fcas });
+  }
+
+  const statsByKey = Object.fromEntries(statsRows.map((r) => [r.battery_key, r]));
+
+  return Object.keys(KNOWN_BATTERIES).map((key) => {
+    const s = statsByKey[key];
+    return {
+      battery_key: key,
+      total_revenue: s?.total_revenue ?? 0,
+      avg_monthly_revenue: s?.avg_monthly_revenue ?? 0,
+      fcas_share_pct: s?.fcas_share_pct ?? 0,
+      avg_daily_revenue: s?.avg_daily_revenue ?? 0,
+      sparkline: sparklineByKey[key] ?? [],
+    };
+  });
+}
+
+/** Monthly aggregate revenue for one battery, most recent first. Omit months for all history. */
+export async function getMonthlyRevenue(
+  key: string,
+  months?: number
+): Promise<BatteryMonthlyRow[]> {
+  const limit = months != null ? `LIMIT ${months}` : "";
+  return query<BatteryMonthlyRow>(
+    `SELECT
+       LEFT(CAST(date AS VARCHAR), 7) AS month,
+       COALESCE(SUM(net_energy), 0) AS net_energy,
+       COALESCE(SUM(total_fcas_revenue), 0) AS total_fcas_revenue,
+       COALESCE(SUM(net), 0) AS net
+     FROM battery_revenue_daily
+     WHERE battery_key = ?
+     GROUP BY LEFT(CAST(date AS VARCHAR), 7)
+     ORDER BY month DESC
+     ${limit}`,
+    key
+  );
+}
+
+/** Aggregated stats for one battery (all-time + derived metrics). */
+export async function getBatteryStats(key: string): Promise<BatteryStatsRow | null> {
+  const rows = await query<BatteryStatsRow>(
+    `SELECT
+       battery_key,
+       COALESCE(SUM(net), 0) AS total_revenue,
+       COALESCE(SUM(CASE
+         WHEN date >= CURRENT_DATE - INTERVAL '30 days'
+         THEN net ELSE 0 END), 0) AS last_30d_revenue,
+       CASE
+         WHEN SUM(net) > 0
+         THEN 100.0 * COALESCE(SUM(total_fcas_revenue), 0) / NULLIF(SUM(net), 0)
+         ELSE 0
+       END AS fcas_share_pct,
+       COALESCE(MAX(net), 0) AS best_day_revenue,
+       COALESCE(AVG(net), 0) AS avg_daily_revenue
+     FROM battery_revenue_daily
+     WHERE battery_key = ?
+     GROUP BY battery_key`,
+    key
+  );
+  return rows[0] ?? null;
+}
+
 /** All 3-D UMAP embeddings from battery_strategy_embedding, most recent first. */
 export async function getStrategyEmbeddings(): Promise<StrategyPoint[]> {
   const rows = await query<{
@@ -215,4 +320,71 @@ export async function getStrategyEmbeddings(): Promise<StrategyPoint[]> {
     cluster_id: r.cluster_id ?? -1,
     daily_revenue: r.daily_revenue ?? 0,
   }));
+}
+
+/**
+ * Oracle (perfect-hindsight) revenue comparison.
+ * Computes the theoretical maximum single-cycle energy arbitrage revenue per day
+ * using actual dispatch prices, then joins with actual daily revenue.
+ *
+ * mw, mwh, region come from KNOWN_BATTERIES (server-side) and are interpolated
+ * as numeric/string literals — NOT user input — so this is safe from injection.
+ */
+export async function getOracleComparison(
+  key: string,
+  region: string,
+  mw: number,
+  mwh: number,
+  days?: number
+): Promise<BatteryOracleRow[]> {
+  // Number of 5-min intervals to fully charge or discharge at the rated MW
+  const nCycles = Math.floor((mwh / mw) * 12);
+  const limitClause = days != null ? `LIMIT ${days}` : "";
+
+  const rows = await query<{ date: string; actual: number; oracle: number; efficiency_pct: number | null }>(
+    `WITH ranked AS (
+       SELECT
+         (settlement_date - INTERVAL '4 hours')::DATE AS trading_day,
+         rrp,
+         ROW_NUMBER() OVER (
+           PARTITION BY (settlement_date - INTERVAL '4 hours')::DATE
+           ORDER BY rrp DESC
+         ) AS dis_rank,
+         ROW_NUMBER() OVER (
+           PARTITION BY (settlement_date - INTERVAL '4 hours')::DATE
+           ORDER BY rrp ASC
+         ) AS chg_rank
+       FROM dispatch_prices
+       WHERE region = ?
+     ),
+     oracle_daily AS (
+       SELECT
+         trading_day,
+         GREATEST(0.0,
+           ${mw} * (5.0 / 60) * (
+             COALESCE(SUM(rrp) FILTER (WHERE dis_rank <= ${nCycles}), 0) -
+             COALESCE(SUM(rrp) FILTER (WHERE chg_rank <= ${nCycles}), 0)
+           )
+         ) AS oracle_revenue
+       FROM ranked
+       GROUP BY trading_day
+     )
+     SELECT
+       CAST(a.date AS VARCHAR) AS date,
+       COALESCE(a.net, 0) AS actual,
+       COALESCE(o.oracle_revenue, 0) AS oracle,
+       CASE
+         WHEN o.oracle_revenue > 0
+         THEN LEAST(100.0 * COALESCE(a.net, 0) / o.oracle_revenue, 200)
+         ELSE NULL
+       END AS efficiency_pct
+     FROM battery_revenue_daily a
+     LEFT JOIN oracle_daily o ON o.trading_day = a.date
+     WHERE a.battery_key = ?
+     ORDER BY a.date DESC
+     ${limitClause}`,
+    region,
+    key
+  );
+  return rows;
 }

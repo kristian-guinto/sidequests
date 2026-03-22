@@ -31,6 +31,16 @@ export const BATTERY_COLORS: Record<string, string> = {
   gannawarra: "#f472b6",
   dalrymple_north: "#2dd4bf",
   wandoan: "#facc15",
+  torrens_island: "#ef4444",
+  blyth: "#7c3aed",
+  templers: "#059669",
+  capital_battery: "#b45309",
+  rangebank: "#4f46e5",
+  hazelwood: "#be185d",
+  koorangie: "#0891b2",
+  tarong: "#65a30d",
+  western_downs: "#78716c",
+  greenbank: "#0ea5e9",
 }
 
 export const CLUSTER_COLORS = [
@@ -57,6 +67,16 @@ export const BATTERY_DISPLAY_NAMES: Record<string, string> = {
   gannawarra: "Gannawarra",
   dalrymple_north: "Dalrymple North",
   wandoan: "Wandoan",
+  torrens_island: "Torrens Island",
+  blyth: "Blyth",
+  templers: "Templers",
+  capital_battery: "Capital Battery",
+  rangebank: "Rangebank",
+  hazelwood: "Hazelwood",
+  koorangie: "Koorangie",
+  tarong: "Tarong",
+  western_downs: "Western Downs",
+  greenbank: "Greenbank",
 }
 
 /** Nameplate MWh capacity — used to normalise revenue to $/MWh for fair cross-site comparison. */
@@ -68,4 +88,14 @@ export const BATTERY_MWH_CAPACITY: Record<string, number> = {
   gannawarra: 50.0,
   dalrymple_north: 8.0,
   wandoan: 150.0,
+  torrens_island: 250.0,
+  blyth: 400.0,
+  templers: 330.0,
+  capital_battery: 200.0,
+  rangebank: 400.0,
+  hazelwood: 150.0,
+  koorangie: 119.0,
+  tarong: 600.0,
+  western_downs: 540.0,
+  greenbank: 400.0,
 }
