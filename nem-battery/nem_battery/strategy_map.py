@@ -38,28 +38,32 @@ FCAS_COLUMNS = [
 PRICE_COLUMNS = ["rrp"]
 MW_COLUMNS = ["discharge_mw", "charge_mw"]
 FEATURE_COLUMNS = [
+    "state_reversal_count",
+    "normalised_total_variation",
+    "utilization_factor",
+    "energy_price_pearson_correlation",
+    "energy_price_spearman_correlation",
+    "price_selectivity_index",
     "fcas_revenue_share",
     "reg_vs_contingency_ratio",
-    "raise_vs_lower_bias",
     "revenue_diversity_index",
     "co_optimization_frequency",
-    "revenue_per_mw",
-    "daily_cycle_count",
-    "utilization_factor",
-    "charge_discharge_ratio",
-    "discharge_peak_intensity",
-    "resting_time_avg",
-    "energy_price_correlation",
-    "negative_price_capture",
-    "discharge_strike_price",
-    "charge_strike_price",
-    "discharge_price_premium",
-    "volatility_capture_rate",
     "evening_peak_weight",
     "morning_peak_weight",
     "solar_soak_charge_weight",
     "overnight_charge_weight",
-    "price_response_speed",
+    "negative_price_capture",
+    # "raise_vs_lower_bias",
+    # "revenue_per_mw",
+    # "daily_cycle_count",
+    # "charge_discharge_ratio",
+    # "discharge_peak_intensity",
+    # "resting_time_avg",
+    # "discharge_strike_price",
+    # "charge_strike_price",
+    # "discharge_price_premium",
+    # "volatility_capture_rate",
+    # "price_response_speed",
 ]
 
 
@@ -330,6 +334,54 @@ def _price_response_speed(
     return float(np.average(scores, weights=weights)) if weights else 0.0
 
 
+def _state_reversal_count(energy_mw: np.ndarray) -> int:
+    sign_energy_mw = np.sign(energy_mw)
+    reversals = np.diff(sign_energy_mw)
+    reversal_count = int(np.sum(reversals != 0))
+
+    return reversal_count
+
+
+def _normalised_total_variation(energy_mw: np.ndarray) -> float:
+    total_variation = np.sum(np.abs(np.diff(energy_mw)))
+    normalised_tv = total_variation / (np.sum(np.abs(energy_mw)) + EPSILON)
+    return float(normalised_tv)
+
+
+def _pearson_correlation(x: np.ndarray, y: np.ndarray) -> float:
+    if len(x) == 0 or len(y) == 0:
+        return 0.0
+    if np.std(x) <= 0.0 or np.std(y) <= 0.0:
+        return 0.0
+    return float(np.corrcoef(x, y)[0, 1])
+
+
+def _spearman_correlation(x: np.ndarray, y: np.ndarray) -> float:
+    if len(x) == 0 or len(y) == 0:
+        return 0.0
+    if np.std(x) <= 0.0 or np.std(y) <= 0.0:
+        return 0.0
+    rank_x = np.argsort(np.argsort(x))
+    rank_y = np.argsort(np.argsort(y))
+    return float(np.corrcoef(rank_x, rank_y)[0, 1])
+
+
+def _price_selectivity_index(rrp: np.ndarray, energy_mw: np.ndarray) -> float:
+    if len(rrp) == 0 or len(energy_mw) == 0:
+        return 0.0
+    positive_mask = energy_mw > 0.0
+    negative_mask = energy_mw < 0.0
+    if not positive_mask.any() or not negative_mask.any():
+        return 0.0
+    mean_positive_rrp = float(rrp[positive_mask].mean())
+    mean_negative_rrp = float(rrp[negative_mask].mean())
+    if mean_positive_rrp + mean_negative_rrp == 0.0:
+        return 0.0
+    return float(
+        (mean_positive_rrp - mean_negative_rrp) / (abs(mean_positive_rrp) + abs(mean_negative_rrp))
+    )
+
+
 def _day_feature_row(
     battery_key: str,
     trading_day: pd.Timestamp,
@@ -389,13 +441,14 @@ def _day_feature_row(
     ]
 
     discharge_weighted_rrp = _weighted_average(discharge_rrp, positive_discharge)
-    correlation = 0.0
-    if np.std(discharge) > 0.0 and np.std(rrp) > 0.0:
-        correlation = float(np.corrcoef(discharge, rrp)[0, 1])
+    rrp_power_pearson_correlation = _pearson_correlation(rrp, energy_mw / battery.mw_capacity)
+    rrp_power_spearman_correlation = _spearman_correlation(rrp, energy_mw)
 
     negative_price_mask = rrp < 0.0
     negative_price_capture = (
-        float(charge[negative_price_mask].mean()) if negative_price_mask.any() else 0.0
+        float(charge[negative_price_mask].mean()) / float(battery.mw_capacity)
+        if negative_price_mask.any()
+        else 0.0
     )
 
     return {
@@ -403,39 +456,25 @@ def _day_feature_row(
         "battery_name": battery_name,
         "region": region,
         "trading_day": trading_day,
+        # Operational complexity features
+        "state_reversal_count": _state_reversal_count(energy_mw),
+        "normalised_total_variation": _normalised_total_variation(energy_mw),
+        "utilization_factor": float(np.mean((discharge > 0.0) | (charge > 0.0))),
+        # Market reactivity features
+        "energy_price_pearson_correlation": rrp_power_pearson_correlation,
+        "energy_price_spearman_correlation": rrp_power_spearman_correlation,
+        "price_selectivity_index": _price_selectivity_index(rrp, energy_mw),
+        # value stacking
         "fcas_revenue_share": _safe_divide(total_fcas, energy_value + total_fcas),
         "reg_vs_contingency_ratio": _safe_divide(
             raise_reg + lower_reg,
-            total_fcas,
-        ),
-        "raise_vs_lower_bias": _safe_divide(
-            raise_contingency + raise_reg,
             total_fcas,
         ),
         "revenue_diversity_index": _shannon_entropy(streams),
         "co_optimization_frequency": float(
             np.mean((np.abs(energy_mw) > 0.0) & (total_fcas_interval > 0.0))
         ),
-        "revenue_per_mw": _safe_divide(day_net, max_discharge),
-        "daily_cycle_count": _safe_divide(total_discharge * INTERVAL_HOURS, cycle_denominator),
-        "utilization_factor": float(np.mean((discharge > 0.0) | (charge > 0.0))),
-        "charge_discharge_ratio": _safe_divide(total_discharge, total_charge + EPSILON),
-        "discharge_peak_intensity": _safe_divide(
-            max_discharge,
-            float(positive_discharge.mean()) if len(positive_discharge) else 0.0,
-        ),
-        "resting_time_avg": _resting_time_avg(state),
-        "energy_price_correlation": correlation,
-        "negative_price_capture": negative_price_capture,
-        "discharge_strike_price": (
-            float(np.percentile(discharge_rrp, 10)) if len(discharge_rrp) else 0.0
-        ),
-        "charge_strike_price": float(np.percentile(charge_rrp, 90)) if len(charge_rrp) else 0.0,
-        "discharge_price_premium": _safe_divide(discharge_weighted_rrp, day_mean_rrp),
-        "volatility_capture_rate": _safe_divide(
-            float(positive_interval_net[top_indices].sum()) if len(top_indices) else 0.0,
-            float(positive_interval_net.sum()),
-        ),
+        # temporal strategy features
         "evening_peak_weight": _safe_divide(
             float(day.loc[evening_mask, "discharge_mw"].sum()),
             total_discharge,
@@ -452,11 +491,37 @@ def _day_feature_row(
             float(day.loc[overnight_mask, "charge_mw"].sum()),
             total_charge,
         ),
-        "price_response_speed": _price_response_speed(rrp, discharge, charge),
+        # others
+        "negative_price_capture": negative_price_capture,
+        # data collection only
         "net": day_net,
         "opportunity_capture": _opportunity_capture(
             rrp, discharge, charge, actual_energy_revenue, actual_energy_cost
         ),
+        "max_rrp": float(rrp.max()) if len(rrp) else 0.0,
+        # end
+        "raise_vs_lower_bias": _safe_divide(
+            raise_contingency + raise_reg,
+            total_fcas,
+        ),
+        "revenue_per_mw": _safe_divide(day_net, max_discharge),
+        "daily_cycle_count": _safe_divide(total_discharge * INTERVAL_HOURS, cycle_denominator),
+        "charge_discharge_ratio": _safe_divide(total_discharge, total_charge + EPSILON),
+        "discharge_peak_intensity": _safe_divide(
+            max_discharge,
+            float(positive_discharge.mean()) if len(positive_discharge) else 0.0,
+        ),
+        "resting_time_avg": _resting_time_avg(state),
+        "discharge_strike_price": (
+            float(np.percentile(discharge_rrp, 10)) if len(discharge_rrp) else 0.0
+        ),
+        "charge_strike_price": float(np.percentile(charge_rrp, 90)) if len(charge_rrp) else 0.0,
+        "discharge_price_premium": _safe_divide(discharge_weighted_rrp, day_mean_rrp),
+        "volatility_capture_rate": _safe_divide(
+            float(positive_interval_net[top_indices].sum()) if len(top_indices) else 0.0,
+            float(positive_interval_net.sum()),
+        ),
+        "price_response_speed": _price_response_speed(rrp, discharge, charge),
     }
 
 
@@ -483,9 +548,15 @@ def train_strategy_model(
     dbscan_eps: float = 0.6,
     dbscan_min_samples: int = 10,
     random_state: int = 42,
+    drop_cols: Sequence[str] | None = None,
 ) -> StrategyArtifacts:
+
+    if drop_cols:
+        features = features.drop(columns=drop_cols)
+
+    _feature_columns = [col for col in FEATURE_COLUMNS if col in features.columns]
     scaler = StandardScaler()
-    matrix = scaler.fit_transform(features[FEATURE_COLUMNS])
+    matrix = scaler.fit_transform(features[_feature_columns])
 
     embedding_2d = umap.UMAP(
         n_components=2,
@@ -511,12 +582,16 @@ def train_strategy_model(
         random_state=random_state,
     ).fit_transform(matrix)
 
+    _mwh_capacity_map = {key: battery.mwh_capacity for key, battery in KNOWN_BATTERIES.items()}
     meta_columns = ["battery_key", "battery_name", "region", "trading_day"]
     viz2 = features[meta_columns].copy()
     viz2["x"] = embedding_2d[:, 0]
     viz2["y"] = embedding_2d[:, 1]
     viz2["cluster"] = labels.astype(str)
     viz2["net_revenue"] = features["net"]
+    viz2["revenue_per_mwh"] = viz2.apply(
+        lambda row: row["net_revenue"] / _mwh_capacity_map.get(row["battery_key"], 1), axis=1
+    )
     viz2["opportunity_capture"] = features["opportunity_capture"]
 
     viz3 = features[meta_columns].copy()
@@ -525,11 +600,14 @@ def train_strategy_model(
     viz3["z"] = embedding_3d[:, 2]
     viz3["cluster"] = labels.astype(str)
     viz3["net_revenue"] = features["net"]
+    viz3["revenue_per_mwh"] = viz3.apply(
+        lambda row: row["net_revenue"] / _mwh_capacity_map.get(row["battery_key"], 1), axis=1
+    )
     viz3["opportunity_capture"] = features["opportunity_capture"]
 
     cluster_summary = (
         features.assign(cluster=labels.astype(str))
-        .groupby("cluster")[FEATURE_COLUMNS]
+        .groupby("cluster")[_feature_columns]
         .mean()
         .reset_index()
         .sort_values("cluster")
@@ -577,14 +655,15 @@ _CREATE_EMBEDDING_TABLE = """
         z             DOUBLE,
         cluster_id    INTEGER,
         daily_revenue DOUBLE,
+        revenue_per_mwh DOUBLE,
         PRIMARY KEY (trading_day, battery_key)
     )
 """
 
 _UPSERT_EMBEDDING = """
     INSERT INTO battery_strategy_embedding
-        (trading_day, battery_key, battery_name, region, x, y, z, cluster_id, daily_revenue)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (trading_day, battery_key, battery_name, region, x, y, z, cluster_id, daily_revenue, revenue_per_mwh)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT (trading_day, battery_key) DO UPDATE SET
         battery_name  = EXCLUDED.battery_name,
         region        = EXCLUDED.region,
@@ -592,7 +671,8 @@ _UPSERT_EMBEDDING = """
         y             = EXCLUDED.y,
         z             = EXCLUDED.z,
         cluster_id    = EXCLUDED.cluster_id,
-        daily_revenue = EXCLUDED.daily_revenue
+        daily_revenue = EXCLUDED.daily_revenue,
+        revenue_per_mwh = EXCLUDED.revenue_per_mwh
 """
 
 
@@ -627,9 +707,158 @@ def write_embeddings_to_db(artifacts: StrategyArtifacts, target: str = "local") 
                     lambda r: rev_lookup.get((r["trading_day_str"], r["battery_key"])),  # type: ignore[return-value]
                     axis=1,
                 ),
+                viz3["revenue_per_mwh"].astype(float),
             )
         )
         conn.executemany(_UPSERT_EMBEDDING, rows)
+        return len(rows)
+    finally:
+        conn.close()
+
+
+def write_cluster_summary_to_db(artifacts: StrategyArtifacts, target: str = "local") -> int:
+    """Upsert cluster summary statistics into battery_strategy_cluster_summary."""
+    url = _resolve_target_url(target)
+    conn = duckdb.connect(url)
+    try:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS battery_strategy_cluster_summary (
+                cluster_id INTEGER PRIMARY KEY,
+                state_reversal_count DOUBLE,
+                normalised_total_variation DOUBLE,
+                utilization_factor DOUBLE,
+                energy_price_pearson_correlation DOUBLE,
+                energy_price_spearman_correlation DOUBLE,
+                price_selectivity_index DOUBLE,
+                fcas_revenue_share DOUBLE,
+                reg_vs_contingency_ratio DOUBLE,
+                revenue_diversity_index DOUBLE,
+                co_optimization_frequency DOUBLE,
+                evening_peak_weight DOUBLE,
+                morning_peak_weight DOUBLE,
+                solar_soak_charge_weight DOUBLE,
+                overnight_charge_weight DOUBLE,
+                negative_price_capture DOUBLE
+            )
+            """
+        )
+
+        rows = list(
+            zip(
+                pd.to_numeric(artifacts.cluster_summary["cluster"], errors="coerce")
+                .fillna(-1)
+                .astype(int),
+                artifacts.cluster_summary["state_reversal_count"].astype(float),
+                artifacts.cluster_summary["normalised_total_variation"].astype(float),
+                artifacts.cluster_summary["utilization_factor"].astype(float),
+                artifacts.cluster_summary["energy_price_pearson_correlation"].astype(float),
+                artifacts.cluster_summary["energy_price_spearman_correlation"].astype(float),
+                artifacts.cluster_summary["price_selectivity_index"].astype(float),
+                artifacts.cluster_summary["fcas_revenue_share"].astype(float),
+                artifacts.cluster_summary["reg_vs_contingency_ratio"].astype(float),
+                artifacts.cluster_summary["revenue_diversity_index"].astype(float),
+                artifacts.cluster_summary["co_optimization_frequency"].astype(float),
+                artifacts.cluster_summary["evening_peak_weight"].astype(float),
+                artifacts.cluster_summary["morning_peak_weight"].astype(float),
+                artifacts.cluster_summary["solar_soak_charge_weight"].astype(float),
+                artifacts.cluster_summary["overnight_charge_weight"].astype(float),
+                artifacts.cluster_summary["negative_price_capture"].astype(float),
+            )
+        )
+        conn.executemany(
+            """
+            INSERT INTO battery_strategy_cluster_summary
+            (cluster_id, state_reversal_count, normalised_total_variation, utilization_factor, energy_price_pearson_correlation, energy_price_spearman_correlation, price_selectivity_index, fcas_revenue_share, reg_vs_contingency_ratio, revenue_diversity_index, co_optimization_frequency, evening_peak_weight, morning_peak_weight, solar_soak_charge_weight, overnight_charge_weight, negative_price_capture)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (cluster_id) DO UPDATE SET
+                state_reversal_count = EXCLUDED.state_reversal_count,
+                normalised_total_variation = EXCLUDED.normalised_total_variation,
+                utilization_factor = EXCLUDED.utilization_factor,
+                energy_price_pearson_correlation = EXCLUDED.energy_price_pearson_correlation,
+                energy_price_spearman_correlation = EXCLUDED.energy_price_spearman_correlation,
+                price_selectivity_index = EXCLUDED.price_selectivity_index,
+                fcas_revenue_share = EXCLUDED.fcas_revenue_share,
+                reg_vs_contingency_ratio = EXCLUDED.reg_vs_contingency_ratio,
+                revenue_diversity_index = EXCLUDED.revenue_diversity_index,
+                co_optimization_frequency = EXCLUDED.co_optimization_frequency,
+                evening_peak_weight = EXCLUDED.evening_peak_weight,
+                morning_peak_weight = EXCLUDED.morning_peak_weight,
+                solar_soak_charge_weight = EXCLUDED.solar_soak_charge_weight,
+                overnight_charge_weight = EXCLUDED.overnight_charge_weight,
+                negative_price_capture = EXCLUDED.negative_price_capture
+            """,
+            rows,
+        )
+        return len(rows)
+    finally:
+        conn.close()
+
+
+def write_2d_embedding_to_db(artifacts: StrategyArtifacts, target: str = "local") -> int:
+    """Upsert 2D embeddings joined with daily revenue into battery_strategy_embedding_2d."""
+    viz2 = artifacts.embedding_2d.copy()
+    viz2["cluster_id"] = pd.to_numeric(viz2["cluster"], errors="coerce").fillna(-1).astype(int)
+    viz2["trading_day_str"] = viz2["trading_day"].dt.strftime("%Y-%m-%d")
+
+    url = _resolve_target_url(target)
+    conn = duckdb.connect(url)
+    try:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS battery_strategy_embedding_2d (
+                trading_day   DATE    NOT NULL,
+                battery_key   VARCHAR NOT NULL,
+                battery_name  VARCHAR,
+                region        VARCHAR,
+                x             DOUBLE,
+                y             DOUBLE,
+                cluster_id    INTEGER,
+                daily_revenue DOUBLE,
+                revenue_per_mwh DOUBLE,
+                PRIMARY KEY (trading_day, battery_key)
+            )
+            """
+        )
+
+        # Build a lookup of (date_str, battery_key) -> daily net revenue
+        rev_rows = conn.execute(
+            "SELECT date::VARCHAR AS d, battery_key, net FROM battery_revenue_daily"
+        ).fetchall()
+        rev_lookup: dict[tuple[str, str], float] = {(r[0], r[1]): r[2] for r in rev_rows}
+
+        rows = list(
+            zip(
+                viz2["trading_day_str"],
+                viz2["battery_key"],
+                viz2["battery_name"],
+                viz2["region"],
+                viz2["x"].astype(float),
+                viz2["y"].astype(float),
+                viz2["cluster_id"].astype(int),
+                viz2.apply(
+                    lambda r: rev_lookup.get((r["trading_day_str"], r["battery_key"])),  # type: ignore[return-value]
+                    axis=1,
+                ),
+                viz2["revenue_per_mwh"].astype(float),
+            )
+        )
+        conn.executemany(
+            """
+            INSERT INTO battery_strategy_embedding_2d
+            (trading_day, battery_key, battery_name, region, x, y, cluster_id, daily_revenue, revenue_per_mwh)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (trading_day, battery_key) DO UPDATE SET
+                battery_name  = EXCLUDED.battery_name,
+                region        = EXCLUDED.region,
+                x             = EXCLUDED.x,
+                y             = EXCLUDED.y,
+                cluster_id    = EXCLUDED.cluster_id,
+                daily_revenue = EXCLUDED.daily_revenue,
+                revenue_per_mwh = EXCLUDED.revenue_per_mwh
+            """,
+            rows,
+        )
         return len(rows)
     finally:
         conn.close()
@@ -699,6 +928,7 @@ def plot_cluster_feature_means(artifacts: StrategyArtifacts) -> None:
         relative_values,
         x=relative_values.columns.astype(str),
         y=relative_values.index,
+        text_auto=".2%",
         labels={"x": "Cluster", "y": "Feature", "color": "Relative Value"},
         color_continuous_scale="Blues",
         aspect="auto",
@@ -796,6 +1026,14 @@ def run_pipeline(
             "No complete 288-interval trading days were found in battery_revenue_interval."
         )
     features = build_feature_frame(prepared)
+
+    # additional filters
+    features = features[features["net"] != 0].reset_index(drop=True)  # remove zero-revenue days
+
+    # remove outliers since we want to capture strategy rather than extreme price events
+    p95_max_rrp = features["max_rrp"].quantile(0.95)
+    features = features[features["max_rrp"] <= p95_max_rrp].reset_index(drop=True)
+
     artifacts = train_strategy_model(
         features,
         clusterer=clusterer,
@@ -806,6 +1044,8 @@ def run_pipeline(
     save_outputs(artifacts, output_dir)
     if write_db:
         write_embeddings_to_db(artifacts, target=target)
+        write_cluster_summary_to_db(artifacts, target=target)
+        write_2d_embedding_to_db(artifacts, target=target)
     return artifacts
 
 
