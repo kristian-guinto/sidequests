@@ -59,7 +59,7 @@ from dotenv import load_dotenv
 from nem_battery.battery import KNOWN_BATTERIES, calculate_daily_revenue, calculate_revenue
 from nem_battery.reports.dispatch import fetch_dispatch_interval
 from nem_battery.reports.nextday import fetch_next_day_dispatch
-from nem_battery.types import DispatchDay, DispatchInterval
+from nem_battery._types import DispatchDay, DispatchInterval
 
 if TYPE_CHECKING:
     import duckdb as _duckdb_mod

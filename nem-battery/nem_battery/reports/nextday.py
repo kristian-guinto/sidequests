@@ -30,7 +30,7 @@ from nem_battery.reports.dispatch import (
     _build_prices,
     _build_unit_solutions,
 )
-from nem_battery.types import DispatchDay, DispatchInterval
+from nem_battery._types import DispatchDay, DispatchInterval
 
 _UNIT_SOLUTION_TABLES = {"UNIT_SOLUTION"}
 _PRICE_TABLES = {"PRICE"}

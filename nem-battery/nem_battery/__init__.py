@@ -56,7 +56,7 @@ from nem_battery.reports.nextday import fetch_next_day_dispatch
 from nem_battery.reports.scada import fetch_scada
 from nem_battery.reports.trading import fetch_trading_prices
 from nem_battery.stream import stream_dispatch, stream_dispatch_to
-from nem_battery.types import (
+from nem_battery._types import (
     FCAS_SERVICES,
     DailyRevenue,
     DispatchDay,

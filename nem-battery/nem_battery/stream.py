@@ -30,7 +30,7 @@ import httpx
 from nem_battery import _client
 from nem_battery.reports import dispatch as _dispatch
 from nem_battery.reports import scada as _scada
-from nem_battery.types import DispatchInterval
+from nem_battery._types import DispatchInterval
 
 _log = logging.getLogger(__name__)
 

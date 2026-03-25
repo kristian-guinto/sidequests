@@ -27,7 +27,7 @@ from nem_battery import (
     stream_dispatch,
 )
 from nem_battery.battery import Battery
-from nem_battery.types import FCAS_SERVICES, DailyRevenue, IntervalRevenue
+from nem_battery._types import FCAS_SERVICES, DailyRevenue, IntervalRevenue
 
 app = typer.Typer(
     name="nem-battery",
@@ -350,7 +350,11 @@ def cmd_ingest_daily(
         typer.Option("--target", "-t", metavar="NAME", help=_TARGET_HELP),
     ] = "local",
 ) -> None:
-    """Ingest a full historical day into DB (pipeline)."""
+    """Ingest a full historical day into DB (pipeline).
+
+    Always force-replaces existing interval rows with settled Next_Day_Dispatch
+    values, correcting any preliminary data written by the 5-min live ingest.
+    """
     from nem_battery import pipeline
 
     if date_str:
@@ -368,7 +372,7 @@ def cmd_ingest_daily(
     else:
         day = date.today() - timedelta(days=1)
         print(f"(no date specified, defaulting to yesterday: {day})")
-    asyncio.run(pipeline.run_ingest_day(day, target))
+    asyncio.run(pipeline.run_ingest_day(day, target, force=True))
 
 
 @app.command("backfill")

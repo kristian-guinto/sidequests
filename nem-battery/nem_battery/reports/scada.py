@@ -15,7 +15,7 @@ from __future__ import annotations
 import httpx
 
 from nem_battery import _client, _parser
-from nem_battery.types import ScadaReading
+from nem_battery._types import ScadaReading
 
 _TABLES = {"UNIT_SCADA"}
 

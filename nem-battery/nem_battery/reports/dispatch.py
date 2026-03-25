@@ -19,7 +19,7 @@ from datetime import datetime
 import httpx
 
 from nem_battery import _client, _parser
-from nem_battery.types import DispatchInterval, RegionPrices, UnitSolution
+from nem_battery._types import DispatchInterval, RegionPrices, UnitSolution
 
 _TABLES = {"PRICE", "UNIT_SOLUTION"}
 
