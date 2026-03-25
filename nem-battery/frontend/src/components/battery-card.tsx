@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { BatterySparkline } from "@/components/battery-sparkline";
 import type { BatteryMeta, BatterySummaryRow } from "@/lib/types";
+import { CLUSTER_NAMES, CLUSTER_COLORS } from "@/lib/strategy-types";
 
 function fmtRevenue(v: number): string {
   const abs = Math.abs(v);
@@ -29,9 +30,22 @@ export function BatteryCard({ batteryKey, meta, summary }: Props) {
         <CardHeader className="pb-2">
           <div className="flex items-start justify-between gap-2">
             <CardTitle className="text-base leading-tight">{meta.name}</CardTitle>
-            <Badge variant="outline" className="shrink-0 text-xs">
-              {meta.region}
-            </Badge>
+            <div className="flex items-center gap-1 shrink-0">
+              {summary?.dominant_cluster != null && (
+                <Badge
+                  className="text-xs border-0"
+                  style={{
+                    backgroundColor: CLUSTER_COLORS[summary.dominant_cluster],
+                    color: "#fff",
+                  }}
+                >
+                  {CLUSTER_NAMES[summary.dominant_cluster]}
+                </Badge>
+              )}
+              <Badge variant="outline" className="text-xs">
+                {meta.region}
+              </Badge>
+            </div>
           </div>
           <p className="text-xs text-muted-foreground">
             {meta.mw != null ? `${meta.mw} MW` : "—"}

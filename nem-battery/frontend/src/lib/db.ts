@@ -10,7 +10,7 @@
  */
 
 import path from "path";
-import type { BatteryDailyRow, BatteryIntervalRow, BatterySummaryRow, BatteryMonthlyRow, BatteryStatsRow, BatteryOracleRow } from "./types";
+import type { BatteryDailyRow, BatteryIntervalRow, BatterySummaryRow, BatteryMonthlyRow, BatteryStatsRow, BatteryOracleRow, ClusterSummaryRow } from "./types";
 import { KNOWN_BATTERIES } from "./types";
 import type { StrategyPoint } from "./strategy-types";
 import type { DuckDBConnection } from "@duckdb/node-api";
@@ -157,7 +157,12 @@ export async function getDailyRevenue(key: string, days?: number): Promise<Batte
   );
 }
 
-/** All 5-min interval rows for one battery on a given date (YYYY-MM-DD). */
+/** All 5-min interval rows for one battery on a given date (YYYY-MM-DD).
+ *
+ * NEM dispatch days run from 00:05 to 00:00 the next day (288 intervals).
+ * The midnight interval (settlement_date = (date+1) 00:00:00) belongs to this
+ * trading day, so we use a range query instead of a DATE equality check.
+ */
 export async function getIntervalsForDay(
   key: string,
   date: string
@@ -166,17 +171,24 @@ export async function getIntervalsForDay(
     `SELECT *
      FROM battery_revenue_interval
      WHERE battery_key = ?
-       AND settlement_date::DATE = ?::DATE
+       AND settlement_date > ?::DATE
+       AND settlement_date <= (?::DATE + INTERVAL '1 day')
      ORDER BY settlement_date`,
     key,
+    date,
     date
   );
 }
 
-/** Distinct dates available for a battery in the interval table. */
+/** Distinct dates available for a battery in the interval table.
+ *
+ * Subtracts 5 minutes before extracting the date so that the midnight interval
+ * (settlement_date = (date+1) 00:00:00) is correctly attributed to its trading
+ * day (date) rather than creating a ghost entry for the next calendar day.
+ */
 export async function getAvailableDates(key: string): Promise<string[]> {
   const rows = await query<{ date: string }>(
-    `SELECT DISTINCT settlement_date::DATE::VARCHAR AS date
+    `SELECT DISTINCT (settlement_date - INTERVAL '5 minutes')::DATE::VARCHAR AS date
      FROM battery_revenue_interval
      WHERE battery_key = ?
      ORDER BY date DESC`,
@@ -187,7 +199,7 @@ export async function getAvailableDates(key: string): Promise<string[]> {
 
 /** Analytics summary for all batteries: all-time totals + 30-day sparkline. */
 export async function getBatterySummaries(): Promise<BatterySummaryRow[]> {
-  const [statsRows, sparklineRows] = await Promise.all([
+  const [statsRows, sparklineRows, clusterRows] = await Promise.all([
     query<{
       battery_key: string;
       total_revenue: number;
@@ -221,6 +233,12 @@ export async function getBatterySummaries(): Promise<BatterySummaryRow[]> {
       GROUP BY battery_key, LEFT(CAST(date AS VARCHAR), 7)
       ORDER BY battery_key, month
     `),
+    query<{ battery_key: string; dominant_cluster: number }>(`
+      SELECT battery_key, MODE(cluster_id) AS dominant_cluster
+      FROM battery_strategy_embedding_2d
+      WHERE cluster_id >= 0
+      GROUP BY battery_key
+    `),
   ]);
 
   const sparklineByKey: Record<string, { month: string; net_energy: number; fcas: number }[]> = {};
@@ -230,6 +248,7 @@ export async function getBatterySummaries(): Promise<BatterySummaryRow[]> {
   }
 
   const statsByKey = Object.fromEntries(statsRows.map((r) => [r.battery_key, r]));
+  const clusterByKey = Object.fromEntries(clusterRows.map((r) => [r.battery_key, r.dominant_cluster]));
 
   return Object.keys(KNOWN_BATTERIES).map((key) => {
     const s = statsByKey[key];
@@ -240,6 +259,7 @@ export async function getBatterySummaries(): Promise<BatterySummaryRow[]> {
       fcas_share_pct: s?.fcas_share_pct ?? 0,
       avg_daily_revenue: s?.avg_daily_revenue ?? 0,
       sparkline: sparklineByKey[key] ?? [],
+      dominant_cluster: clusterByKey[key] ?? null,
     };
   });
 }
@@ -289,8 +309,39 @@ export async function getBatteryStats(key: string): Promise<BatteryStatsRow | nu
   return rows[0] ?? null;
 }
 
-/** All 3-D UMAP embeddings from battery_strategy_embedding, most recent first. */
+/** All 2-D UMAP embeddings from battery_strategy_embedding_2d, most recent first. */
 export async function getStrategyEmbeddings(): Promise<StrategyPoint[]> {
+  const rows = await query<{
+    trading_day: string
+    battery_key: string
+    x: number
+    y: number
+    cluster_id: number
+    daily_revenue: number | null
+  }>(
+    `SELECT
+       trading_day::VARCHAR AS trading_day,
+       battery_key,
+       x, y,
+       cluster_id,
+       daily_revenue
+     FROM battery_strategy_embedding_2d
+     ORDER BY trading_day DESC, battery_key`
+  );
+  return rows.map((r) => ({
+    id: `${r.battery_key}_${r.trading_day}`,
+    battery_key: r.battery_key,
+    date: r.trading_day,
+    x: Number(r.x),
+    y: Number(r.y),
+    z: 0,
+    cluster_id: r.cluster_id ?? -1,
+    daily_revenue: r.daily_revenue ?? 0,
+  }));
+}
+
+/** All 3-D UMAP embeddings from battery_strategy_embedding (x, y, z). */
+export async function getStrategyEmbeddings3D(): Promise<StrategyPoint[]> {
   const rows = await query<{
     trading_day: string
     battery_key: string
@@ -319,6 +370,32 @@ export async function getStrategyEmbeddings(): Promise<StrategyPoint[]> {
     cluster_id: r.cluster_id ?? -1,
     daily_revenue: r.daily_revenue ?? 0,
   }));
+}
+
+/** Mean feature values per cluster from battery_strategy_cluster_summary. */
+export async function getClusterSummaries(): Promise<ClusterSummaryRow[]> {
+  const rows = await query<ClusterSummaryRow>(
+    `SELECT
+       cluster_id,
+       state_reversal_count,
+       normalised_total_variation,
+       utilization_factor,
+       energy_price_pearson_correlation,
+       energy_price_spearman_correlation,
+       price_selectivity_index,
+       fcas_revenue_share,
+       reg_vs_contingency_ratio,
+       revenue_diversity_index,
+       co_optimization_frequency,
+       evening_peak_weight,
+       morning_peak_weight,
+       solar_soak_charge_weight,
+       overnight_charge_weight,
+       negative_price_capture
+     FROM battery_strategy_cluster_summary
+     ORDER BY cluster_id`
+  );
+  return rows;
 }
 
 /**

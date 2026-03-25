@@ -167,6 +167,8 @@ export interface BatterySummaryRow {
   /** Average daily revenue over days with recorded activity (excludes non-operating days). */
   avg_daily_revenue: number;
   sparkline: { month: string; net_energy: number; fcas: number }[];
+  /** Dominant strategy cluster (most frequent cluster_id), or null if no embedding data. */
+  dominant_cluster: number | null;
 }
 
 /** Monthly aggregate — from /api/batteries/[key]/monthly. */
@@ -185,6 +187,26 @@ export interface BatteryStatsRow {
   fcas_share_pct: number;
   best_day_revenue: number;
   avg_daily_revenue: number;
+}
+
+/** Mean feature values per cluster — from /api/strategy/cluster-summary. */
+export interface ClusterSummaryRow {
+  cluster_id: number;
+  state_reversal_count: number;
+  normalised_total_variation: number;
+  utilization_factor: number;
+  energy_price_pearson_correlation: number;
+  energy_price_spearman_correlation: number;
+  price_selectivity_index: number;
+  fcas_revenue_share: number;
+  reg_vs_contingency_ratio: number;
+  revenue_diversity_index: number;
+  co_optimization_frequency: number;
+  evening_peak_weight: number;
+  morning_peak_weight: number;
+  solar_soak_charge_weight: number;
+  overnight_charge_weight: number;
+  negative_price_capture: number;
 }
 
 /** Oracle (perfect-hindsight) comparison row — from /api/batteries/[key]/oracle. */

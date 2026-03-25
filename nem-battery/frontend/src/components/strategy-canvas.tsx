@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useRef } from "react"
+import { memo, useMemo, useRef } from "react"
 import { Canvas, useFrame } from "@react-three/fiber"
 import { OrbitControls } from "@react-three/drei"
 import * as THREE from "three"
@@ -149,7 +149,7 @@ export interface StrategyCanvasProps {
   onHover: (p: StrategyPoint | null) => void
 }
 
-export function StrategyCanvas({ points, colorMode, minRevenue, maxRevenue, hoveredId, onHover }: StrategyCanvasProps) {
+function StrategyCanvasInner({ points, colorMode, minRevenue, maxRevenue, hoveredId, onHover }: StrategyCanvasProps) {
   return (
     <Canvas
       camera={{ position: [7, 5, 9], fov: 55, near: 0.1, far: 100 }}
@@ -167,3 +167,5 @@ export function StrategyCanvas({ points, colorMode, minRevenue, maxRevenue, hove
     </Canvas>
   )
 }
+
+export const StrategyCanvas = memo(StrategyCanvasInner)

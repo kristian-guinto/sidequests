@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  CartesianGrid,
   Cell,
   ResponsiveContainer,
   Scatter,
@@ -9,6 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useTheme } from "next-themes";
 import type { StrategyPoint } from "@/lib/strategy-types";
 import { CLUSTER_COLORS, CLUSTER_NAMES } from "@/lib/strategy-types";
 
@@ -65,6 +67,8 @@ interface Props {
 }
 
 export function StrategyScatter2D({ thisPoints, otherPoints }: Props) {
+  const { resolvedTheme } = useTheme();
+  const edgeStroke = resolvedTheme === "dark" ? "#ffffff" : "#1a1a1a";
   if (thisPoints.length === 0 && otherPoints.length === 0) {
     return (
       <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
@@ -76,15 +80,11 @@ export function StrategyScatter2D({ thisPoints, otherPoints }: Props) {
     );
   }
 
-  // Derive present clusters from thisPoints for legend
-  const presentClusters = [...new Set(thisPoints.map((p) => p.cluster_id))].sort(
-    (a, b) => a - b
-  );
-
   return (
     <div className="space-y-3">
       <ResponsiveContainer width="100%" height={360}>
         <ScatterChart margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.08} strokeWidth={1} />
           <XAxis
             type="number"
             dataKey="x"
@@ -103,58 +103,44 @@ export function StrategyScatter2D({ thisPoints, otherPoints }: Props) {
             tickFormatter={() => ""}
             label={{ value: "UMAP 2", angle: -90, position: "insideLeft", fontSize: 9, fill: "currentColor", fillOpacity: 0.4 }}
           />
-          <Tooltip content={<ScatterTooltip />} cursor={false} />
+          {/* Tooltip disabled - no hover information */}
 
-          {/* Background: all other batteries */}
-          <Scatter
-            data={otherPoints}
-            isAnimationActive={false}
-            shape="circle"
-          >
-            {otherPoints.map((_, i) => (
-              <Cell key={`bg-${i}`} fill="rgb(113 113 122)" fillOpacity={0.15} />
+          {/* Background: other batteries — hollow circles in cluster colour */}
+          <Scatter data={otherPoints} isAnimationActive={false} shape="circle">
+            {otherPoints.map((p, i) => (
+              <Cell key={`bg-${i}`} fill="none" stroke={clusterColor(p.cluster_id)} strokeWidth={1} r={1.5} />
             ))}
           </Scatter>
 
-          {/* Foreground: this battery, colored by cluster */}
-          <Scatter
-            data={thisPoints}
-            isAnimationActive={false}
-            shape="circle"
-          >
-            {thisPoints.map((p, i) => (
-              <Cell
-                key={`fg-${i}`}
-                fill={clusterColor(p.cluster_id)}
-                fillOpacity={0.85}
-                r={4}
-              />
+          {/* Foreground: selected battery — amber with white edge, stands out from cluster colours */}
+          <Scatter data={thisPoints} isAnimationActive={false} shape="circle">
+            {thisPoints.map((_, i) => (
+              <Cell key={`fg-${i}`} fill="#F59E0B" fillOpacity={1} r={3} stroke={edgeStroke} strokeWidth={1.5} />
             ))}
           </Scatter>
         </ScatterChart>
       </ResponsiveContainer>
 
-      {/* Cluster legend */}
-      {presentClusters.length > 0 && (
-        <div className="flex flex-wrap gap-3 px-1">
-          {presentClusters.map((cid) => (
-            <div key={cid} className="flex items-center gap-1.5 text-xs">
-              <div
-                className="h-2.5 w-2.5 rounded-full"
-                style={{ backgroundColor: clusterColor(cid) }}
-              />
-              <span className="text-muted-foreground">{clusterLabel(cid)}</span>
-            </div>
-          ))}
-          <div className="flex items-center gap-1.5 text-xs">
-            <div className="h-2.5 w-2.5 rounded-full bg-zinc-500 opacity-30" />
-            <span className="text-muted-foreground">Other batteries</span>
-          </div>
+      {/* Legend */}
+      <div className="flex flex-wrap gap-3 px-1">
+        <div className="flex items-center gap-1.5 text-xs">
+          <div className="h-3 w-3 rounded-full" style={{ backgroundColor: "#F59E0B" }} />
+          <span className="text-muted-foreground font-medium">This battery</span>
         </div>
-      )}
+        <span className="text-muted-foreground/30 text-xs">·</span>
+        {[0, 1, 2].map((cid) => (
+          <div key={cid} className="flex items-center gap-1.5 text-xs">
+            <div
+              className="h-2.5 w-2.5 rounded-full"
+              style={{ border: `2px solid ${clusterColor(cid)}`, background: "transparent" }}
+            />
+            <span className="text-muted-foreground">{clusterLabel(cid)}</span>
+          </div>
+        ))}
+      </div>
       {thisPoints.length > 0 && (
         <p className="text-xs text-muted-foreground px-1">
-          {thisPoints.length} trading days plotted · each dot = one day&apos;s strategy
+          {thisPoints.length} trading days · each dot = one day&apos;s strategy
         </p>
       )}
     </div>

@@ -68,7 +68,7 @@ export function StrategyMap() {
   const [hiPct, setHiPct] = useState(98)
 
   useEffect(() => {
-    fetch("/api/strategy/points")
+    fetch("/api/strategy/points3d")
       .then((res) => res.json())
       .then((data: StrategyPoint[]) => {
         if (Array.isArray(data) && data.length > 0) {

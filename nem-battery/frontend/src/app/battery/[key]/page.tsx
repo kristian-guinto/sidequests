@@ -13,6 +13,8 @@ import { MonthlyRevenueChart } from "@/components/monthly-revenue-chart";
 import { RevenueHeatmap } from "@/components/revenue-heatmap";
 import { OracleChart } from "@/components/oracle-chart";
 import { StrategyScatter2D } from "@/components/strategy-scatter-2d";
+import { StrategyClusterGuide } from "@/components/strategy-cluster-guide";
+import { StrategyMethodNote } from "@/components/strategy-method-note";
 import { IntervalChart, IntervalPowerChart } from "@/components/interval-chart";
 import {
   KNOWN_BATTERIES,
@@ -24,6 +26,7 @@ import {
   type BatterySummaryRow,
 } from "@/lib/types";
 import type { StrategyPoint } from "@/lib/strategy-types";
+import { CLUSTER_NAMES, CLUSTER_COLORS } from "@/lib/strategy-types";
 
 function fmtDollar(v: number): string {
   const abs = Math.abs(v);
@@ -356,6 +359,19 @@ export default function BatteryDetailPage() {
       ? sortedDates.slice(windowStart, windowEnd)
       : sortedDates.slice(0, maxVisibleDates);
 
+  const thisStrategyPoints = strategyPoints.filter((p) => p.battery_key === batteryKey);
+  const otherStrategyPoints = strategyPoints.filter((p) => p.battery_key !== batteryKey);
+
+  // Compute dominant cluster (most days) for the cluster guide highlight
+  const clusterCounts: Record<number, number> = {};
+  for (const p of thisStrategyPoints) {
+    clusterCounts[p.cluster_id] = (clusterCounts[p.cluster_id] ?? 0) + 1;
+  }
+  const dominantCluster =
+    thisStrategyPoints.length > 0
+      ? Number(Object.entries(clusterCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 0)
+      : undefined;
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -458,27 +474,62 @@ export default function BatteryDetailPage() {
             </Card>
           </TabsContent>
 
-          {/* Strategy tab — 2D UMAP scatter */}
-          <TabsContent value="strategy" className="space-y-4">
+          {/* Strategy tab — 2D UMAP scatter + cluster guide + method note */}
+          <TabsContent value="strategy" className="space-y-6">
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium">
                   Strategy Map — where does this battery sit in strategy space?
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
                 {!strategyLoaded ? (
                   <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
                     Loading…
                   </div>
                 ) : (
-                  <StrategyScatter2D
-                    thisPoints={strategyPoints.filter((p) => p.battery_key === batteryKey)}
-                    otherPoints={strategyPoints.filter((p) => p.battery_key !== batteryKey)}
-                  />
+                  <>
+                    <StrategyScatter2D
+                      thisPoints={thisStrategyPoints}
+                      otherPoints={otherStrategyPoints}
+                    />
+                    {thisStrategyPoints.length > 0 && (
+                      <div className="space-y-1.5 pt-2 border-t">
+                        <p className="text-xs font-medium">Days by strategy cluster</p>
+                        {Object.entries(clusterCounts)
+                          .map(([cid, n]) => ({ cid: Number(cid), n }))
+                          .sort((a, b) => b.n - a.n)
+                          .map(({ cid, n }) => {
+                            const pct = Math.round((n / thisStrategyPoints.length) * 100);
+                            const color = CLUSTER_COLORS[cid] ?? "#71717a";
+                            const name = CLUSTER_NAMES[cid] ?? `Cluster ${cid}`;
+                            return (
+                              <div key={cid} className="flex items-center gap-2">
+                                <div className="w-40 text-xs text-muted-foreground truncate">{name}</div>
+                                <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
+                                  <div
+                                    className="h-full rounded-full"
+                                    style={{ width: `${pct}%`, backgroundColor: color }}
+                                  />
+                                </div>
+                                <div className="text-xs text-muted-foreground tabular-nums w-24 text-right">
+                                  {n} days ({pct}%)
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    )}
+                  </>
                 )}
               </CardContent>
             </Card>
+            {strategyLoaded && thisStrategyPoints.length > 0 && (
+              <>
+                <StrategyClusterGuide dominantCluster={dominantCluster} />
+                <StrategyMethodNote />
+              </>
+            )}
           </TabsContent>
 
           {/* Potential tab — oracle comparison */}
