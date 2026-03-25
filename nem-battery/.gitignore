@@ -10,4 +10,4 @@ wheels/
 .venv
 *.env
 
-*/strategy-map-output*
+nbs/*
