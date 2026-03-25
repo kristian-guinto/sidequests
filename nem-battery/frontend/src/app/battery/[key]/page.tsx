@@ -476,6 +476,7 @@ export default function BatteryDetailPage() {
 
           {/* Strategy tab — 2D UMAP scatter + cluster guide + method note */}
           <TabsContent value="strategy" className="space-y-6">
+            <StrategyMethodNote />
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium">
@@ -525,10 +526,7 @@ export default function BatteryDetailPage() {
               </CardContent>
             </Card>
             {strategyLoaded && thisStrategyPoints.length > 0 && (
-              <>
-                <StrategyClusterGuide dominantCluster={dominantCluster} />
-                <StrategyMethodNote />
-              </>
+              <StrategyClusterGuide dominantCluster={dominantCluster} />
             )}
           </TabsContent>
 

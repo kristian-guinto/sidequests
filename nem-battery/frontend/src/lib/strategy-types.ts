@@ -1,5 +1,5 @@
 /**
- * A single point in 3D strategy space — one battery, one day.
+ * A single point in 2D strategy space — one battery, one day.
  *
  * Schema (DuckDB table `battery_strategy_embedding_2d`):
  *   trading_day DATE        -- the trading day
@@ -15,12 +15,9 @@ export interface StrategyPoint {
   date: string         // YYYY-MM-DD
   x: number
   y: number
-  z: number            // unused for 2D; always 0
   daily_revenue: number   // AUD
   cluster_id: number
 }
-
-export type ColorMode = "revenue" | "battery" | "cluster"
 
 export const BATTERY_COLORS: Record<string, string> = {
   hornsdale: "#fb923c",
@@ -152,44 +149,3 @@ export const FEATURE_GROUPS: FeatureGroup[] = [
     ],
   },
 ]
-
-export const BATTERY_DISPLAY_NAMES: Record<string, string> = {
-  hornsdale: "Hornsdale",
-  victorian_big_battery: "Victorian Big Battery",
-  wallgrove: "Wallgrove",
-  lake_bonney: "Lake Bonney",
-  gannawarra: "Gannawarra",
-  dalrymple_north: "Dalrymple North",
-  wandoan: "Wandoan",
-  torrens_island: "Torrens Island",
-  blyth: "Blyth",
-  templers: "Templers",
-  capital_battery: "Capital Battery",
-  rangebank: "Rangebank",
-  hazelwood: "Hazelwood",
-  koorangie: "Koorangie",
-  tarong: "Tarong",
-  western_downs: "Western Downs",
-  greenbank: "Greenbank",
-}
-
-/** Nameplate MWh capacity — used to normalise revenue to $/MWh for fair cross-site comparison. */
-export const BATTERY_MWH_CAPACITY: Record<string, number> = {
-  hornsdale: 193.5,
-  victorian_big_battery: 450.0,
-  wallgrove: 75.0,
-  lake_bonney: 52.0,
-  gannawarra: 50.0,
-  dalrymple_north: 8.0,
-  wandoan: 150.0,
-  torrens_island: 250.0,
-  blyth: 400.0,
-  templers: 330.0,
-  capital_battery: 200.0,
-  rangebank: 400.0,
-  hazelwood: 150.0,
-  koorangie: 119.0,
-  tarong: 600.0,
-  western_downs: 540.0,
-  greenbank: 400.0,
-}

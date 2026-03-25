@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Orbit } from "lucide-react";
 import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -64,13 +63,6 @@ export function BatteryGrid() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Link
-              href="/strategy"
-              className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}
-            >
-              <Orbit className="h-3.5 w-3.5" />
-              Strategy Map
-            </Link>
             <ThemeToggle />
           </div>
         </div>

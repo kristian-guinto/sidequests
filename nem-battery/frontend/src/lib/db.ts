@@ -334,39 +334,6 @@ export async function getStrategyEmbeddings(): Promise<StrategyPoint[]> {
     date: r.trading_day,
     x: Number(r.x),
     y: Number(r.y),
-    z: 0,
-    cluster_id: r.cluster_id ?? -1,
-    daily_revenue: r.daily_revenue ?? 0,
-  }));
-}
-
-/** All 3-D UMAP embeddings from battery_strategy_embedding (x, y, z). */
-export async function getStrategyEmbeddings3D(): Promise<StrategyPoint[]> {
-  const rows = await query<{
-    trading_day: string
-    battery_key: string
-    x: number
-    y: number
-    z: number
-    cluster_id: number
-    daily_revenue: number | null
-  }>(
-    `SELECT
-       trading_day::VARCHAR AS trading_day,
-       battery_key,
-       x, y, z,
-       cluster_id,
-       daily_revenue
-     FROM battery_strategy_embedding
-     ORDER BY trading_day DESC, battery_key`
-  );
-  return rows.map((r) => ({
-    id: `${r.battery_key}_${r.trading_day}`,
-    battery_key: r.battery_key,
-    date: r.trading_day,
-    x: Number(r.x),
-    y: Number(r.y),
-    z: Number(r.z),
     cluster_id: r.cluster_id ?? -1,
     daily_revenue: r.daily_revenue ?? 0,
   }));
