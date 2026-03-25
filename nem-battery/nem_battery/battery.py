@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from nem_battery.types import (
+from nem_battery._types import (
     FCAS_SERVICES,
     DailyRevenue,
     DispatchDay,
@@ -145,8 +145,8 @@ KNOWN_BATTERIES: dict[str, Battery] = {
         name="Blyth BESS",
         region="SA1",
         generator_duid="BLYTHB1",
-        mw_capacity=200.0,
-        mwh_capacity=400.0,
+        mw_capacity=237.5,
+        mwh_capacity=477.0,
     ),
     "templers": Battery(
         name="Templers BESS",
@@ -187,8 +187,8 @@ KNOWN_BATTERIES: dict[str, Battery] = {
         name="Koorangie BESS",
         region="VIC1",
         generator_duid="KESSB1",
-        mw_capacity=119.0,
-        mwh_capacity=119.0,
+        mw_capacity=185.0,
+        mwh_capacity=370.0,
     ),
     "tarong": Battery(
         name="Tarong BESS",
@@ -201,8 +201,8 @@ KNOWN_BATTERIES: dict[str, Battery] = {
         name="Western Downs BESS",
         region="QLD1",
         generator_duid="WDBESS1",
-        mw_capacity=270.0,
-        mwh_capacity=540.0,
+        mw_capacity=540.0,
+        mwh_capacity=1080.0,
     ),
     "greenbank": Battery(
         name="Greenbank BESS",
