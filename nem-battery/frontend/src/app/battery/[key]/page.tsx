@@ -57,7 +57,7 @@ function fmtWeekday(s: string): string {
   return d.toLocaleDateString("en-AU", { weekday: "long" });
 }
 
-const FCAS_SERVICES: { key: keyof BatteryDailyRow; label: string }[] = [
+const FCAS_SERVICE_KEYS: { key: keyof BatteryIntervalRow; label: string }[] = [
   { key: "raise6sec", label: "Raise 6s" },
   { key: "raise60sec", label: "Raise 60s" },
   { key: "raise5min", label: "Raise 5m" },
@@ -68,13 +68,35 @@ const FCAS_SERVICES: { key: keyof BatteryDailyRow; label: string }[] = [
   { key: "lowerreg", label: "Lower Reg" },
 ];
 
-function FcasBreakdown({ row }: { row: BatteryDailyRow }) {
-  const total = row.net;
+function FcasBreakdown({ rows }: { rows: BatteryIntervalRow[] }) {
+  if (rows.length === 0) {
+    return (
+      <p className="text-xs text-muted-foreground py-2">
+        No interval data for this date.
+      </p>
+    );
+  }
+
+  const energyRevenue = rows.reduce((s, r) => s + r.energy_revenue, 0);
+  const energyCost = rows.reduce((s, r) => s + r.energy_cost, 0);
+  const netEnergy = energyRevenue - energyCost;
+  const totalFcas = rows.reduce((s, r) => s + r.total_fcas, 0);
+  const net = netEnergy + totalFcas;
+  const intervalCount = rows.length;
+
+  const fcasByKey: Record<string, number> = {};
+  for (const { key } of FCAS_SERVICE_KEYS) {
+    fcasByKey[key] = rows.reduce((s, r) => s + (r[key] as number), 0);
+  }
+
   const sharePct = (v: number) =>
-    Math.abs(total) > 0 ? ((v / total) * 100).toFixed(0) + "%" : "—";
+    Math.abs(net) > 0 ? ((v / net) * 100).toFixed(0) + "%" : "—";
 
   return (
     <div className="overflow-x-auto">
+      <p className="text-xs text-muted-foreground mb-2">
+        {intervalCount} × 5-min intervals
+      </p>
       <table className="w-full text-xs">
         <thead>
           <tr className="border-b text-muted-foreground">
@@ -87,16 +109,16 @@ function FcasBreakdown({ row }: { row: BatteryDailyRow }) {
           <tr className="border-b border-border/40 hover:bg-muted/20 font-medium">
             <td className="py-1.5 text-green-600 dark:text-green-400">Energy</td>
             <td
-              className={`py-1.5 text-right font-mono ${row.net_energy >= 0 ? "text-green-500" : "text-red-500"}`}
+              className={`py-1.5 text-right font-mono ${netEnergy >= 0 ? "text-green-500" : "text-red-500"}`}
             >
-              {fmtDollar(row.net_energy)}
+              {fmtDollar(netEnergy)}
             </td>
             <td className="py-1.5 text-right text-muted-foreground">
-              {sharePct(row.net_energy)}
+              {sharePct(netEnergy)}
             </td>
           </tr>
-          {FCAS_SERVICES.map(({ key, label }) => {
-            const v = row[key] as number;
+          {FCAS_SERVICE_KEYS.map(({ key, label }) => {
+            const v = fcasByKey[key];
             return (
               <tr key={key} className="border-b border-border/40 hover:bg-muted/20">
                 <td className="py-1.5 pl-3 text-muted-foreground">{label}</td>
@@ -114,9 +136,9 @@ function FcasBreakdown({ row }: { row: BatteryDailyRow }) {
           <tr className="border-t border-border font-semibold">
             <td className="pt-2 pb-1">Total</td>
             <td
-              className={`pt-2 pb-1 text-right font-mono ${total >= 0 ? "text-green-500" : "text-red-500"}`}
+              className={`pt-2 pb-1 text-right font-mono ${net >= 0 ? "text-green-500" : "text-red-500"}`}
             >
-              {fmtDollar(total)}
+              {fmtDollar(net)}
             </td>
             <td className="pt-2 pb-1 text-right text-muted-foreground">100%</td>
           </tr>
@@ -676,8 +698,8 @@ export default function BatteryDetailPage() {
               </TabsContent>
             </Tabs>
 
-            {/* Daily revenue breakdown for the selected date */}
-            {selectedDayRow && (
+            {/* Revenue breakdown derived directly from interval rows */}
+            {selectedDate && (
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium">
@@ -685,7 +707,13 @@ export default function BatteryDetailPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <FcasBreakdown row={selectedDayRow} />
+                  {intervalLoading ? (
+                    <div className="flex h-16 items-center justify-center text-sm text-muted-foreground">
+                      Loading…
+                    </div>
+                  ) : (
+                    <FcasBreakdown rows={intervalRows} />
+                  )}
                 </CardContent>
               </Card>
             )}
