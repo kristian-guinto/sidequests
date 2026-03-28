@@ -10,7 +10,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date, datetime
 
-# The 8 FCAS services cleared in the NEM, in a stable canonical order.
+# The 10 FCAS services cleared in the NEM, in a stable canonical order.
+# RAISE1SEC / LOWER1SEC (1-second contingency) were introduced in November 2023;
+# their enabled-MW values are 0.0 for any interval before that date.
 FCAS_SERVICES: tuple[str, ...] = (
     "RAISE6SEC",
     "RAISE60SEC",
@@ -20,6 +22,8 @@ FCAS_SERVICES: tuple[str, ...] = (
     "LOWER60SEC",
     "LOWER5MIN",
     "LOWERREG",
+    "RAISE1SEC",
+    "LOWER1SEC",
 )
 
 
@@ -38,6 +42,8 @@ class RegionPrices:
     lower60sec: float
     lower5min: float
     lowerreg: float
+    raise1sec: float = 0.0  # 1-second contingency FCAS, post-Nov 2023
+    lower1sec: float = 0.0
 
     def fcas_price(self, service: str) -> float:
         """Return the clearing price for a named FCAS service."""
@@ -63,10 +69,34 @@ class UnitSolution:
     lower60sec: float
     lower5min: float
     lowerreg: float
+    raise1sec: float = 0.0  # 1-second contingency FCAS, post-Nov 2023
+    lower1sec: float = 0.0
+    # Enablement FLAGS per FCAS service.  Odd value (bit 0 set) = enabled.
+    # Default 1 (enabled) so that intervals missing these columns are treated
+    # the same as before: FCAS MW from old files is counted in full.
+    raise6secflags: int = 1
+    raise60secflags: int = 1
+    raise5minflags: int = 1
+    raiseregflags: int = 1
+    lower6secflags: int = 1
+    lower60secflags: int = 1
+    lower5minflags: int = 1
+    lowerregflags: int = 1
+    raise1secflags: int = 1
+    lower1secflags: int = 1
 
     def fcas_mw(self, service: str) -> float:
         """Return enabled FCAS MW for a named service."""
         return getattr(self, service.lower())
+
+    def fcas_enabled(self, service: str) -> bool:
+        """True when the FLAGS for this service indicate the unit is enabled.
+
+        AEMO FLAGS encoding: odd value (bit 0 set) = enabled (1=enabled,
+        3=trapped-but-contributing).  Even value = not contributing
+        (0=not enabled, 4=stranded outside trapezium).
+        """
+        return bool(getattr(self, service.lower() + "flags") % 2 == 1)
 
 
 @dataclass(frozen=True, slots=True)
@@ -130,6 +160,7 @@ class IntervalRevenue:
     fcas_revenue: dict[str, float]  # service → $
     discharge_mw: float
     charge_mw: float
+    mlf: float = 1.0  # Marginal Loss Factor applied to this interval's energy revenue
 
     @property
     def total_fcas(self) -> float:

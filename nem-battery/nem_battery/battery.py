@@ -57,6 +57,7 @@ class Battery:
     load_duid: str | None = None
     mw_capacity: float | None = None
     mwh_capacity: float | None = None
+    mlf: float = 1.0  # Marginal Loss Factor (AEMO annual MLF publication)
 
     @property
     def duids(self) -> list[str]:
@@ -258,14 +259,14 @@ def calculate_revenue(
         discharge_mw = gen_sol.total_cleared if gen_sol else 0.0
         charge_mw = load_sol.total_cleared if load_sol else 0.0
 
-    energy_revenue = discharge_mw * prices.rrp * _INTERVAL_HOURS
-    energy_cost = charge_mw * prices.rrp * _INTERVAL_HOURS
+    energy_revenue = discharge_mw * prices.rrp * _INTERVAL_HOURS * battery.mlf
+    energy_cost = charge_mw * prices.rrp * _INTERVAL_HOURS * battery.mlf
 
     fcas_revenue: dict[str, float] = {}
     for svc in FCAS_SERVICES:
         svc_price = prices.fcas_price(svc)
-        gen_mw = gen_sol.fcas_mw(svc) if gen_sol else 0.0
-        load_mw = load_sol.fcas_mw(svc) if load_sol else 0.0
+        gen_mw = gen_sol.fcas_mw(svc) if (gen_sol and gen_sol.fcas_enabled(svc)) else 0.0
+        load_mw = load_sol.fcas_mw(svc) if (load_sol and load_sol.fcas_enabled(svc)) else 0.0
         fcas_revenue[svc] = (gen_mw + load_mw) * svc_price * _INTERVAL_HOURS
 
     return IntervalRevenue(
@@ -276,6 +277,7 @@ def calculate_revenue(
         fcas_revenue=fcas_revenue,
         discharge_mw=discharge_mw,
         charge_mw=charge_mw,
+        mlf=battery.mlf,
     )
 
 

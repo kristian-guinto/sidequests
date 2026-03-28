@@ -95,6 +95,8 @@ def _build_prices(rows: list[dict[str, str]]) -> dict[str, RegionPrices]:
             lower60sec=_parser.safe_float(row.get("LOWER60SECRRP", "0")),
             lower5min=_parser.safe_float(row.get("LOWER5MINRRP", "0")),
             lowerreg=_parser.safe_float(row.get("LOWERREGRRP", "0")),
+            raise1sec=_parser.safe_float(row.get("RAISE1SECRRP", "0")),
+            lower1sec=_parser.safe_float(row.get("LOWER1SECRRP", "0")),
         )
     return prices
 
@@ -117,6 +119,21 @@ def _build_unit_solutions(rows: list[dict[str, str]]) -> dict[str, UnitSolution]
             lower60sec=_parser.safe_float(row.get("LOWER60SEC", "0")),
             lower5min=_parser.safe_float(row.get("LOWER5MIN", "0")),
             lowerreg=_parser.safe_float(row.get("LOWERREG", "0")),
+            raise1sec=_parser.safe_float(row.get("RAISE1SEC", "0")),
+            lower1sec=_parser.safe_float(row.get("LOWER1SEC", "0")),
+            # FLAGS: odd value (bit 0 set) = enabled. Default 1 so that files
+            # that predate these columns are treated as fully enabled (preserving
+            # prior behaviour). Explicit "0" or "4" from AEMO will override.
+            raise6secflags=int(row.get("RAISE6SECFLAGS") or "1"),
+            raise60secflags=int(row.get("RAISE60SECFLAGS") or "1"),
+            raise5minflags=int(row.get("RAISE5MINFLAGS") or "1"),
+            raiseregflags=int(row.get("RAISEREGFLAGS") or "1"),
+            lower6secflags=int(row.get("LOWER6SECFLAGS") or "1"),
+            lower60secflags=int(row.get("LOWER60SECFLAGS") or "1"),
+            lower5minflags=int(row.get("LOWER5MINFLAGS") or "1"),
+            lowerregflags=int(row.get("LOWERREGFLAGS") or "1"),
+            raise1secflags=int(row.get("RAISE1SECFLAGS") or "1"),
+            lower1secflags=int(row.get("LOWER1SECFLAGS") or "1"),
         )
     return solutions
 

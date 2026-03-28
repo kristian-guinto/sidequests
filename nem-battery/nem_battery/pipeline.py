@@ -59,7 +59,7 @@ from dotenv import load_dotenv
 from nem_battery.battery import KNOWN_BATTERIES, calculate_daily_revenue, calculate_revenue
 from nem_battery.reports.dispatch import fetch_dispatch_interval
 from nem_battery.reports.nextday import fetch_next_day_dispatch
-from nem_battery._types import DispatchDay, DispatchInterval
+from nem_battery._types import FCAS_SERVICES, DispatchDay, DispatchInterval
 
 if TYPE_CHECKING:
     import duckdb as _duckdb_mod
@@ -83,12 +83,14 @@ CREATE TABLE IF NOT EXISTS dispatch_prices (
     lower60sec      DOUBLE,
     lower5min       DOUBLE,
     lowerreg        DOUBLE,
+    raise1sec       DOUBLE,
+    lower1sec       DOUBLE,
     PRIMARY KEY (settlement_date, region)
 )
 """
 
 _INSERT_PRICES = """
-INSERT INTO dispatch_prices VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO dispatch_prices VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT DO NOTHING
 """
 
@@ -113,6 +115,10 @@ CREATE TABLE IF NOT EXISTS battery_revenue_interval (
     lower60sec      DOUBLE,
     lower5min       DOUBLE,
     lowerreg        DOUBLE,
+    generator_duid  VARCHAR,
+    mlf             DOUBLE,
+    raise1sec       DOUBLE,
+    lower1sec       DOUBLE,
     PRIMARY KEY (settlement_date, battery_key)
 )
 """
@@ -137,6 +143,10 @@ CREATE TABLE IF NOT EXISTS battery_revenue_daily (
     lower60sec           DOUBLE,
     lower5min            DOUBLE,
     lowerreg             DOUBLE,
+    generator_duid       VARCHAR,
+    mlf                  DOUBLE,
+    raise1sec            DOUBLE,
+    lower1sec            DOUBLE,
     PRIMARY KEY (date, battery_key)
 )
 """
@@ -144,7 +154,8 @@ CREATE TABLE IF NOT EXISTS battery_revenue_daily (
 _INSERT_INTERVAL = """
 INSERT INTO battery_revenue_interval VALUES (
     ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-    ?, ?, ?, ?, ?, ?, ?, ?
+    ?, ?, ?, ?, ?, ?, ?, ?,
+    ?, ?, ?, ?
 )
 ON CONFLICT DO NOTHING
 """
@@ -153,7 +164,8 @@ _INSERT_DAILY = """
 INSERT INTO battery_revenue_daily VALUES (
     ?, ?, ?, ?, ?,
     ?, ?, ?, ?, ?,
-    ?, ?, ?, ?, ?, ?, ?, ?
+    ?, ?, ?, ?, ?, ?, ?, ?,
+    ?, ?, ?, ?
 )
 ON CONFLICT DO NOTHING
 """
@@ -270,11 +282,34 @@ def connect_target(target: str = "local") -> _duckdb_mod.DuckDBPyConnection:
     return connect(url)
 
 
+# Columns added after initial schema release — applied by _migrate_schema() so
+# that existing databases are upgraded without requiring a manual ALTER TABLE.
+_SCHEMA_MIGRATIONS: list[tuple[str, str, str]] = [
+    ("dispatch_prices", "raise1sec", "DOUBLE"),
+    ("dispatch_prices", "lower1sec", "DOUBLE"),
+    ("battery_revenue_interval", "generator_duid", "VARCHAR"),
+    ("battery_revenue_interval", "mlf", "DOUBLE"),
+    ("battery_revenue_interval", "raise1sec", "DOUBLE"),
+    ("battery_revenue_interval", "lower1sec", "DOUBLE"),
+    ("battery_revenue_daily", "generator_duid", "VARCHAR"),
+    ("battery_revenue_daily", "mlf", "DOUBLE"),
+    ("battery_revenue_daily", "raise1sec", "DOUBLE"),
+    ("battery_revenue_daily", "lower1sec", "DOUBLE"),
+]
+
+
+def _migrate_schema(conn: _duckdb_mod.DuckDBPyConnection) -> None:
+    """Add any missing columns to existing tables (idempotent)."""
+    for table, column, dtype in _SCHEMA_MIGRATIONS:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {dtype}")
+
+
 def ensure_schema(conn: _duckdb_mod.DuckDBPyConnection) -> None:
-    """Create pipeline tables if they don't exist (idempotent)."""
+    """Create pipeline tables if they don't exist, then apply any migrations."""
     conn.execute(_CREATE_PRICES)
     conn.execute(_CREATE_INTERVAL)
     conn.execute(_CREATE_DAILY)
+    _migrate_schema(conn)
 
 
 # ---------------------------------------------------------------------------
@@ -298,6 +333,8 @@ def _price_rows(interval: DispatchInterval) -> list[tuple]:
                 p.lower60sec,
                 p.lower5min,
                 p.lowerreg,
+                p.raise1sec,
+                p.lower1sec,
             )
         )
     return rows
@@ -337,6 +374,10 @@ def _revenue_interval_rows(
                 fcas.get("LOWER60SEC", 0.0),
                 fcas.get("LOWER5MIN", 0.0),
                 fcas.get("LOWERREG", 0.0),
+                battery.generator_duid,
+                battery.mlf,
+                fcas.get("RAISE1SEC", 0.0),
+                fcas.get("LOWER1SEC", 0.0),
             )
         )
     return rows
@@ -352,17 +393,7 @@ def _revenue_daily_rows(
             continue
         rev = calculate_daily_revenue(battery, dispatch_day)
         fcas_by_svc = {
-            svc: sum(i.fcas_revenue.get(svc, 0.0) for i in rev.intervals)
-            for svc in (
-                "RAISE6SEC",
-                "RAISE60SEC",
-                "RAISE5MIN",
-                "RAISEREG",
-                "LOWER6SEC",
-                "LOWER60SEC",
-                "LOWER5MIN",
-                "LOWERREG",
-            )
+            svc: sum(i.fcas_revenue.get(svc, 0.0) for i in rev.intervals) for svc in FCAS_SERVICES
         }
         rows.append(
             (
@@ -384,6 +415,10 @@ def _revenue_daily_rows(
                 fcas_by_svc["LOWER60SEC"],
                 fcas_by_svc["LOWER5MIN"],
                 fcas_by_svc["LOWERREG"],
+                battery.generator_duid,
+                battery.mlf,
+                fcas_by_svc["RAISE1SEC"],
+                fcas_by_svc["LOWER1SEC"],
             )
         )
     return rows
@@ -515,6 +550,127 @@ async def run_ingest_day(
         f"Ingested {day}{label}  intervals={len(dispatch_day.intervals)}  "
         f"prices={total_p}  revenue_interval={total_r}  revenue_daily={n_daily}"
     )
+
+
+def recompute_daily_from_intervals(
+    conn: _duckdb_mod.DuckDBPyConnection,
+    start: date,
+    end: date,
+    battery_keys: set[str] | None = None,
+) -> int:
+    """Recompute battery_revenue_daily by aggregating battery_revenue_interval.
+
+    Pure SQL operation — no AEMO network requests.  The interval table is the
+    sole source of truth; every daily row in [start, end] is rebuilt as the
+    exact sum of its constituent 5-minute rows.  Existing daily rows for the
+    same (date, battery_key) pairs are replaced (UPSERT semantics).
+
+    Trading-day attribution uses ``(settlement_date - INTERVAL '5 minutes')::DATE``
+    so the midnight interval (00:00:00 next calendar day) is correctly counted
+    against the current trading day, matching the frontend query in db.ts.
+
+    Args:
+        conn:         Open DuckDB connection.
+        start:        First trading day to recompute (inclusive).
+        end:          Last trading day to recompute (inclusive).
+        battery_keys: If set, only recompute these battery keys.
+
+    Returns:
+        Number of (date, battery_key) rows written.
+    """
+    battery_filter = ""
+    params: list = [start, end]
+    if battery_keys:
+        placeholders = ", ".join(["?"] * len(battery_keys))
+        battery_filter = f" AND battery_key IN ({placeholders})"
+        params.extend(sorted(battery_keys))
+
+    conn.execute(
+        f"""
+        INSERT INTO battery_revenue_daily
+            (date, battery_key, battery_name, region, interval_count,
+             total_energy_revenue, total_energy_cost, net_energy,
+             total_fcas_revenue, net,
+             raise6sec, raise60sec, raise5min, raisereg,
+             lower6sec, lower60sec, lower5min, lowerreg,
+             generator_duid, mlf, raise1sec, lower1sec)
+        SELECT
+            (settlement_date - INTERVAL '5 minutes')::DATE  AS date,
+            battery_key,
+            ANY_VALUE(battery_name)                         AS battery_name,
+            ANY_VALUE(region)                               AS region,
+            COUNT(*)                                        AS interval_count,
+            SUM(energy_revenue)                             AS total_energy_revenue,
+            SUM(energy_cost)                                AS total_energy_cost,
+            SUM(energy_revenue) - SUM(energy_cost)          AS net_energy,
+            SUM(total_fcas)                                 AS total_fcas_revenue,
+            SUM(net)                                        AS net,
+            SUM(raise6sec),  SUM(raise60sec), SUM(raise5min), SUM(raisereg),
+            SUM(lower6sec),  SUM(lower60sec), SUM(lower5min), SUM(lowerreg),
+            ANY_VALUE(generator_duid)                       AS generator_duid,
+            ANY_VALUE(mlf)                                  AS mlf,
+            COALESCE(SUM(raise1sec),  0)                    AS raise1sec,
+            COALESCE(SUM(lower1sec),  0)                    AS lower1sec
+        FROM battery_revenue_interval
+        WHERE (settlement_date - INTERVAL '5 minutes')::DATE BETWEEN ? AND ?
+          {battery_filter}
+        GROUP BY 1, 2
+        ON CONFLICT (date, battery_key) DO UPDATE SET
+            battery_name         = excluded.battery_name,
+            region               = excluded.region,
+            interval_count       = excluded.interval_count,
+            total_energy_revenue = excluded.total_energy_revenue,
+            total_energy_cost    = excluded.total_energy_cost,
+            net_energy           = excluded.net_energy,
+            total_fcas_revenue   = excluded.total_fcas_revenue,
+            net                  = excluded.net,
+            raise6sec            = excluded.raise6sec,
+            raise60sec           = excluded.raise60sec,
+            raise5min            = excluded.raise5min,
+            raisereg             = excluded.raisereg,
+            lower6sec            = excluded.lower6sec,
+            lower60sec           = excluded.lower60sec,
+            lower5min            = excluded.lower5min,
+            lowerreg             = excluded.lowerreg,
+            generator_duid       = excluded.generator_duid,
+            mlf                  = excluded.mlf,
+            raise1sec            = excluded.raise1sec,
+            lower1sec            = excluded.lower1sec
+        """,
+        params,
+    )
+    row = conn.execute(
+        """
+        SELECT COUNT(*)
+        FROM battery_revenue_daily
+        WHERE date BETWEEN ? AND ?
+        """,
+        [start, end],
+    ).fetchone()
+    return int(row[0]) if row else 0
+
+
+async def run_recompute_daily(
+    start: date,
+    end: date,
+    target: str = "local",
+    battery_keys: set[str] | None = None,
+) -> None:
+    """Recompute battery_revenue_daily from stored interval rows (no network I/O).
+
+    Args:
+        start:        First trading day to recompute (inclusive).
+        end:          Last trading day to recompute (inclusive).
+        target:       Database target name from pyproject.toml (default: ``"local"``).
+        battery_keys: If set, only recompute these battery keys.
+    """
+    conn = connect_target(target)
+    ensure_schema(conn)
+    label = f" (batteries: {', '.join(sorted(battery_keys))})" if battery_keys else ""
+    print(f"Recomputing daily rows from intervals: {start} → {end}{label}…")
+    n = recompute_daily_from_intervals(conn, start, end, battery_keys=battery_keys)
+    conn.close()
+    print(f"Done. {n} daily rows now in [{start}, {end}].")
 
 
 async def run_backfill(

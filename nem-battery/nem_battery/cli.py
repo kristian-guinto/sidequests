@@ -433,6 +433,54 @@ def cmd_backfill(
     )
 
 
+@app.command("recompute-daily")
+def cmd_recompute_daily(
+    start: Annotated[str, typer.Argument(metavar="START", help="First trading day YYYY-MM-DD")],
+    end: Annotated[
+        str,
+        typer.Argument(metavar="END", help="Last trading day YYYY-MM-DD (inclusive)"),
+    ],
+    target: Annotated[
+        str,
+        typer.Option("--target", "-t", metavar="NAME", help=_TARGET_HELP),
+    ] = "local",
+    battery: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--battery",
+            "-b",
+            metavar="KEY",
+            help="Only process this battery (repeat for multiple). Default: all batteries.",
+        ),
+    ] = None,
+) -> None:
+    """Recompute battery_revenue_daily from stored interval rows (no network I/O).
+
+    Aggregates battery_revenue_interval for the date range and writes the
+    results to battery_revenue_daily, replacing any existing rows.  Use this
+    after a backfill or when the daily table has drifted from the interval table
+    due to config changes or partial-day writes.
+    """
+    from nem_battery import pipeline
+
+    try:
+        start_date = date.fromisoformat(start)
+        end_date = date.fromisoformat(end)
+    except ValueError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=1)
+    if start_date > end_date:
+        typer.echo("error: START must not be after END", err=True)
+        raise typer.Exit(code=1)
+    if battery:
+        unknown = set(battery) - set(KNOWN_BATTERIES)
+        if unknown:
+            typer.echo(f"error: unknown battery keys: {', '.join(sorted(unknown))}", err=True)
+            raise typer.Exit(code=1)
+    battery_keys = set(battery) if battery else None
+    asyncio.run(pipeline.run_recompute_daily(start_date, end_date, target, battery_keys))
+
+
 def _db_label(target: str) -> str:
     """Return 'target → url' label, sourcing URL from pyproject.toml targets."""
     from nem_battery import pipeline

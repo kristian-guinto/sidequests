@@ -1,17 +1,17 @@
 """
-Fetch and parse TradingIS reports — 30-minute settlement prices.
+Fetch and parse TradingIS reports — 30-minute averaged prices.
 
 Published every 30 minutes to:
   https://www.nemweb.com.au/Reports/Current/TradingIS_Reports/
 
-The NEM settles financial transactions at the *trading interval* price
-(TRADING_PRICE.RRP), which is the time-weighted average of the six
-5-minute dispatch prices within each 30-minute period. This is the
-price used in generator/load revenue settlement — not the dispatch price.
+The NEM moved to Five-Minute Settlement (5MS) on 1 October 2021. Since then,
+financial settlement and battery revenue calculations are based on 5-minute
+dispatch interval prices from DispatchIS, not from the 30-minute trading
+interval price here.
 
-For battery dashboard purposes:
-  - Use DispatchIS prices for real-time operational monitoring
-  - Use TradingIS prices for financial revenue/cost calculations
+This module is retained for display purposes only (e.g. showing the
+time-weighted average price for a 30-minute window in a dashboard). Do not
+use TradingIS prices for revenue or cost calculations.
 """
 
 from __future__ import annotations

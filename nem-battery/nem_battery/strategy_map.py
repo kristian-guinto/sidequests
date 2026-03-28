@@ -93,7 +93,10 @@ def _cluster_points(
 
 
 def trading_day_for_timestamp(timestamp: pd.Timestamp) -> pd.Timestamp:
-    return (timestamp - pd.Timedelta(hours=4)).normalize()
+    # NEM trading day starts at 04:05 and ends at 04:00 the following calendar
+    # day. Subtracting 4h5m maps every settlement timestamp onto its correct
+    # trading day, including the last interval (04:00 on day T+1 → 23:55 on T).
+    return (timestamp - pd.Timedelta(hours=4, minutes=5)).normalize()
 
 
 def _safe_divide(numerator: float, denominator: float, default: float = 0.0) -> float:
