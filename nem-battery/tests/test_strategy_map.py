@@ -12,9 +12,14 @@ from nem_battery import strategy_map
 def test_trading_day_alignment_uses_4am_boundary() -> None:
     before_boundary = pd.Timestamp("2026-03-02 03:55:00")
     after_boundary = pd.Timestamp("2026-03-02 04:05:00")
+    # 04:00 on day T+1 is the last interval of trading day T, not the first of T+1.
+    last_interval_of_prev_day = pd.Timestamp("2026-03-02 04:00:00")
 
     assert strategy_map.trading_day_for_timestamp(before_boundary) == pd.Timestamp("2026-03-01")
     assert strategy_map.trading_day_for_timestamp(after_boundary) == pd.Timestamp("2026-03-02")
+    assert strategy_map.trading_day_for_timestamp(last_interval_of_prev_day) == pd.Timestamp(
+        "2026-03-01"
+    )
 
 
 def test_resting_time_average_counts_idle_intervals_between_charge_and_discharge() -> None:
