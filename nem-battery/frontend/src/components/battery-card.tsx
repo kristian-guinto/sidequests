@@ -32,15 +32,20 @@ export function BatteryCard({ batteryKey, meta, summary }: Props) {
             <CardTitle className="text-base leading-tight">{meta.name}</CardTitle>
             <div className="flex items-center gap-1 shrink-0">
               {summary?.dominant_cluster != null && (
-                <Badge
-                  className="text-xs border-0"
-                  style={{
-                    backgroundColor: CLUSTER_COLORS[summary.dominant_cluster],
-                    color: "#fff",
-                  }}
+                <Link
+                  href={`/battery/${batteryKey}?tab=strategy`}
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  {CLUSTER_NAMES[summary.dominant_cluster]}
-                </Badge>
+                  <Badge
+                    className="text-xs border-0 hover:opacity-80 transition-opacity"
+                    style={{
+                      backgroundColor: CLUSTER_COLORS[summary.dominant_cluster],
+                      color: "#fff",
+                    }}
+                  >
+                    {CLUSTER_NAMES[summary.dominant_cluster]}
+                  </Badge>
+                </Link>
               )}
               <Badge variant="outline" className="text-xs">
                 {meta.region}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -151,6 +151,7 @@ function FcasBreakdown({ rows }: { rows: BatteryIntervalRow[] }) {
 export default function BatteryDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const batteryKey = typeof params.key === "string" ? params.key : "";
   const meta = KNOWN_BATTERIES[batteryKey];
 
@@ -170,7 +171,10 @@ export default function BatteryDetailPage() {
 
   const [allSummaries, setAllSummaries] = useState<BatterySummaryRow[]>([]);
 
-  const [activeTab, setActiveTab] = useState("monthly");
+  const tabParam = searchParams.get("tab");
+  const validTabs = ["monthly", "intervals", "strategy", "potential"];
+  const initialTab = tabParam && validTabs.includes(tabParam) ? tabParam : "monthly";
+  const [activeTab, setActiveTab] = useState(initialTab);
 
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>("");
