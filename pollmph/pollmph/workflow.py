@@ -34,7 +34,7 @@ def run_sentiment_on_date(
     write_to_db: bool = True,
     adapter: LLMAdapter | None = None,
 ):
-    llm_adapter = adapter or get_xai_adapter(model="grok-4.1-fast-reasoning")
+    llm_adapter = adapter or get_xai_adapter(model="grok-4.3")
     sb_client = get_supabase_client()
     task = SentimentTask(adapter=llm_adapter, sb_client=sb_client, verbose=verbose)
 
@@ -189,7 +189,7 @@ def run_weekly_summary(
     write_to_db: bool = True,
     adapter: LLMAdapter | None = None,
 ):
-    llm_adapter = adapter or get_xai_adapter(model="grok-4.1-fast-reasoning")
+    llm_adapter = adapter or get_xai_adapter(model="grok-4.3")
     sb_client = get_supabase_client()
     task = ContextSummaryTask(adapter=llm_adapter, sb_client=sb_client, verbose=verbose)
 
