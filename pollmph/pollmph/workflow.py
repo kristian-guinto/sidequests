@@ -11,6 +11,7 @@ from pollmph.db import (
     read_sentiment,
     create_sentiment,
     update_proposition_next_run_date,
+    update_proposition_search_queries,
     create_weekly_summary,
     has_weekly_summary_on_date,
 )
@@ -24,6 +25,30 @@ def run_date_interval_policy(attention_value: float) -> int:
         return 3
     else:
         return 7
+
+
+def merge_search_queries(
+    existing: list[str] | None,
+    suggested: list[str] | None,
+    max_queries: int = 8,
+) -> list[str]:
+    """Merge freshly suggested search queries with the existing list.
+
+    Newly suggested queries take priority (they reflect the latest discourse);
+    older queries fill any remaining slots up to `max_queries`. Deduplicates
+    case-insensitively while preserving the first-seen casing.
+    """
+    merged: list[str] = []
+    seen: set[str] = set()
+    for query in [*(suggested or []), *(existing or [])]:
+        key = query.strip().lower()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        merged.append(query.strip())
+        if len(merged) >= max_queries:
+            break
+    return merged
 
 
 def run_sentiment_on_date(
@@ -123,6 +148,19 @@ def run_sentiment_on_date(
                     print(
                         f"Failed to create sentiment for proposition {proposition.proposition_id} on {target_date.strftime('%Y-%m-%d')}."
                     )
+
+                # refresh recommended search queries with freshly discovered terms
+                if output.suggested_search_queries:
+                    merged_queries = merge_search_queries(
+                        proposition.search_queries, output.suggested_search_queries
+                    )
+                    if merged_queries != (proposition.search_queries or []):
+                        update_proposition_search_queries(
+                            sb_client, proposition.proposition_id, merged_queries
+                        )
+                        print(
+                            f"  Search queries refreshed for {proposition.proposition_id}: {merged_queries}"
+                        )
 
             # update next run date based on attention value
             if update_next_run and write_to_db:

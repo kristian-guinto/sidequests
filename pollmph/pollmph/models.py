@@ -20,6 +20,14 @@ class SentimentResponse(BaseModel):
     rationale_consensus: str
     rationale_attention: str
     data_quality: float = Field(ge=0.0, le=1.0)
+    suggested_search_queries: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Updated search queries for future runs, reflecting any new named entities, "
+            "hashtags, bill numbers, or terminology that emerged in today's search results. "
+            "Leave empty if the existing recommended queries are still the best fit."
+        ),
+    )
 
 
 class SentimentModel(SentimentResponse):

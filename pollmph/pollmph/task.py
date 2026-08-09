@@ -110,18 +110,37 @@ class SentimentTask:
             metrics: Consensus (Agreement) and Attention (Volume).
 
             ### INSTRUCTIONS
-            STEP 1: Execute web and social searches using the Recommended Search Queries to gather discourse
-            within the search period. Look for a balance of administration, opposition, and general public
-            reactions.
-            STEP 2: Analyze the sentiment and volume of the data retrieved. Your rationale must be grounded in evidence
-               gathered from the searches within the specified period. Do not paraphrase or recycle rationale from the Prior Context —
-               if the situation is unchanged, say so explicitly and cite what the search results confirmed (or failed to find).
-            STEP 3: Compare the data against the Prior Context to identify whether the trend is continuing,
-                reversing, or accelerating.
-            STEP 4: Output your final evaluation strictly in the JSON format provided below. Do not include
+            STEP 1: Skim the Prior Context (provided below) only to understand the historical baseline.
+                Treat it strictly as background — it describes what was true in the past, not what is
+                true today.
+            STEP 2: Treat the Recommended Search Queries as a starting seed, not a fixed list. Execute web
+                and social searches using them to gather discourse within the search period, looking for a
+                balance of administration, opposition, and general public reactions. Prioritize this fresh
+                evidence over anything in the Prior Context.
+            STEP 3: If your searches surface new named entities, hashtags, bill/case numbers, nicknames, or
+                slang that the Recommended Search Queries don't capture, run additional follow-up searches
+                using those newly discovered terms — political discourse terminology shifts quickly and the
+                seed queries may be stale.
+            STEP 4: Analyze the sentiment and volume of the data retrieved. Your rationale AND your scores must
+                be grounded in evidence gathered from today's searches, not derived from the Prior Context's
+                averages or trend labels. If the situation is genuinely unchanged, say so explicitly and cite
+                the specific new search results that confirm continuity (or explain what you searched for and
+                failed to find) — never assign a score merely because it matches the historical pattern.
+            STEP 5: Only after independently forming your Consensus and Attention scores from fresh evidence,
+                compare them against the Prior Context to describe whether the trend is continuing, reversing,
+                or accelerating. The Prior Context's trend/statistics are a lens for describing movement, not
+                an input for setting today's scores.
+            STEP 6: Populate `suggested_search_queries` with an updated set of queries for future runs —
+                keep the ones that still surfaced relevant discourse, drop ones that returned nothing useful,
+                and add any new terms discovered in Step 3. Leave it empty only if the original queries remain
+                fully adequate with no changes needed.
+            STEP 7: Output your final evaluation strictly in the JSON format provided below. Do not include
                 any conversational text outside the JSON.
 
             ### SCORING RUBRIC
+            The values below are reference anchors on a continuous 0.00-1.00 scale, not the only valid outputs.
+            Use precise decimal values (e.g. 0.62, 0.38) that reflect the actual nuance of today's evidence —
+            do not snap to the nearest quarter-point out of convenience.
 
             METRIC 1: CONSENSUS (0.00 to 1.00)
             Does the public agree with the Proposition?
@@ -130,8 +149,10 @@ class SentimentTask:
             * 0.50: Perfect polarization (a 50/50 war), completely neutral reporting, or apathy.
             * 0.75: Broad support. Generally accepted as true/good, with only a vocal minority opposing.
             * 1.00: Unanimous, enthusiastic agreement.
-            (Note: If Attention is below 0.10, default Consensus to match the most recent day's Consensus value in
-               the Prior Context).
+            (Note: If Attention is below 0.10 AND your searches turned up no new discourse whatsoever, you may
+               carry forward the most recent day's Consensus value from the Prior Context. This is a fallback
+               for a genuine absence of evidence, not a shortcut — if you found any new discourse, score it
+               independently instead.)
 
             METRIC 2: ATTENTION (0.00 to 1.00)
             How loudly is the public talking about this?
@@ -148,16 +169,20 @@ class SentimentTask:
         )
 
         query = f"""
+        ### PRIOR CONTEXT (background only — do not use to set today's scores)
+
+        {prior_context if prior_context else "No prior context provided."}
+
         ### INPUT DATA
 
         Proposition to Evaluate: "{proposition.proposition_text}"
-        Recommended Search Queries: {proposition.search_queries if proposition.search_queries else "No search queries provided."}
+        Recommended Search Queries (seed only, may be stale): {proposition.search_queries if proposition.search_queries else "No search queries provided."}
         Search Period: From {search_start} to {search_end}
         Context Window: Last {self.prior_context_days} days
 
-        Prior Context:
-
-        {prior_context if prior_context else "No prior context provided."}
+        Remember: search for and prioritize fresh discourse from the Search Period above. Your Consensus
+        and Attention scores must reflect what today's searches actually found, not the Prior Context. If
+        the seed queries are stale, search using better terms and report them in `suggested_search_queries`.
         """
 
         completion = self.adapter.stream(

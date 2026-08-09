@@ -40,9 +40,9 @@ def create_sentiment(
 
 def read_sentiment(
     sb_client: SupabaseClient,
-    proposition_id: str | None,
-    start_date: datetime | None,
-    end_date: datetime | None,
+    proposition_id: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
     limit: int = 10,
 ) -> list[SentimentModel] | None:
     query = sb_client.table("sentiments").select("*")
@@ -205,6 +205,25 @@ def update_proposition_next_run_date(
         return response.data
     except Exception as e:
         print(f"Error updating proposition next run date: {e}")
+        return None
+
+
+def update_proposition_search_queries(
+    sb_client: SupabaseClient,
+    proposition_id: str,
+    search_queries: list[str],
+):
+    try:
+        response = (
+            sb_client.table("propositions")
+            .update({"search_queries": search_queries})
+            .eq("proposition_id", proposition_id)
+            .execute()
+        )
+        print(f"Proposition {proposition_id} search queries updated successfully.")
+        return response.data
+    except Exception as e:
+        print(f"Error updating proposition search queries: {e}")
         return None
 
 

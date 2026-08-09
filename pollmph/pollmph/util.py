@@ -75,6 +75,7 @@ def get_mock_adapter(
     rationale_consensus: str = "Mock consensus rationale",
     rationale_attention: str = "Mock attention rationale",
     data_quality: float = 0.85,
+    suggested_search_queries: list[str] | None = None,
 ):
     from pollmph.adapters.mock import MockAdapter
     from pollmph.models import SentimentResponse
@@ -86,6 +87,7 @@ def get_mock_adapter(
         rationale_consensus=rationale_consensus,
         rationale_attention=rationale_attention,
         data_quality=data_quality,
+        suggested_search_queries=suggested_search_queries or [],
     ).model_dump_json()
 
     return MockAdapter(response_json=response_json)
