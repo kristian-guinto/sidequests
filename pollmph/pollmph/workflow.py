@@ -55,6 +55,19 @@ def run_sentiment_on_date(
                 )
                 continue
 
+            print(
+                f"Next run date for proposition {proposition.proposition_id}: {proposition.next_run_date}"
+            )
+
+            if (
+                proposition.next_run_date
+                and proposition.next_run_date > target_date.date()
+            ):
+                print(
+                    f"Proposition {proposition.proposition_id} is not scheduled for sentiment analysis on {target_date.strftime('%Y-%m-%d')}. Skipping.",
+                )
+                continue
+
             # run sentiment task
             print(
                 f"\nRunning sentiment analysis for proposition {proposition.proposition_id} on {target_date.strftime('%Y-%m-%d')}...",
@@ -169,13 +182,13 @@ def run_backfill_sentiment(
 ):
     today = datetime.now()
     for i in range(days_back):
-        target_date = today - timedelta(days=i)
+        target_date = today - timedelta(days=(days_back - i))
         print(f"\n=== Running sentiment for {target_date.strftime('%Y-%m-%d')} ===")
         # disable next_run_date update during backfill to ensure we backfill all dates.
         run_sentiment_on_date(
             target_date,
             proposition_ids=proposition_ids,
-            update_next_run=False,
+            update_next_run=True,
             adapter=adapter,
             write_to_db=not no_db,
             verbose=verbose,
