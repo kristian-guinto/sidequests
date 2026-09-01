@@ -134,7 +134,7 @@ export function EmissionsChart({
           if (rawPt?.timestamp) {
             try {
               formattedTime = format(parseISO(rawPt.timestamp), "d MMM yyyy, h:mm a");
-            } catch {}
+            } catch { }
           }
 
           const rows = params.map((p) => {
@@ -261,15 +261,12 @@ export function EmissionsChart({
 
   return (
     <ChartCard onMouseLeave={() => onHoverPoint?.(null)}>
-      <ChartCardHeader>
+      <ChartCardHeader className="py-2 px-3 sm:px-4">
         <ChartCardTitle>
           <div className="flex items-center space-x-2">
             <CloudFog className="h-4 w-4 text-neutral-500 dark:text-neutral-400" />
             <span>
-              {isPercentage ? "Emissions Contribution Share" : "Emissions Volume"}
-            </span>
-            <span className="text-xs font-normal text-neutral-400 dark:text-neutral-500 font-mono">
-              ({isPercentage ? "% Share" : "tCO₂e/5m"})
+              Emissions ({isPercentage ? "%" : "tCO₂e/5m"})
             </span>
           </div>
           <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-100 dark:bg-[#18181B] text-neutral-800 dark:text-neutral-200 border border-neutral-200/60 dark:border-neutral-800 font-mono shadow-xs">
@@ -279,11 +276,6 @@ export function EmissionsChart({
             </strong>
           </div>
         </ChartCardTitle>
-        <ChartCardDescription>
-          {isPercentage
-            ? "100% relative emissions contribution breakdown by thermal fossil fuel source"
-            : "Estimated greenhouse gas emissions volume generated from thermal fossil fuels"}
-        </ChartCardDescription>
       </ChartCardHeader>
 
       <ChartCardContent>
