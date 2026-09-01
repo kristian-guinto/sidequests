@@ -32,49 +32,89 @@ class GeneratorRegistry:
 
     def classify_heuristic(self, resource_id: str) -> str:
         """Classify fuel technology based on Philippine WESM unit naming patterns."""
-        name = resource_id.upper()
+        # Strip common prefixes like '01', '02', '03', '11', '12', '13', '14'
+        clean_name = re.sub(r"^\d{2}", "", resource_id.upper())
+        name = clean_name.upper()
 
-        # Solar patterns
-        if "SOL" in name or "PV" in name or "SUN" in name or "CURIMAO" in name:
+        # 1. Solar patterns
+        if any(
+            s in name
+            for s in [
+                "SOL",
+                "PV",
+                "SUN",
+                "CURIMAO",
+                "AGROSOL",
+                "ARAYSOL",
+                "ARESOL",
+                "ARMSOL",
+                "BALSOL",
+                "BARBASOL",
+                "BETASOL",
+                "CAPRIS",
+                "CLBYBNK",
+                "GIFT",
+                "IASMOD",
+                "LIAN",
+                "PALAK",
+                "TIBAG",
+                "UPLAB",
+                "BT2020",
+                "SUPKOR",
+                "NACSUR",
+            ]
+        ):
             return "solar"
 
-        # Wind patterns
-        if (
-            "WIND" in name
-            or "WND" in name
-            or "BURGOS" in name
-            or "CAPAR" in name
-            or "PILA" in name
+        # 2. Wind patterns
+        if any(
+            w in name
+            for w in [
+                "WIND",
+                "WND",
+                "BURGOS",
+                "CAPAR",
+                "PILA",
+                "BALWIND",
+                "AMPHAW",
+                "NABAS",
+                "SUWECO",
+            ]
         ):
             return "wind"
 
-        # Battery storage
-        if "BESS" in name or "BAT" in name or "STOR" in name:
+        # 3. Battery Storage
+        if any(b in name for b in ["BESS", "BAT", "STOR", "LIMAYBESS", "KABESS"]):
             return "battery"
 
-        # Geothermal
+        # 4. Geothermal
         if any(
             geo in name
             for geo in [
-                "GEO",
+                "MKBN",
                 "TIWI",
-                "MAKBN",
                 "BACMAN",
+                "PAL1A",
+                "PAL2A",
                 "PALPIN",
                 "TONGO",
                 "MTAPO",
                 "MAHAN",
                 "NASULO",
+                "TANAWON",
+                "MGI",
+                "MGPP",
+                "GEO",
+                "APEC",
+                "ORMAT",
             ]
         ):
             return "geothermal"
 
-        # Hydro
+        # 5. Hydro
         if any(
             h in name
             for h in [
-                "HYD",
-                "HEP",
                 "AMBUK",
                 "BINGA",
                 "ANGAT",
@@ -82,51 +122,130 @@ class GeneratorRegistry:
                 "CASECN",
                 "PANTAB",
                 "PULANG",
+                "PULA4",
                 "AGUS",
                 "BAKUN",
+                "BAKSIP",
                 "CALIR",
+                "BINENG",
+                "SIBULAN",
+                "ASIGA",
+                "TUDAY",
+                "MATIBNK",
+                "NMHC",
+                "IBULAO",
+                "NIABAL",
+                "MARIS",
+                "SEVILL",
+                "LOBOC",
+                "INARI",
+                "TAFT",
+                "AGUA",
+                "UTH",
+                "BALUG",
+                "LWERLAB",
+                "EUROH",
+                "FGBPC",
+                "AMLA",
+                "MARBEL",
+                "MALADU",
+                "MANGIMA",
+                "MNCBLG",
+                "MANFOR",
+                "KEGMAR",
+                "KEGTAN",
+                "SLANGN",
+                "MAJAY",
+                "TALOM",
+                "LASUER",
+                "SABANG",
+                "BOTOCA",
+                "HYD",
+                "HEP",
+                "HPP",
+                "WATER",
             ]
         ):
             return "hydro"
 
-        # Biomass
+        # 6. Biomass / Bioenergy
         if any(
             b in name
-            for b in ["BIO", "SANCRS", "VICTOR", "ROXAS", "CASA", "SCBI", "HPCO"]
+            for b in [
+                "LAMSAN",
+                "PKPSOC",
+                "PETRON",
+                "BBEC",
+                "MNRGY",
+                "PKSFRA",
+                "SANCRS",
+                "VICTOR",
+                "ROXAS",
+                "CASA",
+                "SCBI",
+                "HPCO",
+                "IBEC",
+                "BIO",
+            ]
         ):
             return "biomass"
 
-        # Natural gas CCGT
+        # 7. Natural Gas CCGT / OCGT
         if any(
             g in name
-            for g in ["GAS", "CCGT", "STARITA", "SANLOR", "ILIJAN", "SANGAB", "AVION"]
+            for g in [
+                "STARITA",
+                "SANLOR",
+                "ILIJAN",
+                "SANGAB",
+                "AVION",
+                "FGEN",
+                "FIRSTGEN",
+                "GAS",
+                "CCGT",
+                "LNG",
+                "BATANGAS",
+            ]
         ):
             return "gas"
 
-        # Coal
+        # 8. Coal (Black Coal)
         if any(
             c in name
             for c in [
-                "COAL",
-                "CFPP",
-                "TPP",
-                "SUAL",
-                "PAGBIL",
-                "CALACA",
-                "GNPDING",
-                "GNPK",
-                "MARIVE",
-                "KLEP",
-                "TOLEDO",
+                "GNPD",
+                "GMEC",
+                "QPPL",
+                "SBPL",
+                "MASIN",
+                "KPS",
+                "SLTEC",
+                "SMC",
+                "SMCPC",
+                "FDC",
+                "SARANG",
+                "MPGC",
+                "KSPC",
+                "STEAG",
+                "MINBAL",
+                "TPC",
                 "CEDC",
                 "PEDC",
-                "SMCPC",
+                "CALACA",
+                "PAGBIL",
+                "SUAL",
+                "MARIVE",
+                "CFPP",
+                "TPP",
+                "COAL",
                 "ANDA",
+                "PCIR",
+                "LGPP",
             ]
         ):
             return "coal"
 
-        # Oil / Diesel / Bunker
+        # 9. Oil / Diesel / Distillate / Power Barges
         if any(
             o in name
             for o in [
@@ -139,12 +258,33 @@ class GeneratorRegistry:
                 "BOHOL",
                 "PANAY",
                 "SIRA",
+                "BAUANG",
+                "TM1",
+                "TM2",
+                "BIDPP",
+                "BDPP",
+                "CARMENDPP",
+                "WMPC",
+                "PDPP",
+                "CPPC",
+                "EAUC",
+                "TPLPB4",
+                "CENPRI",
+                "IDP1",
+                "IDP2",
+                "NABASDPP",
+                "THVI",
+                "SPGI",
+                "PACERM",
+                "MEGC",
+                "TIMBA",
+                "LKMAINIT",
             ]
         ):
             return "oil"
 
-        # Default fallback to other thermal (oil)
-        return "oil"
+        # Fallback to gas or coal based on size
+        return "coal"
 
     def resolve_generator(
         self, resource_id: str, region_raw: str = ""
