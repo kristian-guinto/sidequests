@@ -85,11 +85,10 @@ export function Header({
               <button
                 key={r.id}
                 onClick={() => onRegionChange(r.id)}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                  region === r.id
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${region === r.id
                     ? "bg-white text-slate-900 font-semibold shadow-sm"
                     : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
-                }`}
+                  }`}
               >
                 {r.label}
               </button>
@@ -120,9 +119,8 @@ export function Header({
             <button
               key={r.id}
               onClick={() => onRegionChange(r.id)}
-              className={`px-3 py-1 rounded-md text-xs font-medium whitespace-nowrap transition ${
-                region === r.id ? "bg-slate-900 text-white font-semibold" : "text-slate-600 bg-slate-100"
-              }`}
+              className={`px-3 py-1 rounded-md text-xs font-medium whitespace-nowrap transition ${region === r.id ? "bg-slate-900 text-white font-semibold" : "text-slate-600 bg-slate-100"
+                }`}
             >
               {r.label}
             </button>
@@ -139,9 +137,8 @@ export function Header({
                 <button
                   key={rng.id}
                   onClick={() => handleRangeClick(rng.id)}
-                  className={`px-2.5 py-0.5 rounded text-xs transition ${
-                    range === rng.id ? "bg-white text-slate-900 font-semibold shadow-sm" : "hover:text-slate-900"
-                  }`}
+                  className={`px-2.5 py-0.5 rounded text-xs transition ${range === rng.id ? "bg-white text-slate-900 font-semibold shadow-sm" : "hover:text-slate-900"
+                    }`}
                 >
                   {rng.label}
                 </button>
@@ -157,9 +154,8 @@ export function Header({
                 <button
                   key={inv.id}
                   onClick={() => onIntervalChange(inv.id)}
-                  className={`px-2 py-0.5 rounded text-xs transition ${
-                    interval === inv.id ? "bg-white text-slate-900 font-semibold shadow-sm" : "hover:text-slate-900"
-                  }`}
+                  className={`px-2 py-0.5 rounded text-xs transition ${interval === inv.id ? "bg-white text-slate-900 font-semibold shadow-sm" : "hover:text-slate-900"
+                    }`}
                 >
                   {inv.label}
                 </button>
@@ -173,18 +169,16 @@ export function Header({
             <div className="flex bg-slate-100 rounded-md p-0.5 border border-slate-200/80">
               <button
                 onClick={() => onViewModeChange("discrete")}
-                className={`flex items-center space-x-1 px-2.5 py-0.5 rounded text-xs transition ${
-                  viewMode === "discrete" ? "bg-white text-slate-900 font-semibold shadow-sm" : "hover:text-slate-900"
-                }`}
+                className={`flex items-center space-x-1 px-2.5 py-0.5 rounded text-xs transition ${viewMode === "discrete" ? "bg-white text-slate-900 font-semibold shadow-sm" : "hover:text-slate-900"
+                  }`}
               >
                 <BarChart2 className="h-3 w-3" />
                 <span>Discrete</span>
               </button>
               <button
                 onClick={() => onViewModeChange("cumulative")}
-                className={`flex items-center space-x-1 px-2.5 py-0.5 rounded text-xs transition ${
-                  viewMode === "cumulative" ? "bg-white text-slate-900 font-semibold shadow-sm" : "hover:text-slate-900"
-                }`}
+                className={`flex items-center space-x-1 px-2.5 py-0.5 rounded text-xs transition ${viewMode === "cumulative" ? "bg-white text-slate-900 font-semibold shadow-sm" : "hover:text-slate-900"
+                  }`}
               >
                 <Layers className="h-3 w-3" />
                 <span>Cumulative</span>

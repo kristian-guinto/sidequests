@@ -258,7 +258,7 @@ export function GenerationChart({
           <span className="text-xs font-normal text-slate-500">({unit})</span>
         </h3>
       </div>
-      <ReactECharts option={option} style={{ height, width: "100%" }} notMerge={true} lazyUpdate={true} />
+      <ReactECharts option={option} style={{ height, width: "100%" }} notMerge={true} lazyUpdate={false} />
     </div>
   );
 }
