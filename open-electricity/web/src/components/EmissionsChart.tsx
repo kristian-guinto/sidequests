@@ -4,6 +4,7 @@ import React, { useMemo } from "react";
 import ReactECharts from "echarts-for-react";
 import { FuelGenerationPoint } from "@/lib/types";
 import { FUEL_META } from "@/lib/colors";
+import { computeXAxisConfig } from "@/lib/chartUtils";
 import { format, parseISO } from "date-fns";
 import { Menu } from "lucide-react";
 
@@ -18,20 +19,7 @@ export function EmissionsChart({
   height = "180px",
   onHoverPoint,
 }: EmissionsChartProps) {
-  const timestamps = useMemo(() => {
-    return data.map((d) => {
-      try {
-        if (d.timestamp.includes("T")) {
-          return format(parseISO(d.timestamp), "EEE d MMM HH:mm");
-        } else if (d.timestamp.includes("-") && d.timestamp.length === 10) {
-          return format(parseISO(d.timestamp), "EEE d MMM");
-        }
-        return d.timestamp;
-      } catch {
-        return d.timestamp;
-      }
-    });
-  }, [data]);
+  const xAxisConfig = useMemo(() => computeXAxisConfig(data, false), [data]);
 
   const emissionsData = useMemo(() => {
     return data.map((d) => {
@@ -56,6 +44,7 @@ export function EmissionsChart({
   const option = useMemo(() => {
     return {
       backgroundColor: "#FFFFFF",
+      animation: false,
       tooltip: {
         trigger: "axis",
         axisPointer: {
@@ -70,11 +59,19 @@ export function EmissionsChart({
         borderColor: "#E2E8F0",
         borderWidth: 1,
         padding: [6, 10],
-        extraCssText: "box-shadow: 0 4px 12px rgba(0,0,0,0.08); border-radius: 6px;",
+        extraCssText: "box-shadow: 0 4px 12px rgba(0,0,0,0.08); border-radius: 6px; z-index: 100;",
         textStyle: { color: "#0F172A", fontSize: 11 },
         formatter: (params: any[]) => {
           if (!params || params.length === 0) return "";
-          const time = params[0].axisValue;
+          const idx = params[0].dataIndex;
+          const rawPt = data[idx];
+          let formattedTime = params[0].axisValue;
+          if (rawPt?.timestamp) {
+            try {
+              formattedTime = format(parseISO(rawPt.timestamp), "d MMM yyyy, h:mm a");
+            } catch {}
+          }
+
           let total = 0;
           const rows = params.map((p) => {
             const val = Number(p.value) || 0;
@@ -82,9 +79,9 @@ export function EmissionsChart({
             return { name: p.seriesName, val, color: p.color };
           });
 
-          let html = `<div class="font-sans min-w-[170px]">
+          let html = `<div class="font-sans min-w-[180px]">
             <div class="border-b border-neutral-200 pb-1 mb-1 flex justify-between items-center text-[11px]">
-              <span class="text-neutral-500">${time}</span>
+              <span class="text-neutral-500 font-medium">${formattedTime}</span>
               <span class="font-bold text-neutral-900">${total.toFixed(1)} tCO₂e</span>
             </div>`;
 
@@ -104,27 +101,14 @@ export function EmissionsChart({
           return html;
         },
       },
-      grid: {
-        left: 50,
-        right: 20,
-        bottom: 25,
-        top: 10,
-      },
+      grid: xAxisConfig.grid,
       xAxis: {
         type: "category",
         boundaryGap: false,
-        data: timestamps,
+        data: xAxisConfig.timestamps,
         axisLine: { lineStyle: { color: "#E2E8F0" } },
         axisTick: { show: false },
-        axisLabel: {
-          color: "#64748B",
-          fontSize: 10,
-          interval: "auto",
-          formatter: (val: string) => {
-            const parts = val.split(" ");
-            return parts.length >= 3 ? `${parts[0]}\n${parts[1]} ${parts[2]}` : val;
-          },
-        },
+        axisLabel: xAxisConfig.axisLabel,
         splitLine: {
           show: true,
           lineStyle: { color: "#F8FAFC", type: "solid" },
@@ -137,6 +121,7 @@ export function EmissionsChart({
         axisLabel: {
           color: "#64748B",
           fontSize: 10,
+          margin: 12,
           formatter: (v: number) => `${v.toLocaleString()}`,
         },
         splitLine: {
@@ -155,16 +140,6 @@ export function EmissionsChart({
           data: emissionsData.map((d) => d.coal),
         },
         {
-          name: "Gas",
-          type: "line",
-          stack: "Emissions",
-          areaStyle: { color: FUEL_META.gas.color, opacity: 0.98 },
-          lineStyle: { width: 0.3, color: "#fff" },
-          itemStyle: { color: FUEL_META.gas.color },
-          showSymbol: false,
-          data: emissionsData.map((d) => d.gas),
-        },
-        {
           name: "Distillate",
           type: "line",
           stack: "Emissions",
@@ -174,9 +149,19 @@ export function EmissionsChart({
           showSymbol: false,
           data: emissionsData.map((d) => d.oil),
         },
+        {
+          name: "Gas",
+          type: "line",
+          stack: "Emissions",
+          areaStyle: { color: FUEL_META.gas.color, opacity: 0.98 },
+          lineStyle: { width: 0.3, color: "#fff" },
+          itemStyle: { color: FUEL_META.gas.color },
+          showSymbol: false,
+          data: emissionsData.map((d) => d.gas),
+        },
       ],
     };
-  }, [timestamps, emissionsData]);
+  }, [data, emissionsData, xAxisConfig]);
 
   const onEvents = useMemo(() => {
     return {
@@ -194,28 +179,23 @@ export function EmissionsChart({
 
   return (
     <div
-      className="bg-white border border-neutral-200 rounded-sm"
+      className="bg-white border border-neutral-200 rounded-sm overflow-hidden"
       onMouseLeave={() => onHoverPoint?.(null)}
     >
       {/* Chart Header Bar */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-neutral-100 bg-neutral-50/50">
+      <div className="flex items-center justify-between px-3.5 py-2 border-b border-neutral-100 bg-neutral-50/50">
         <div className="flex items-center space-x-2 text-xs font-semibold text-neutral-800">
           <Menu className="h-3.5 w-3.5 text-neutral-400" />
           <span>Emissions Volume</span>
-          <span className="text-[11px] font-normal text-neutral-500 font-mono">
-            (tCO₂e / interval)
-          </span>
+          <span className="text-[11px] font-normal text-neutral-500 font-mono">(tCO₂e/5m)</span>
         </div>
         <div className="text-[11px] font-medium text-neutral-500 font-mono">
-          Av.{" "}
-          <strong className="text-neutral-900 font-bold">
-            {avgEmissions.toLocaleString()} tCO₂e
-          </strong>
+          Av. <strong className="text-neutral-900 font-bold">{avgEmissions.toLocaleString()} tCO₂e</strong>
         </div>
       </div>
 
-      {/* Chart Canvas */}
-      <div className="p-2">
+      {/* Chart Canvas with proper vertical spacing */}
+      <div className="pt-2 pb-1 px-1">
         <ReactECharts
           option={option}
           onEvents={onEvents}

@@ -4,6 +4,7 @@ import React, { useMemo } from "react";
 import ReactECharts from "echarts-for-react";
 import { FuelGenerationPoint, ViewMode } from "@/lib/types";
 import { FUEL_META } from "@/lib/colors";
+import { computeXAxisConfig } from "@/lib/chartUtils";
 import { format, parseISO } from "date-fns";
 import { Menu } from "lucide-react";
 
@@ -32,29 +33,16 @@ export function GenerationChart({
   data,
   viewMode,
   unit = "MW",
-  height = "320px",
+  height = "330px",
   onHoverPoint,
 }: GenerationChartProps) {
-  const timestamps = useMemo(() => {
-    return data.map((d) => {
-      try {
-        if (d.timestamp.includes("T")) {
-          return format(parseISO(d.timestamp), "EEE d MMM HH:mm");
-        } else if (d.timestamp.includes("-") && d.timestamp.length === 10) {
-          return format(parseISO(d.timestamp), "EEE d MMM");
-        }
-        return d.timestamp;
-      } catch {
-        return d.timestamp;
-      }
-    });
-  }, [data]);
-
   const avgGeneration = useMemo(() => {
     if (!data || data.length === 0) return 0;
     const totalSum = data.reduce((acc, d) => acc + (d.totalGeneration || 0), 0);
     return Math.round(totalSum / data.length);
   }, [data]);
+
+  const xAxisConfig = useMemo(() => computeXAxisConfig(data, false), [data]);
 
   const option = useMemo(() => {
     const isCumulative = viewMode === "cumulative";
@@ -106,6 +94,7 @@ export function GenerationChart({
 
     return {
       backgroundColor: "#FFFFFF",
+      animation: false,
       tooltip: {
         trigger: "axis",
         axisPointer: {
@@ -120,14 +109,22 @@ export function GenerationChart({
         borderColor: "#E2E8F0",
         borderWidth: 1,
         padding: [8, 12],
-        extraCssText: "box-shadow: 0 4px 12px rgba(0,0,0,0.08); border-radius: 6px;",
+        extraCssText: "box-shadow: 0 4px 12px rgba(0,0,0,0.08); border-radius: 6px; z-index: 100;",
         textStyle: {
           color: "#0F172A",
           fontSize: 11,
         },
         formatter: (params: any[]) => {
           if (!params || params.length === 0) return "";
-          const time = params[0].axisValue;
+          const idx = params[0].dataIndex;
+          const rawPt = data[idx];
+          let formattedTime = params[0].axisValue;
+          if (rawPt?.timestamp) {
+            try {
+              formattedTime = format(parseISO(rawPt.timestamp), "d MMM yyyy, h:mm a");
+            } catch {}
+          }
+
           let total = 0;
           let demandVal = 0;
 
@@ -145,9 +142,9 @@ export function GenerationChart({
           const unitStr = isEnergy ? "GWh" : "MW";
           const formattedTotal = isEnergy ? total.toFixed(2) : Math.round(total).toLocaleString();
 
-          let html = `<div class="font-sans min-w-[190px]">
+          let html = `<div class="font-sans min-w-[200px]">
             <div class="border-b border-neutral-200 pb-1 mb-1.5 flex justify-between items-center text-[11px]">
-              <span class="text-neutral-500">${time}</span>
+              <span class="text-neutral-500 font-medium">${formattedTime}</span>
               <span class="font-bold text-neutral-900">${formattedTotal} ${unitStr}</span>
             </div>`;
 
@@ -177,27 +174,14 @@ export function GenerationChart({
           return html;
         },
       },
-      grid: {
-        left: 50,
-        right: 20,
-        bottom: 25,
-        top: 15,
-      },
+      grid: xAxisConfig.grid,
       xAxis: {
         type: "category",
         boundaryGap: false,
-        data: timestamps,
+        data: xAxisConfig.timestamps,
         axisLine: { lineStyle: { color: "#E2E8F0" } },
         axisTick: { show: false },
-        axisLabel: {
-          color: "#64748B",
-          fontSize: 10,
-          interval: "auto",
-          formatter: (val: string) => {
-            const parts = val.split(" ");
-            return parts.length >= 3 ? `${parts[0]}\n${parts[1]} ${parts[2]}` : val;
-          },
-        },
+        axisLabel: xAxisConfig.axisLabel,
         splitLine: {
           show: true,
           lineStyle: { color: "#F8FAFC", type: "solid" },
@@ -210,6 +194,7 @@ export function GenerationChart({
         axisLabel: {
           color: "#64748B",
           fontSize: 10,
+          margin: 12,
           formatter: (v: number) => (isEnergy ? `${v}` : `${v.toLocaleString()}`),
         },
         splitLine: {
@@ -218,7 +203,7 @@ export function GenerationChart({
       },
       series,
     };
-  }, [data, timestamps, viewMode, unit]);
+  }, [data, viewMode, unit, xAxisConfig]);
 
   const onEvents = useMemo(() => {
     return {
@@ -236,11 +221,11 @@ export function GenerationChart({
 
   return (
     <div
-      className="bg-white border border-neutral-200 rounded-sm"
+      className="bg-white border border-neutral-200 rounded-sm overflow-hidden"
       onMouseLeave={() => onHoverPoint?.(null)}
     >
       {/* Chart Header Bar */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-neutral-100 bg-neutral-50/50">
+      <div className="flex items-center justify-between px-3.5 py-2 border-b border-neutral-100 bg-neutral-50/50">
         <div className="flex items-center space-x-2 text-xs font-semibold text-neutral-800">
           <Menu className="h-3.5 w-3.5 text-neutral-400" />
           <span>Generation</span>
@@ -251,8 +236,8 @@ export function GenerationChart({
         </div>
       </div>
 
-      {/* Chart Canvas */}
-      <div className="p-2">
+      {/* Chart Canvas with proper padding */}
+      <div className="pt-2 pb-1 px-1">
         <ReactECharts
           option={option}
           onEvents={onEvents}

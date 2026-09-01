@@ -3,6 +3,7 @@
 import React, { useMemo } from "react";
 import ReactECharts from "echarts-for-react";
 import { FuelGenerationPoint } from "@/lib/types";
+import { computeXAxisConfig } from "@/lib/chartUtils";
 import { format, parseISO } from "date-fns";
 import { Menu } from "lucide-react";
 
@@ -18,23 +19,10 @@ export function PriceChart({
   data,
   currencySymbol = "₱",
   currencyCode = "PHP",
-  height = "160px",
+  height = "180px",
   onHoverPoint,
 }: PriceChartProps) {
-  const timestamps = useMemo(() => {
-    return data.map((d) => {
-      try {
-        if (d.timestamp.includes("T")) {
-          return format(parseISO(d.timestamp), "EEE d MMM HH:mm");
-        } else if (d.timestamp.includes("-") && d.timestamp.length === 10) {
-          return format(parseISO(d.timestamp), "EEE d MMM");
-        }
-        return d.timestamp;
-      } catch {
-        return d.timestamp;
-      }
-    });
-  }, [data]);
+  const xAxisConfig = useMemo(() => computeXAxisConfig(data, true), [data]);
 
   const prices = useMemo(() => {
     return data.map((d) => d.price || 0);
@@ -49,6 +37,7 @@ export function PriceChart({
   const option = useMemo(() => {
     return {
       backgroundColor: "#FFFFFF",
+      animation: false,
       tooltip: {
         trigger: "axis",
         axisPointer: {
@@ -59,15 +48,23 @@ export function PriceChart({
         borderColor: "#E2E8F0",
         borderWidth: 1,
         padding: [6, 10],
-        extraCssText: "box-shadow: 0 4px 12px rgba(0,0,0,0.08); border-radius: 6px;",
+        extraCssText: "box-shadow: 0 4px 12px rgba(0,0,0,0.08); border-radius: 6px; z-index: 100;",
         textStyle: { color: "#0F172A", fontSize: 11 },
         formatter: (params: any[]) => {
           if (!params || params.length === 0) return "";
-          const p = params[0];
-          const val = Number(p.value) || 0;
-          return `<div class="font-sans min-w-[150px]">
-            <div class="text-neutral-500 text-[10px] mb-1">${p.axisValue}</div>
-            <div class="flex items-center justify-between space-x-3 text-xs">
+          const idx = params[0].dataIndex;
+          const rawPt = data[idx];
+          let formattedTime = params[0].axisValue;
+          if (rawPt?.timestamp) {
+            try {
+              formattedTime = format(parseISO(rawPt.timestamp), "d MMM yyyy, h:mm a");
+            } catch {}
+          }
+
+          const val = Number(params[0].value) || 0;
+          return `<div class="font-sans min-w-[170px]">
+            <div class="text-neutral-500 font-medium text-[11px] mb-1">${formattedTime}</div>
+            <div class="flex items-center justify-between space-x-3 text-xs border-t border-neutral-100 pt-1">
               <span class="font-semibold text-rose-600">Spot Price:</span>
               <span class="font-mono font-bold text-neutral-900">${currencySymbol}${Math.round(
             val
@@ -76,27 +73,14 @@ export function PriceChart({
           </div>`;
         },
       },
-      grid: {
-        left: 50,
-        right: 20,
-        bottom: 25,
-        top: 10,
-      },
+      grid: xAxisConfig.grid,
       xAxis: {
         type: "category",
         boundaryGap: false,
-        data: timestamps,
+        data: xAxisConfig.timestamps,
         axisLine: { lineStyle: { color: "#E2E8F0" } },
         axisTick: { show: false },
-        axisLabel: {
-          color: "#64748B",
-          fontSize: 10,
-          interval: "auto",
-          formatter: (val: string) => {
-            const parts = val.split(" ");
-            return parts.length >= 3 ? `${parts[0]}\n${parts[1]} ${parts[2]}` : val;
-          },
-        },
+        axisLabel: xAxisConfig.axisLabel,
         splitLine: {
           show: true,
           lineStyle: { color: "#F8FAFC", type: "solid" },
@@ -109,6 +93,7 @@ export function PriceChart({
         axisLabel: {
           color: "#64748B",
           fontSize: 10,
+          margin: 12,
           formatter: (v: number) =>
             `${v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`}`,
         },
@@ -135,7 +120,7 @@ export function PriceChart({
               x2: 0,
               y2: 1,
               colorStops: [
-                { offset: 0, color: "rgba(225, 29, 72, 0.15)" },
+                { offset: 0, color: "rgba(225, 29, 72, 0.12)" },
                 { offset: 1, color: "rgba(225, 29, 72, 0.00)" },
               ],
             },
@@ -143,7 +128,7 @@ export function PriceChart({
         },
       ],
     };
-  }, [timestamps, prices, currencySymbol, currencyCode]);
+  }, [data, prices, currencySymbol, xAxisConfig]);
 
   const onEvents = useMemo(() => {
     return {
@@ -161,11 +146,11 @@ export function PriceChart({
 
   return (
     <div
-      className="bg-white border border-neutral-200 rounded-sm"
+      className="bg-white border border-neutral-200 rounded-sm overflow-hidden"
       onMouseLeave={() => onHoverPoint?.(null)}
     >
       {/* Chart Header Bar */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-neutral-100 bg-neutral-50/50">
+      <div className="flex items-center justify-between px-3.5 py-2 border-b border-neutral-100 bg-neutral-50/50">
         <div className="flex items-center space-x-2 text-xs font-semibold text-neutral-800">
           <Menu className="h-3.5 w-3.5 text-neutral-400" />
           <span>Wholesale Spot Price</span>
@@ -182,8 +167,8 @@ export function PriceChart({
         </div>
       </div>
 
-      {/* Chart Canvas */}
-      <div className="p-2">
+      {/* Chart Canvas with proper vertical spacing */}
+      <div className="pt-2 pb-2 px-1">
         <ReactECharts
           option={option}
           onEvents={onEvents}
