@@ -1,15 +1,25 @@
 import duckdb
 from pathlib import Path
-from pipeline.config import SQLITE_DB_PATH, DUCKDB_PATH, MOTHERDUCK_TOKEN, MOTHERDUCK_DATABASE
+from pipeline.config import (
+    SQLITE_DB_PATH,
+    DUCKDB_PATH,
+    MOTHERDUCK_TOKEN,
+    MOTHERDUCK_DATABASE,
+)
+
 
 def migrate(target: str = "local"):
     """
     Migrates all data from SQLite (open_nem_ph.db) to DuckDB (local file or MotherDuck),
     automatically applying the OpenNEM-SEA multi-country schema (country_code, currency).
     """
-    print("================================================================================")
+    print(
+        "================================================================================"
+    )
     print("  OpenNEM-SEA Zero-Loss Migration: SQLite -> Multi-Country DuckDB")
-    print("================================================================================")
+    print(
+        "================================================================================"
+    )
 
     if not SQLITE_DB_PATH.exists():
         print(f"❌ SQLite database not found at: {SQLITE_DB_PATH}")
@@ -21,7 +31,9 @@ def migrate(target: str = "local"):
     if target == "motherduck" or (target == "auto" and MOTHERDUCK_TOKEN):
         duck_conn_str = f"md:{MOTHERDUCK_DATABASE}"
         print(f"✓ Target Database: MotherDuck Cloud ({duck_conn_str})...")
-        duck_conn = duckdb.connect(duck_conn_str, config={"motherduck_token": MOTHERDUCK_TOKEN})
+        duck_conn = duckdb.connect(
+            duck_conn_str, config={"motherduck_token": MOTHERDUCK_TOKEN}
+        )
     else:
         duck_conn_str = str(DUCKDB_PATH)
         print(f"✓ Target Database: Local DuckDB ({DUCKDB_PATH.name})...")
@@ -166,22 +178,37 @@ def migrate(target: str = "local"):
 
     # 4. Integrity Validation Report
     print("\n[3/4] Running Data Integrity Verification...")
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("  DATA INTEGRITY VERIFICATION REPORT")
-    print("="*80)
-    print(f"  {'Table Name':<25} | {'SQLite Rows':<14} | {'DuckDB Rows':<14} | {'Status'}")
-    print("  " + "-"*76)
+    print("=" * 80)
+    print(
+        f"  {'Table Name':<25} | {'SQLite Rows':<14} | {'DuckDB Rows':<14} | {'Status'}"
+    )
+    print("  " + "-" * 76)
 
     all_passed = True
-    for tbl in ["facilities", "energy_dispatch_5m", "regional_summary_5m", "energy_daily_stats"]:
-        sq_cnt = duck_conn.execute(f"SELECT COUNT(*) FROM sqlite_db.{tbl}").fetchone()[0]
-        duck_cnt = duck_conn.execute(f"SELECT COUNT(*) FROM {tbl} WHERE country_code = 'PH'").fetchone()[0]
-        status = "✅ MATCH" if sq_cnt == duck_cnt else f"❌ MISMATCH (Diff: {sq_cnt - duck_cnt})"
+    for tbl in [
+        "facilities",
+        "energy_dispatch_5m",
+        "regional_summary_5m",
+        "energy_daily_stats",
+    ]:
+        sq_cnt = duck_conn.execute(f"SELECT COUNT(*) FROM sqlite_db.{tbl}").fetchone()[
+            0
+        ]
+        duck_cnt = duck_conn.execute(
+            f"SELECT COUNT(*) FROM {tbl} WHERE country_code = 'PH'"
+        ).fetchone()[0]
+        status = (
+            "✅ MATCH"
+            if sq_cnt == duck_cnt
+            else f"❌ MISMATCH (Diff: {sq_cnt - duck_cnt})"
+        )
         if sq_cnt != duck_cnt:
             all_passed = False
         print(f"  {tbl:<25} | {sq_cnt:<14} | {duck_cnt:<14} | {status}")
 
-    print("  " + "-"*76)
+    print("  " + "-" * 76)
 
     duck_conn.execute("DETACH sqlite_db;")
     duck_conn.close()
@@ -193,6 +220,7 @@ def migrate(target: str = "local"):
         print("\n⚠️ Migration finished with discrepancies. Please check the logs.\n")
 
     return all_passed
+
 
 if __name__ == "__main__":
     migrate()

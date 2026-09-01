@@ -18,14 +18,20 @@ class BaseProvider(ABC):
 
     @abstractmethod
     def fetch_dispatch(
-        self, start_date: Optional[str] = None, end_date: Optional[str] = None, days: int = 2
+        self,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        days: int = 2,
     ) -> List[Dict[str, Any]]:
         """Fetches interval electricity generation by fuel technology and market spot prices."""
         pass
 
     @abstractmethod
     def fetch_regional_summaries(
-        self, start_date: Optional[str] = None, end_date: Optional[str] = None, days: int = 2
+        self,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        days: int = 2,
     ) -> List[Dict[str, Any]]:
         """Fetches regional demand, interconnector flows, transmission losses, and net energy balance."""
         pass

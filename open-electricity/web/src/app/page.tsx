@@ -15,20 +15,19 @@ import {
   COUNTRIES_METADATA,
 } from "@/lib/types";
 import { Header } from "@/components/Header";
-import { SummaryCards } from "@/components/SummaryCards";
 import { GenerationChart } from "@/components/GenerationChart";
+import { EmissionsChart } from "@/components/EmissionsChart";
 import { PriceChart } from "@/components/PriceChart";
-import { FuelTable } from "@/components/FuelTable";
-import { InterconnectorCard } from "@/components/InterconnectorCard";
+import { DataSidebar } from "@/components/DataSidebar";
 import { generateMockEnergyData } from "@/lib/mockData";
-import { Info, ExternalLink } from "lucide-react";
+import { Database, Activity, ExternalLink } from "lucide-react";
 
 export default function DashboardPage() {
   const [country, setCountry] = useState<CountryCode>("PH");
   const [region, setRegion] = useState<Region>("ALL");
   const [range, setRange] = useState<TimeRange>("7d");
   const [interval, setInterval] = useState<TimeInterval>("30m");
-  const [viewMode, setViewMode] = useState<ViewMode>("discrete");
+  const [viewMode, setViewMode] = useState<ViewMode>("cumulative");
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const [points, setPoints] = useState<FuelGenerationPoint[]>([]);
@@ -73,7 +72,7 @@ export default function DashboardPage() {
         throw new Error("Failed to fetch API data");
       }
     } catch (e) {
-      console.warn("Using fallback local dataset:", e);
+      console.warn("Using fallback dataset:", e);
       const fallback = generateMockEnergyData(country, region, range, interval);
       setPoints(fallback.points);
       setSummary(fallback.summary);
@@ -90,7 +89,8 @@ export default function DashboardPage() {
   }, [fetchData]);
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50 text-slate-900">
+    <div className="flex flex-col min-h-screen bg-[#FAFAFA] text-neutral-900 font-sans">
+      {/* OpenNEM Two-Tier Header */}
       <Header
         country={country}
         onCountryChange={handleCountryChange}
@@ -106,79 +106,64 @@ export default function DashboardPage() {
         isLoading={isLoading}
       />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-5 space-y-5">
-        {/* KPI Metrics */}
-        {summary && <SummaryCards metrics={summary} region={region} />}
+      {/* Main Full-Width Two-Column Workspace */}
+      <main className="flex-1 w-full px-3 sm:px-4 lg:px-6 py-3">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-start">
+          {/* Left Column (8 cols ~ 67% width): Synchronized Chart Stack */}
+          <div className="lg:col-span-8 space-y-2.5">
+            {/* Chart 1: Generation by Fuel Tech (MW / GWh) */}
+            <GenerationChart
+              data={points}
+              viewMode={viewMode}
+              unit={unit}
+              height="310px"
+            />
 
-        {/* Main Charts Area */}
-        <div className="space-y-3.5">
-          <GenerationChart
-            data={points}
-            viewMode={viewMode}
-            unit={unit}
-            height="430px"
-          />
-          <PriceChart
-            data={points}
-            currencySymbol={countryInfo.currencySymbol}
-            currencyCode={countryInfo.currencyCode}
-            height="170px"
-          />
-        </div>
+            {/* Chart 2: Emissions Volume (tCO2e/interval) */}
+            <EmissionsChart
+              data={points}
+              height="170px"
+            />
 
-        {/* Two-column Layout: Fuel Table + Interconnectors */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
-          <div className="lg:col-span-2">
-            <FuelTable breakdown={breakdown} />
+            {/* Chart 3: Spot Market Price */}
+            <PriceChart
+              data={points}
+              currencySymbol={countryInfo.currencySymbol}
+              currencyCode={countryInfo.currencyCode}
+              height="150px"
+            />
           </div>
 
-          <div className="space-y-4">
-            <InterconnectorCard interconnectors={interconnectors} />
-
-            {/* Information Card */}
-            <div className="bg-white border border-slate-200/90 rounded-xl p-4 text-xs text-slate-600 space-y-2 shadow-sm">
-              <div className="flex items-center space-x-2 text-slate-900 font-semibold">
-                <Info className="h-4 w-4 text-emerald-600" />
-                <span>About OpenElectricity {countryInfo.name}</span>
-              </div>
-              <p className="leading-relaxed">
-                An open-source energy transition and electricity spot market tracker for Southeast Asia ({countryInfo.name}), inspired by OpenNEM.
-              </p>
-              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
-                <span className="text-slate-500">
-                  Data Engine: <strong className="text-slate-700 font-semibold">DuckDB / MotherDuck</strong>
-                </span>
-                <span className="text-emerald-700 font-medium">
-                  {countryInfo.currencyCode} Spot Market
-                </span>
-              </div>
-            </div>
+          {/* Right Column (4 cols ~ 33% width): Sticky Fuel & Emissions Sidebar */}
+          <div className="lg:col-span-4 lg:sticky lg:top-[105px]">
+            <DataSidebar
+              breakdown={breakdown}
+              summary={summary}
+              interconnectors={interconnectors}
+              currencySymbol={countryInfo.currencySymbol}
+              currencyCode={countryInfo.currencyCode}
+              unit={unit}
+            />
           </div>
         </div>
       </main>
 
-      <footer className="border-t border-slate-200 bg-white py-5 text-center text-xs text-slate-500 mt-8">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>
-            OpenElectricity SEA &copy; {new Date().getFullYear()} &bull; Tracking Philippines, Singapore, Malaysia, Thailand, Vietnam.
-          </span>
-          <div className="flex items-center space-x-4">
-            <a
-              href="https://explore.openelectricity.org.au/"
-              target="_blank"
-              rel="noreferrer"
-              className="text-slate-600 hover:text-slate-900 transition"
-            >
-              OpenNEM Australia
-            </a>
-            <a
-              href="https://www.iemop.ph"
-              target="_blank"
-              rel="noreferrer"
-              className="text-slate-600 hover:text-slate-900 transition"
-            >
-              IEMOP WESM
-            </a>
+      {/* Sleek Bottom OpenNEM Status Bar */}
+      <footer className="border-t border-neutral-200 bg-neutral-900 text-neutral-300 py-1 px-4 text-[11px] font-mono select-none">
+        <div className="w-full flex items-center justify-between">
+          <div className="flex items-center space-x-3 text-neutral-400">
+            <span className="text-neutral-200 font-semibold">v4.54.10</span>
+            <span>&bull;</span>
+            <span className="flex items-center space-x-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Engine: DuckDB OLAP</span>
+            </span>
+            <span>&bull;</span>
+            <span>API: 4.5.11</span>
+          </div>
+
+          <div className="flex items-center space-x-4 text-neutral-400">
+            <span>Sources: IEMOP (PH), EMA (SG), Single Buyer (MY), EGAT (TH)</span>
           </div>
         </div>
       </footer>
