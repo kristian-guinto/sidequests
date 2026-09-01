@@ -100,6 +100,8 @@ def get_prior_context(
             )
 
             def get_trend(values, threshold=0.01):
+                if len(values) < 2:
+                    return "stable"
                 slope = polyfit(range(len(values)), values, 1)[0]
                 return (
                     "increasing"
