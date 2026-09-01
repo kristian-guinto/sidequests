@@ -66,8 +66,12 @@ uv run ingest --mode daily
 # Run historical backfill for custom date range
 uv run ingest --mode backfill --start-date 2026-08-01 --end-date 2026-08-31
 
-# Sync facility / generator metadata catalog
-uv run ingest --mode sync-facilities
+# Inspect database tables, row counts, and data samples
+uv run ingest inspect
+uv run ingest inspect --table dispatch --region LUZON --limit 10
+uv run ingest inspect --table facilities --limit 10
+uv run ingest inspect --table regional --limit 10
+uv run ingest inspect --table daily --limit 10
 ```
 
 > **Note**: If `SUPABASE_URL` and `SUPABASE_KEY` are not configured in `.env`, the pipeline automatically saves to a local SQLite database (`open_nem_ph.db`).
