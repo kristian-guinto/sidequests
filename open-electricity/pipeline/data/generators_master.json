@@ -1,0 +1,546 @@
+[
+  {
+    "resource_id": "01AMBUK_U01",
+    "facility_name": "Ambuklao Hydro Unit 1",
+    "region": "LUZON",
+    "fuel_tech": "hydro",
+    "capacity_mw": 37.4,
+    "emissions_factor": 0.0
+  },
+  {
+    "resource_id": "01AMBUK_U02",
+    "facility_name": "Ambuklao Hydro Unit 2",
+    "region": "LUZON",
+    "fuel_tech": "hydro",
+    "capacity_mw": 37.3,
+    "emissions_factor": 0.0
+  },
+  {
+    "resource_id": "01AMBUK_U03",
+    "facility_name": "Ambuklao Hydro Unit 3",
+    "region": "LUZON",
+    "fuel_tech": "hydro",
+    "capacity_mw": 37.3,
+    "emissions_factor": 0.0
+  },
+  {
+    "resource_id": "01BINGA_U01",
+    "facility_name": "Binga Hydro Unit 1",
+    "region": "LUZON",
+    "fuel_tech": "hydro",
+    "capacity_mw": 35.0,
+    "emissions_factor": 0.0
+  },
+  {
+    "resource_id": "01BINGA_U02",
+    "facility_name": "Binga Hydro Unit 2",
+    "region": "LUZON",
+    "fuel_tech": "hydro",
+    "capacity_mw": 35.0,
+    "emissions_factor": 0.0
+  },
+  {
+    "resource_id": "01BINGA_U03",
+    "facility_name": "Binga Hydro Unit 3",
+    "region": "LUZON",
+    "fuel_tech": "hydro",
+    "capacity_mw": 35.0,
+    "emissions_factor": 0.0
+  },
+  {
+    "resource_id": "01BINGA_U04",
+    "facility_name": "Binga Hydro Unit 4",
+    "region": "LUZON",
+    "fuel_tech": "hydro",
+    "capacity_mw": 35.0,
+    "emissions_factor": 0.0
+  },
+  {
+    "resource_id": "01ANGAT_A",
+    "facility_name": "Angat Hydro Auxiliary",
+    "region": "LUZON",
+    "fuel_tech": "hydro",
+    "capacity_mw": 44.6,
+    "emissions_factor": 0.0
+  },
+  {
+    "resource_id": "01ANGAT_M",
+    "facility_name": "Angat Hydro Main",
+    "region": "LUZON",
+    "fuel_tech": "hydro",
+    "capacity_mw": 99.8,
+    "emissions_factor": 0.0
+  },
+  {
+    "resource_id": "01MAGAT_U01",
+    "facility_name": "Magat Hydro Unit 1",
+    "region": "LUZON",
+    "fuel_tech": "hydro",
+    "capacity_mw": 95.0,
+    "emissions_factor": 0.0
+  },
+  {
+    "resource_id": "01MAGAT_U02",
+    "facility_name": "Magat Hydro Unit 2",
+    "region": "LUZON",
+    "fuel_tech": "hydro",
+    "capacity_mw": 95.0,
+    "emissions_factor": 0.0
+  },
+  {
+    "resource_id": "01MAGAT_U03",
+    "facility_name": "Magat Hydro Unit 3",
+    "region": "LUZON",
+    "fuel_tech": "hydro",
+    "capacity_mw": 95.0,
+    "emissions_factor": 0.0
+  },
+  {
+    "resource_id": "01MAGAT_U04",
+    "facility_name": "Magat Hydro Unit 4",
+    "region": "LUZON",
+    "fuel_tech": "hydro",
+    "capacity_mw": 95.0,
+    "emissions_factor": 0.0
+  },
+  {
+    "resource_id": "01CASECN_G01",
+    "facility_name": "Casecnan Hydro Unit 1",
+    "region": "LUZON",
+    "fuel_tech": "hydro",
+    "capacity_mw": 75.0,
+    "emissions_factor": 0.0
+  },
+  {
+    "resource_id": "01CASECN_G02",
+    "facility_name": "Casecnan Hydro Unit 2",
+    "region": "LUZON",
+    "fuel_tech": "hydro",
+    "capacity_mw": 75.0,
+    "emissions_factor": 0.0
+  },
+  {
+    "resource_id": "01SANLOR_G01",
+    "facility_name": "San Lorenzo CCGT Gas Unit 50",
+    "region": "LUZON",
+    "fuel_tech": "gas",
+    "capacity_mw": 265.0,
+    "emissions_factor": 0.38
+  },
+  {
+    "resource_id": "01SANLOR_G02",
+    "facility_name": "San Lorenzo CCGT Gas Unit 60",
+    "region": "LUZON",
+    "fuel_tech": "gas",
+    "capacity_mw": 265.0,
+    "emissions_factor": 0.38
+  },
+  {
+    "resource_id": "01STARITA_G01",
+    "facility_name": "Sta. Rita CCGT Gas Unit 10",
+    "region": "LUZON",
+    "fuel_tech": "gas",
+    "capacity_mw": 250.0,
+    "emissions_factor": 0.38
+  },
+  {
+    "resource_id": "01STARITA_G02",
+    "facility_name": "Sta. Rita CCGT Gas Unit 20",
+    "region": "LUZON",
+    "fuel_tech": "gas",
+    "capacity_mw": 250.0,
+    "emissions_factor": 0.38
+  },
+  {
+    "resource_id": "01STARITA_G03",
+    "facility_name": "Sta. Rita CCGT Gas Unit 30",
+    "region": "LUZON",
+    "fuel_tech": "gas",
+    "capacity_mw": 250.0,
+    "emissions_factor": 0.38
+  },
+  {
+    "resource_id": "01STARITA_G04",
+    "facility_name": "Sta. Rita CCGT Gas Unit 40",
+    "region": "LUZON",
+    "fuel_tech": "gas",
+    "capacity_mw": 250.0,
+    "emissions_factor": 0.38
+  },
+  {
+    "resource_id": "01ILIJAN_G01",
+    "facility_name": "Ilijan Gas Power Plant Block 1",
+    "region": "LUZON",
+    "fuel_tech": "gas",
+    "capacity_mw": 600.0,
+    "emissions_factor": 0.40
+  },
+  {
+    "resource_id": "01ILIJAN_G02",
+    "facility_name": "Ilijan Gas Power Plant Block 2",
+    "region": "LUZON",
+    "fuel_tech": "gas",
+    "capacity_mw": 600.0,
+    "emissions_factor": 0.40
+  },
+  {
+    "resource_id": "01SANGAB_G01",
+    "facility_name": "San Gabriel Combined Cycle Gas Plant",
+    "region": "LUZON",
+    "fuel_tech": "gas",
+    "capacity_mw": 414.0,
+    "emissions_factor": 0.36
+  },
+  {
+    "resource_id": "01SUAL_U01",
+    "facility_name": "Sual Coal Power Station Unit 1",
+    "region": "LUZON",
+    "fuel_tech": "coal",
+    "capacity_mw": 647.0,
+    "emissions_factor": 0.92
+  },
+  {
+    "resource_id": "01SUAL_U02",
+    "facility_name": "Sual Coal Power Station Unit 2",
+    "region": "LUZON",
+    "fuel_tech": "coal",
+    "capacity_mw": 647.0,
+    "emissions_factor": 0.92
+  },
+  {
+    "resource_id": "01PAGBIL_U01",
+    "facility_name": "Pagbilao Coal Power Plant Unit 1",
+    "region": "LUZON",
+    "fuel_tech": "coal",
+    "capacity_mw": 382.0,
+    "emissions_factor": 0.92
+  },
+  {
+    "resource_id": "01PAGBIL_U02",
+    "facility_name": "Pagbilao Coal Power Plant Unit 2",
+    "region": "LUZON",
+    "fuel_tech": "coal",
+    "capacity_mw": 382.0,
+    "emissions_factor": 0.92
+  },
+  {
+    "resource_id": "01PAGBIL_U03",
+    "facility_name": "Pagbilao Coal Power Plant Unit 3",
+    "region": "LUZON",
+    "fuel_tech": "coal",
+    "capacity_mw": 420.0,
+    "emissions_factor": 0.90
+  },
+  {
+    "resource_id": "01CALACA_U01",
+    "facility_name": "Calaca Coal Plant Unit 1",
+    "region": "LUZON",
+    "fuel_tech": "coal",
+    "capacity_mw": 300.0,
+    "emissions_factor": 0.95
+  },
+  {
+    "resource_id": "01CALACA_U02",
+    "facility_name": "Calaca Coal Plant Unit 2",
+    "region": "LUZON",
+    "fuel_tech": "coal",
+    "capacity_mw": 300.0,
+    "emissions_factor": 0.95
+  },
+  {
+    "resource_id": "01GNPDING_U01",
+    "facility_name": "GNPower Dinginin Supercritical Coal Unit 1",
+    "region": "LUZON",
+    "fuel_tech": "coal",
+    "capacity_mw": 668.0,
+    "emissions_factor": 0.82
+  },
+  {
+    "resource_id": "01GNPDING_U02",
+    "facility_name": "GNPower Dinginin Supercritical Coal Unit 2",
+    "region": "LUZON",
+    "fuel_tech": "coal",
+    "capacity_mw": 668.0,
+    "emissions_factor": 0.82
+  },
+  {
+    "resource_id": "01GNPK_U01",
+    "facility_name": "GNPower Kauswagan Coal Unit 1",
+    "region": "MINDANAO",
+    "fuel_tech": "coal",
+    "capacity_mw": 138.0,
+    "emissions_factor": 0.88
+  },
+  {
+    "resource_id": "01GNPK_U02",
+    "facility_name": "GNPower Kauswagan Coal Unit 2",
+    "region": "MINDANAO",
+    "fuel_tech": "coal",
+    "capacity_mw": 138.0,
+    "emissions_factor": 0.88
+  },
+  {
+    "resource_id": "01GNPK_U03",
+    "facility_name": "GNPower Kauswagan Coal Unit 3",
+    "region": "MINDANAO",
+    "fuel_tech": "coal",
+    "capacity_mw": 138.0,
+    "emissions_factor": 0.88
+  },
+  {
+    "resource_id": "01GNPK_U04",
+    "facility_name": "GNPower Kauswagan Coal Unit 4",
+    "region": "MINDANAO",
+    "fuel_tech": "coal",
+    "capacity_mw": 138.0,
+    "emissions_factor": 0.88
+  },
+  {
+    "resource_id": "01ANDA_G01",
+    "facility_name": "Anda Coal Power Plant",
+    "region": "LUZON",
+    "fuel_tech": "coal",
+    "capacity_mw": 72.0,
+    "emissions_factor": 0.95
+  },
+  {
+    "resource_id": "01BACMAN_G01",
+    "facility_name": "Bacman Geothermal Unit 1",
+    "region": "LUZON",
+    "fuel_tech": "geothermal",
+    "capacity_mw": 55.0,
+    "emissions_factor": 0.05
+  },
+  {
+    "resource_id": "01BACMAN_G02",
+    "facility_name": "Bacman Geothermal Unit 2",
+    "region": "LUZON",
+    "fuel_tech": "geothermal",
+    "capacity_mw": 55.0,
+    "emissions_factor": 0.05
+  },
+  {
+    "resource_id": "01MAKBN_G01",
+    "facility_name": "Makban Geothermal Plant 1",
+    "region": "LUZON",
+    "fuel_tech": "geothermal",
+    "capacity_mw": 110.0,
+    "emissions_factor": 0.05
+  },
+  {
+    "resource_id": "01MAKBN_G02",
+    "facility_name": "Makban Geothermal Plant 2",
+    "region": "LUZON",
+    "fuel_tech": "geothermal",
+    "capacity_mw": 110.0,
+    "emissions_factor": 0.05
+  },
+  {
+    "resource_id": "01MAKBN_G03",
+    "facility_name": "Makban Geothermal Plant 3",
+    "region": "LUZON",
+    "fuel_tech": "geothermal",
+    "capacity_mw": 110.0,
+    "emissions_factor": 0.05
+  },
+  {
+    "resource_id": "01TIWI_G01",
+    "facility_name": "Tiwi Geothermal Plant Unit 1",
+    "region": "LUZON",
+    "fuel_tech": "geothermal",
+    "capacity_mw": 117.0,
+    "emissions_factor": 0.05
+  },
+  {
+    "resource_id": "01TIWI_G02",
+    "facility_name": "Tiwi Geothermal Plant Unit 2",
+    "region": "LUZON",
+    "fuel_tech": "geothermal",
+    "capacity_mw": 117.0,
+    "emissions_factor": 0.05
+  },
+  {
+    "resource_id": "01PALPIN_G01",
+    "facility_name": "Palinpinon Geothermal Plant 1",
+    "region": "VISAYAS",
+    "fuel_tech": "geothermal",
+    "capacity_mw": 112.5,
+    "emissions_factor": 0.05
+  },
+  {
+    "resource_id": "01TONGO_G01",
+    "facility_name": "Tongonan Geothermal Power Plant",
+    "region": "VISAYAS",
+    "fuel_tech": "geothermal",
+    "capacity_mw": 112.5,
+    "emissions_factor": 0.05
+  },
+  {
+    "resource_id": "01MTAPO_G01",
+    "facility_name": "Mt. Apo Geothermal Plant Unit 1",
+    "region": "MINDANAO",
+    "fuel_tech": "geothermal",
+    "capacity_mw": 54.0,
+    "emissions_factor": 0.05
+  },
+  {
+    "resource_id": "01MTAPO_G02",
+    "facility_name": "Mt. Apo Geothermal Plant Unit 2",
+    "region": "MINDANAO",
+    "fuel_tech": "geothermal",
+    "capacity_mw": 54.0,
+    "emissions_factor": 0.05
+  },
+  {
+    "resource_id": "01ARAYSOL_G01",
+    "facility_name": "Arayat-Mexico Solar Farm Unit 1",
+    "region": "LUZON",
+    "fuel_tech": "solar",
+    "capacity_mw": 50.0,
+    "emissions_factor": 0.0
+  },
+  {
+    "resource_id": "01ARAYSOL_G02",
+    "facility_name": "Arayat-Mexico Solar Farm Unit 2",
+    "region": "LUZON",
+    "fuel_tech": "solar",
+    "capacity_mw": 30.8,
+    "emissions_factor": 0.0
+  },
+  {
+    "resource_id": "01ARAYSOL_G03",
+    "facility_name": "Arayat-Mexico Solar Farm Unit 3",
+    "region": "LUZON",
+    "fuel_tech": "solar",
+    "capacity_mw": 30.0,
+    "emissions_factor": 0.0
+  },
+  {
+    "resource_id": "01BALSOL_G01",
+    "facility_name": "Balsol Solar Power Project",
+    "region": "LUZON",
+    "fuel_tech": "solar",
+    "capacity_mw": 20.0,
+    "emissions_factor": 0.0
+  },
+  {
+    "resource_id": "01AGROSOL_G01",
+    "facility_name": "Agrosolar Plant",
+    "region": "LUZON",
+    "fuel_tech": "solar",
+    "capacity_mw": 3.4,
+    "emissions_factor": 0.0
+  },
+  {
+    "resource_id": "01ARESOL_G01",
+    "facility_name": "Are Solar Plant",
+    "region": "LUZON",
+    "fuel_tech": "solar",
+    "capacity_mw": 37.8,
+    "emissions_factor": 0.0
+  },
+  {
+    "resource_id": "01ARMSOL_G01",
+    "facility_name": "Arm Solar Power Plant",
+    "region": "LUZON",
+    "fuel_tech": "solar",
+    "capacity_mw": 7.1,
+    "emissions_factor": 0.0
+  },
+  {
+    "resource_id": "01BALWIND_G01",
+    "facility_name": "Balaoi Wind Farm",
+    "region": "LUZON",
+    "fuel_tech": "wind",
+    "capacity_mw": 22.4,
+    "emissions_factor": 0.0
+  },
+  {
+    "resource_id": "01BURGOS_G01",
+    "facility_name": "Burgos Wind Project Unit 1",
+    "region": "LUZON",
+    "fuel_tech": "wind",
+    "capacity_mw": 75.0,
+    "emissions_factor": 0.0
+  },
+  {
+    "resource_id": "01BURGOS_G02",
+    "facility_name": "Burgos Wind Project Unit 2",
+    "region": "LUZON",
+    "fuel_tech": "wind",
+    "capacity_mw": 75.0,
+    "emissions_factor": 0.0
+  },
+  {
+    "resource_id": "01CAPAR_G01",
+    "facility_name": "Caparispisan Wind Power Project",
+    "region": "LUZON",
+    "fuel_tech": "wind",
+    "capacity_mw": 81.0,
+    "emissions_factor": 0.0
+  },
+  {
+    "resource_id": "01PILA_G01",
+    "facility_name": "Pililla Wind Farm",
+    "region": "LUZON",
+    "fuel_tech": "wind",
+    "capacity_mw": 54.0,
+    "emissions_factor": 0.0
+  },
+  {
+    "resource_id": "01GUIMAR_G01",
+    "facility_name": "Guimaras Wind Farm",
+    "region": "VISAYAS",
+    "fuel_tech": "wind",
+    "capacity_mw": 54.0,
+    "emissions_factor": 0.0
+  },
+  {
+    "resource_id": "01BIOTECH_G01",
+    "facility_name": "Biotech Farms Biomass Plant",
+    "region": "MINDANAO",
+    "fuel_tech": "biomass",
+    "capacity_mw": 8.0,
+    "emissions_factor": 0.02
+  },
+  {
+    "resource_id": "01SANCRS_G01",
+    "facility_name": "San Carlos Bioenergy Plant",
+    "region": "VISAYAS",
+    "fuel_tech": "biomass",
+    "capacity_mw": 20.0,
+    "emissions_factor": 0.02
+  },
+  {
+    "resource_id": "01MALAYA_U01",
+    "facility_name": "Malaya Thermal Power Plant Unit 1",
+    "region": "LUZON",
+    "fuel_tech": "oil",
+    "capacity_mw": 300.0,
+    "emissions_factor": 0.75
+  },
+  {
+    "resource_id": "01MALAYA_U02",
+    "facility_name": "Malaya Thermal Power Plant Unit 2",
+    "region": "LUZON",
+    "fuel_tech": "oil",
+    "capacity_mw": 350.0,
+    "emissions_factor": 0.75
+  },
+  {
+    "resource_id": "01LIMAYBESS_G01",
+    "facility_name": "Limay Battery Energy Storage System",
+    "region": "LUZON",
+    "fuel_tech": "battery",
+    "capacity_mw": 40.0,
+    "emissions_factor": 0.0
+  },
+  {
+    "resource_id": "01KABESS_G01",
+    "facility_name": "Kabankalan Battery Energy Storage",
+    "region": "VISAYAS",
+    "fuel_tech": "battery",
+    "capacity_mw": 40.0,
+    "emissions_factor": 0.0
+  }
+]
