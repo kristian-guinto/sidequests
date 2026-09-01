@@ -107,20 +107,23 @@ export function Header({
       {/* Top Bar: Brand & Live Status */}
       <div className="w-full px-4 sm:px-6 lg:px-8 border-b border-neutral-100 dark:border-[#27272A]/80">
         <div className="flex items-center justify-between h-13 py-2.5">
-          {/* Logo */}
-          <div className="flex items-center space-x-3">
-            <div className="flex items-baseline space-x-1.5 cursor-pointer">
-              <span className="font-serif font-bold text-xl tracking-tight text-neutral-900 dark:text-white">
-                Open
-              </span>
-              <span className="text-emerald-500 font-sans font-light text-xl">~</span>
-              <span className="font-sans font-bold text-xl tracking-tight text-neutral-900 dark:text-white">
-                Electricity
+          {/* Logo Mark & Name */}
+          <div className="flex items-center space-x-2.5 cursor-pointer group">
+            <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-emerald-600 via-emerald-500 to-teal-400 flex items-center justify-center shadow-xs shadow-emerald-500/20 group-hover:scale-105 transition-transform">
+              <svg
+                className="h-4.5 w-4.5 text-white fill-white"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth="1"
+              >
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+              </svg>
+            </div>
+            <div className="flex items-baseline">
+              <span className="font-sans font-extrabold text-xl tracking-tight text-neutral-950 dark:text-white">
+                Open<span className="text-emerald-600 dark:text-emerald-400 font-black">Electricity</span>
               </span>
             </div>
-            <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-[#18181B] text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-[#27272A] uppercase tracking-wider">
-              SEA Tracker
-            </span>
           </div>
 
           {/* Right Status Pill */}

@@ -3,9 +3,9 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
 
 export const metadata: Metadata = {
-  title: "OpenElectricity Southeast Asia | Live Grid & Market Tracker",
+  title: "OpenElectricity | Live Electricity Grid & Market Tracker",
   description:
-    "Open-source electricity market and fuel mix tracker for Southeast Asia (Philippines, Singapore, Malaysia, Thailand, Vietnam), inspired by OpenNEM.",
+    "OpenElectricity - live electricity grid, generation mix, emissions, and wholesale spot market tracker for Southeast Asia and beyond.",
   keywords: [
     "OpenNEM",
     "OpenElectricity",

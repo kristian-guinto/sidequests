@@ -1,7 +1,7 @@
 [project]
-name = "open-nem-ph"
+name = "open-electricity"
 version = "0.1.0"
-description = "OpenNEM electricity market tracker & analytics pipeline for the Philippines (WESM/IEMOP)"
+description = "OpenElectricity market tracker & analytics pipeline"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
-open-nem-ph = "pipeline.ingest:app"
+open-electricity = "pipeline.ingest:app"
 ingest = "pipeline.ingest:app"
 
 [build-system]
