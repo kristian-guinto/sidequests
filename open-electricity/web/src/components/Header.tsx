@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Region, TimeRange, TimeInterval, ViewMode } from "@/lib/types";
+import { Region, TimeRange, TimeInterval, ViewMode, RANGE_CONFIG } from "@/lib/types";
 import { Zap, RefreshCw, BarChart2, Layers } from "lucide-react";
 
 interface HeaderProps {
@@ -32,13 +32,6 @@ const RANGES: { id: TimeRange; label: string }[] = [
   { id: "1y", label: "1Y" },
 ];
 
-const INTERVALS: { id: TimeInterval; label: string }[] = [
-  { id: "5m", label: "5m" },
-  { id: "30m", label: "30m" },
-  { id: "1h", label: "1h" },
-  { id: "1d", label: "1d" },
-];
-
 export function Header({
   region,
   onRegionChange,
@@ -51,6 +44,19 @@ export function Header({
   onRefresh,
   isLoading,
 }: HeaderProps) {
+  const handleRangeClick = (newRange: TimeRange) => {
+    onRangeChange(newRange);
+    const config = RANGE_CONFIG[newRange];
+    if (config) {
+      onIntervalChange(config.defaultInterval);
+    }
+  };
+
+  const allowedIntervals = RANGE_CONFIG[range]?.allowedIntervals || [
+    { id: "5m", label: "5m" },
+    { id: "30m", label: "30m" },
+  ];
+
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-50 text-slate-800 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -132,7 +138,7 @@ export function Header({
               {RANGES.map((rng) => (
                 <button
                   key={rng.id}
-                  onClick={() => onRangeChange(rng.id)}
+                  onClick={() => handleRangeClick(rng.id)}
                   className={`px-2.5 py-0.5 rounded text-xs transition ${
                     range === rng.id ? "bg-white text-slate-900 font-semibold shadow-sm" : "hover:text-slate-900"
                   }`}
@@ -143,11 +149,11 @@ export function Header({
             </div>
           </div>
 
-          {/* Time Interval Resolution */}
+          {/* Time Interval Resolution (Filtered by current Range) */}
           <div className="flex items-center space-x-2">
             <span className="text-slate-400 font-medium">Interval:</span>
             <div className="flex bg-slate-100 rounded-md p-0.5 border border-slate-200/80">
-              {INTERVALS.map((inv) => (
+              {allowedIntervals.map((inv) => (
                 <button
                   key={inv.id}
                   onClick={() => onIntervalChange(inv.id)}

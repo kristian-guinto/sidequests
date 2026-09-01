@@ -1,7 +1,17 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { Region, TimeRange, TimeInterval, ViewMode, FuelGenerationPoint, SummaryMetrics, FuelBreakdownRow, InterconnectorFlow } from "@/lib/types";
+import {
+  Region,
+  TimeRange,
+  TimeInterval,
+  ViewMode,
+  FuelGenerationPoint,
+  SummaryMetrics,
+  FuelBreakdownRow,
+  InterconnectorFlow,
+  RANGE_CONFIG,
+} from "@/lib/types";
 import { Header } from "@/components/Header";
 import { SummaryCards } from "@/components/SummaryCards";
 import { GenerationChart } from "@/components/GenerationChart";
@@ -24,10 +34,22 @@ export default function DashboardPage() {
   const [interconnectors, setInterconnectors] = useState<InterconnectorFlow[]>([]);
   const [dataSource, setDataSource] = useState<string>("live");
 
+  const unit = RANGE_CONFIG[range]?.unit || "MW";
+
+  const handleRangeChange = (newRange: TimeRange) => {
+    setRange(newRange);
+    const cfg = RANGE_CONFIG[newRange];
+    if (cfg) {
+      setInterval(cfg.defaultInterval);
+    }
+  };
+
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/energy?region=${region}&range=${range}&interval=${interval}`);
+      const res = await fetch(
+        `/api/energy?region=${region}&range=${range}&interval=${interval}`
+      );
       if (res.ok) {
         const json = await res.json();
         setPoints(json.points || []);
@@ -40,7 +62,7 @@ export default function DashboardPage() {
       }
     } catch (e) {
       console.warn("Using fallback local dataset:", e);
-      const fallback = generateMockEnergyData(region, range);
+      const fallback = generateMockEnergyData(region, range, interval);
       setPoints(fallback.points);
       setSummary(fallback.summary);
       setBreakdown(fallback.breakdown);
@@ -61,7 +83,7 @@ export default function DashboardPage() {
         region={region}
         onRegionChange={setRegion}
         range={range}
-        onRangeChange={setRange}
+        onRangeChange={handleRangeChange}
         interval={interval}
         onIntervalChange={setInterval}
         viewMode={viewMode}
@@ -76,7 +98,12 @@ export default function DashboardPage() {
 
         {/* Main Charts Area */}
         <div className="space-y-3.5">
-          <GenerationChart data={points} viewMode={viewMode} height="430px" />
+          <GenerationChart
+            data={points}
+            viewMode={viewMode}
+            unit={unit}
+            height="430px"
+          />
           <PriceChart data={points} height="170px" />
         </div>
 

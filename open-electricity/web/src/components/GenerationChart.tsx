@@ -9,6 +9,7 @@ import { format, parseISO } from "date-fns";
 interface GenerationChartProps {
   data: FuelGenerationPoint[];
   viewMode: ViewMode;
+  unit?: "MW" | "GWh";
   height?: string;
 }
 
@@ -24,11 +25,21 @@ const FUEL_ORDER = [
   "solar",
 ] as const;
 
-export function GenerationChart({ data, viewMode, height = "420px" }: GenerationChartProps) {
+export function GenerationChart({
+  data,
+  viewMode,
+  unit = "MW",
+  height = "420px",
+}: GenerationChartProps) {
   const timestamps = useMemo(() => {
     return data.map((d) => {
       try {
-        return format(parseISO(d.timestamp), "dd MMM HH:mm");
+        if (d.timestamp.includes("T")) {
+          return format(parseISO(d.timestamp), "dd MMM HH:mm");
+        } else if (d.timestamp.includes("-") && d.timestamp.length === 10) {
+          return format(parseISO(d.timestamp), "dd MMM");
+        }
+        return d.timestamp;
       } catch {
         return d.timestamp;
       }
@@ -37,6 +48,7 @@ export function GenerationChart({ data, viewMode, height = "420px" }: Generation
 
   const option = useMemo(() => {
     const isCumulative = viewMode === "cumulative";
+    const isEnergy = unit === "GWh";
 
     const series = FUEL_ORDER.map((fuel) => {
       const meta = FUEL_META[fuel];
@@ -72,7 +84,7 @@ export function GenerationChart({ data, viewMode, height = "420px" }: Generation
         areaStyle: undefined as any,
         lineStyle: {
           width: 2.2,
-          color: "#0F172A", // crisp dark slate
+          color: "#0F172A",
           type: "solid",
         },
         itemStyle: {
@@ -102,7 +114,8 @@ export function GenerationChart({ data, viewMode, height = "420px" }: Generation
         backgroundColor: "rgba(255, 255, 255, 0.98)",
         borderColor: "#E2E8F0",
         borderWidth: 1,
-        extraCssText: "box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); border-radius: 8px;",
+        extraCssText:
+          "box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); border-radius: 8px;",
         textStyle: {
           color: "#0F172A",
           fontSize: 12,
@@ -130,16 +143,24 @@ export function GenerationChart({ data, viewMode, height = "420px" }: Generation
             demandVal = Number(demandItem.value) || 0;
           }
 
+          const unitStr = isEnergy ? "GWh" : "MW";
+          const formattedTotal = isEnergy
+            ? total.toFixed(2)
+            : Math.round(total).toLocaleString();
+
           let tooltipHtml = `<div class="p-1 font-sans min-w-[210px]">
             <div class="font-semibold text-slate-800 border-b border-slate-200 pb-1.5 mb-1.5 flex justify-between items-center text-xs">
               <span class="text-slate-500">${time}</span>
-              <span>Total: <strong class="text-slate-900 font-bold">${Math.round(total).toLocaleString()} MW</strong></span>
+              <span>Total: <strong class="text-slate-900 font-bold">${formattedTotal} ${unitStr}</strong></span>
             </div>`;
 
           if (demandVal > 0) {
+            const formattedDemand = isEnergy
+              ? demandVal.toFixed(2)
+              : Math.round(demandVal).toLocaleString();
             tooltipHtml += `<div class="flex justify-between items-center py-0.5 text-xs text-slate-700 font-medium">
               <span class="flex items-center"><span class="inline-block w-2.5 h-2.5 rounded-full mr-1.5 bg-slate-900"></span>Total Demand:</span>
-              <span class="font-bold text-slate-900">${Math.round(demandVal).toLocaleString()} MW</span>
+              <span class="font-bold text-slate-900">${formattedDemand} ${unitStr}</span>
             </div><div class="border-b border-slate-100 my-1"></div>`;
           }
 
@@ -148,9 +169,12 @@ export function GenerationChart({ data, viewMode, height = "420px" }: Generation
             .forEach((r) => {
               if (r.val > 0) {
                 const pct = total > 0 ? ((r.val / total) * 100).toFixed(1) : "0";
+                const valStr = isEnergy
+                  ? r.val.toFixed(2)
+                  : Math.round(r.val).toLocaleString();
                 tooltipHtml += `<div class="flex justify-between items-center py-0.5 text-xs">
                   <span class="flex items-center text-slate-600"><span class="inline-block w-2.5 h-2.5 rounded-sm mr-1.5 flex-shrink-0" style="background-color:${r.color}"></span>${r.name}:</span>
-                  <span class="font-mono text-slate-800 font-medium">${Math.round(r.val).toLocaleString()} MW <span class="text-slate-400 text-[10px]">(${pct}%)</span></span>
+                  <span class="font-mono text-slate-800 font-medium">${valStr} ${unitStr} <span class="text-slate-400 text-[10px]">(${pct}%)</span></span>
                 </div>`;
               }
             });
@@ -187,14 +211,17 @@ export function GenerationChart({ data, viewMode, height = "420px" }: Generation
       },
       yAxis: {
         type: "value",
-        name: "Generation (MW)",
+        name: isEnergy ? "Energy (GWh)" : "Generation (MW)",
         nameTextStyle: { color: "#64748B", fontSize: 11 },
         axisLine: { show: false },
         axisTick: { show: false },
         axisLabel: {
           color: "#64748B",
           fontSize: 11,
-          formatter: (v: number) => (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${v}`),
+          formatter: (v: number) => {
+            if (isEnergy) return `${v}`;
+            return v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${v}`;
+          },
         },
         splitLine: { lineStyle: { color: "#F1F5F9", type: "solid" } },
       },
@@ -217,14 +244,18 @@ export function GenerationChart({ data, viewMode, height = "420px" }: Generation
       ],
       series,
     };
-  }, [data, timestamps, viewMode]);
+  }, [data, timestamps, viewMode, unit]);
 
   return (
     <div className="bg-white border border-slate-200/90 rounded-xl p-4 shadow-sm">
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-sm font-bold text-slate-900 tracking-tight flex items-center space-x-2">
-          <span>Electricity Generation by Fuel Technology</span>
-          <span className="text-xs font-normal text-slate-500">(MW)</span>
+          <span>
+            {unit === "GWh"
+              ? "Electricity Energy by Fuel Technology"
+              : "Electricity Generation by Fuel Technology"}
+          </span>
+          <span className="text-xs font-normal text-slate-500">({unit})</span>
         </h3>
       </div>
       <ReactECharts option={option} style={{ height, width: "100%" }} notMerge={true} lazyUpdate={true} />

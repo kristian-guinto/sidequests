@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   const interval = (searchParams.get("interval") || "30m").toLowerCase() as TimeInterval;
 
   // 1. Try local SQLite database first (offline local testing)
-  const sqliteResult = queryLocalSQLite(region, range);
+  const sqliteResult = queryLocalSQLite(region, range, interval);
   if (sqliteResult && sqliteResult.points.length > 0) {
     return NextResponse.json({
       region,
@@ -97,7 +97,7 @@ export async function GET(request: NextRequest) {
   }
 
   // 3. Fallback to generated simulation data
-  const data = generateMockEnergyData(region, range);
+  const data = generateMockEnergyData(region, range, interval);
   return NextResponse.json({
     region,
     range,
