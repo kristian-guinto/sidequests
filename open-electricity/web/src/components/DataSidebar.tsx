@@ -221,20 +221,9 @@ export function DataSidebar({
       {/* Sidebar Header: Date range / Hovered Time display */}
       <div className="p-3 border-b border-neutral-100 dark:border-[#27272A] flex items-center justify-between bg-neutral-50/60 dark:bg-[#121215]/80">
         <div className="flex flex-col">
-          <div className="flex items-center space-x-1.5">
-            {isHovered ? (
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border border-amber-300 dark:border-amber-700 animate-pulse">
-                POINT IN TIME
-              </span>
-            ) : (
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-neutral-200 dark:bg-[#27272A] text-neutral-800 dark:text-neutral-200">
-                AGGREGATE
-              </span>
-            )}
-            <span className="font-semibold text-neutral-900 dark:text-white text-xs truncate max-w-[200px]">
-              {formattedTimeHeader}
-            </span>
-          </div>
+          <span className="font-semibold text-neutral-900 dark:text-white text-xs sm:text-[13px] truncate max-w-[240px]">
+            {formattedTimeHeader}
+          </span>
         </div>
 
         {/* Toggle between Table & Donut */}
