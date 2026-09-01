@@ -205,7 +205,7 @@ export function Header({
 
           <div className="h-4 w-[1px] bg-neutral-200 dark:bg-[#27272A] mx-1 hidden sm:block" />
 
-          {/* Chart Mode Toggle (Stacked vs 100% Stacked Area) */}
+          {/* Chart Mode Toggle (Value vs Percentage) */}
           <div className="flex items-center border border-neutral-200 dark:border-[#27272A] rounded p-0.5 bg-neutral-50/50 dark:bg-[#121215]">
             <button
               onClick={() => onViewModeChange("stacked")}
@@ -214,10 +214,10 @@ export function Header({
                   ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold shadow-sm"
                   : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white"
               }`}
-              title="Standard Stacked Area Chart (MW / GWh)"
+              title="Absolute Value (MW / GWh)"
             >
               <AreaIcon className="h-3.5 w-3.5" />
-              <span>Stacked</span>
+              <span>Value</span>
             </button>
             <button
               onClick={() => onViewModeChange("percentage")}
@@ -226,10 +226,10 @@ export function Header({
                   ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold shadow-sm"
                   : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white"
               }`}
-              title="100% Stacked Area Chart (%)"
+              title="Percentage Contribution Share (%)"
             >
               <Percent className="h-3.5 w-3.5" />
-              <span>100% Stacked</span>
+              <span>Percentage</span>
             </button>
           </div>
 
