@@ -16,7 +16,11 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Ensure DuckDB temp files and extensions use writable /tmp on serverless environments
-if not os.getenv("HOME") or os.getenv("HOME") == "/" or not os.access(os.getenv("HOME", ""), os.W_OK):
+if (
+    not os.getenv("HOME")
+    or os.getenv("HOME") == "/"
+    or not os.access(os.getenv("HOME", ""), os.W_OK)
+):
     os.environ["HOME"] = "/tmp"
 
 os.environ.setdefault("DUCKDB_EXTENSION_DIRECTORY", "/tmp/.duckdb/extensions")
