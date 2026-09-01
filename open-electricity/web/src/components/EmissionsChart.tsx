@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useCallback } from "react";
 import ReactECharts from "echarts-for-react";
+import * as echarts from "echarts";
 import { FuelGenerationPoint, ViewMode } from "@/lib/types";
 import { getFuelMeta } from "@/lib/colors";
 import { computeXAxisConfig, getShadcnTooltipConfig } from "@/lib/chartUtils";
@@ -214,6 +215,11 @@ export function EmissionsChart({
     };
   }, [data, onHoverPoint]);
 
+  const onChartReady = useCallback((echartsInstance: any) => {
+    echartsInstance.group = "opennem_sync_group";
+    echarts.connect("opennem_sync_group");
+  }, []);
+
   return (
     <ChartCard onMouseLeave={() => onHoverPoint?.(null)}>
       <ChartCardHeader>
@@ -245,6 +251,7 @@ export function EmissionsChart({
         <ReactECharts
           option={option}
           onEvents={onEvents}
+          onChartReady={onChartReady}
           style={{ height, width: "100%" }}
           notMerge={true}
           lazyUpdate={false}

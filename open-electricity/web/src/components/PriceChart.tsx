@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useCallback } from "react";
 import ReactECharts from "echarts-for-react";
+import * as echarts from "echarts";
 import { FuelGenerationPoint } from "@/lib/types";
 import { computeXAxisConfig, createShadcnGradient, getShadcnTooltipConfig } from "@/lib/chartUtils";
 import {
@@ -143,6 +144,11 @@ export function PriceChart({
     };
   }, [data, onHoverPoint]);
 
+  const onChartReady = useCallback((echartsInstance: any) => {
+    echartsInstance.group = "opennem_sync_group";
+    echarts.connect("opennem_sync_group");
+  }, []);
+
   return (
     <ChartCard onMouseLeave={() => onHoverPoint?.(null)}>
       <ChartCardHeader>
@@ -171,6 +177,7 @@ export function PriceChart({
         <ReactECharts
           option={option}
           onEvents={onEvents}
+          onChartReady={onChartReady}
           style={{ height, width: "100%" }}
           notMerge={true}
           lazyUpdate={false}

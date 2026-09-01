@@ -150,8 +150,8 @@ export function DataSidebar({
         totalDisplay: isEnergy
           ? `${totalGWh.toFixed(1)} GWh`
           : `${Math.round(
-              rows.reduce((acc, r) => acc + (isEnergy ? 0 : r.rawVal), 0)
-            ).toLocaleString()} MW`,
+            rows.reduce((acc, r) => acc + (isEnergy ? 0 : r.rawVal), 0)
+          ).toLocaleString()} MW`,
         renValDisplay: isEnergy
           ? `${renVal.toFixed(1)} GWh`
           : `${Math.round(renVal).toLocaleString()} MW`,
@@ -228,22 +228,20 @@ export function DataSidebar({
         <div className="flex items-center border border-neutral-200 dark:border-[#27272A] rounded p-0.5 bg-white dark:bg-[#121215]">
           <button
             onClick={() => setActiveView("table")}
-            className={`p-1 rounded transition ${
-              activeView === "table"
+            className={`p-1 rounded transition ${activeView === "table"
                 ? "bg-neutral-100 dark:bg-[#27272A] text-neutral-900 dark:text-white font-bold"
                 : "text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
-            }`}
+              }`}
             title="Table View"
           >
             <List className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={() => setActiveView("donut")}
-            className={`p-1 rounded transition ${
-              activeView === "donut"
+            className={`p-1 rounded transition ${activeView === "donut"
                 ? "bg-neutral-100 dark:bg-[#27272A] text-neutral-900 dark:text-white font-bold"
                 : "text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
-            }`}
+              }`}
             title="Donut Chart View"
           >
             <PieIcon className="h-3.5 w-3.5" />
@@ -295,9 +293,8 @@ export function DataSidebar({
               {tableData.rows.map((row) => (
                 <tr
                   key={row.fuelTech}
-                  className={`hover:bg-neutral-50/90 dark:hover:bg-[#18181B]/70 transition-colors group cursor-default ${
-                    row.rawVal === 0 ? "opacity-40" : ""
-                  }`}
+                  className={`hover:bg-neutral-50/90 dark:hover:bg-[#18181B]/70 transition-colors group cursor-default ${row.rawVal === 0 ? "opacity-40" : ""
+                    }`}
                 >
                   <td className="py-1.5 px-3 flex items-center space-x-2">
                     <span
