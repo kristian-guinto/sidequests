@@ -6,7 +6,9 @@ import {
   FuelGenerationPoint,
   SummaryMetrics,
   InterconnectorFlow,
+  FuelTech,
 } from "@/lib/types";
+import { FUEL_META } from "@/lib/colors";
 import { ChevronDown, PieChart as PieIcon, List, Globe } from "lucide-react";
 import ReactECharts from "echarts-for-react";
 import { format, parseISO } from "date-fns";
@@ -22,17 +24,17 @@ interface DataSidebarProps {
   unit?: "MW" | "GWh";
 }
 
-const FUEL_KEYS = [
-  { key: "solar", label: "Solar", color: "#FACC15", isRen: true },
-  { key: "wind", label: "Wind", color: "#22C55E", isRen: true },
-  { key: "hydro", label: "Hydro", color: "#38BDF8", isRen: true },
-  { key: "geothermal", label: "Geothermal", color: "#06B6D4", isRen: true },
-  { key: "biomass", label: "Biomass", color: "#16A34A", isRen: true },
-  { key: "gas", label: "Gas", color: "#FB923C", isRen: false },
-  { key: "coal", label: "Coal", color: "#1E293B", isRen: false },
-  { key: "oil", label: "Oil", color: "#E11D48", isRen: false },
-  { key: "battery", label: "Battery", color: "#6366F1", isRen: true },
-] as const;
+const FUEL_DISPLAY_ORDER: FuelTech[] = [
+  "solar",
+  "wind",
+  "hydro",
+  "geothermal",
+  "biomass",
+  "gas",
+  "coal",
+  "oil",
+  "battery",
+];
 
 export function DataSidebar({
   breakdown,
@@ -77,18 +79,19 @@ export function DataSidebar({
       const totalGen = pt.totalGeneration || 1;
       const ptPrice = pt.price || summary?.avgPricePHPMWh || 0;
 
-      const rows = FUEL_KEYS.map((f) => {
-        const val = Number((pt as any)[f.key]) || 0;
+      const rows = FUEL_DISPLAY_ORDER.map((fKey) => {
+        const meta = FUEL_META[fKey];
+        const val = Number((pt as any)[fKey]) || 0;
         const pct = totalGen > 0 ? (val / totalGen) * 100 : 0;
         return {
-          fuelTech: f.key,
-          label: f.label,
-          color: f.color,
+          fuelTech: fKey,
+          label: meta.label,
+          color: meta.color,
           valueDisplay: `${val.toLocaleString()} MW`,
           rawVal: val,
           pct: pct,
           priceDisplay: `${currencySymbol}${Math.round(ptPrice).toLocaleString()}`,
-          isRenewable: f.isRen,
+          isRenewable: meta.isRenewable,
         };
       }).sort((a, b) => b.rawVal - a.rawVal);
 
@@ -116,6 +119,7 @@ export function DataSidebar({
     const avgPrice = summary?.avgPricePHPMWh || 0;
 
     const rows = breakdown.map((b) => {
+      const meta = FUEL_META[b.fuelTech] || { color: b.color, label: b.label, isRenewable: b.isRenewable };
       const estimatedPrice = Math.round(
         b.fuelTech === "solar"
           ? avgPrice * 0.75
@@ -132,13 +136,13 @@ export function DataSidebar({
 
       return {
         fuelTech: b.fuelTech,
-        label: b.label,
-        color: b.color,
+        label: meta.label,
+        color: meta.color,
         valueDisplay: b.energyGWh.toLocaleString(),
         rawVal: b.energyGWh,
         pct: b.percentage,
         priceDisplay: `${currencySymbol}${estimatedPrice.toLocaleString()}`,
-        isRenewable: b.isRenewable,
+        isRenewable: meta.isRenewable,
       };
     });
 

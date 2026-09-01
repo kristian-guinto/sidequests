@@ -3,6 +3,7 @@
 import React, { useMemo } from "react";
 import ReactECharts from "echarts-for-react";
 import { FuelGenerationPoint } from "@/lib/types";
+import { FUEL_META } from "@/lib/colors";
 import { format, parseISO } from "date-fns";
 import { Menu } from "lucide-react";
 
@@ -144,12 +145,12 @@ export function EmissionsChart({
       },
       series: [
         {
-          name: "Oil",
+          name: "Distillate / Oil",
           type: "line",
           stack: "Emissions",
-          areaStyle: { color: "#E11D48", opacity: 0.95 },
+          areaStyle: { color: FUEL_META.oil.color, opacity: 0.95 },
           lineStyle: { width: 0.3, color: "#fff" },
-          itemStyle: { color: "#E11D48" },
+          itemStyle: { color: FUEL_META.oil.color },
           showSymbol: false,
           data: emissionsData.map((d) => d.oil),
         },
@@ -157,9 +158,9 @@ export function EmissionsChart({
           name: "Gas",
           type: "line",
           stack: "Emissions",
-          areaStyle: { color: "#F97316", opacity: 0.95 },
+          areaStyle: { color: FUEL_META.gas.color, opacity: 0.95 },
           lineStyle: { width: 0.3, color: "#fff" },
-          itemStyle: { color: "#F97316" },
+          itemStyle: { color: FUEL_META.gas.color },
           showSymbol: false,
           data: emissionsData.map((d) => d.gas),
         },
@@ -167,9 +168,9 @@ export function EmissionsChart({
           name: "Coal",
           type: "line",
           stack: "Emissions",
-          areaStyle: { color: "#1E293B", opacity: 0.95 },
+          areaStyle: { color: FUEL_META.coal.color, opacity: 0.95 },
           lineStyle: { width: 0.3, color: "#fff" },
-          itemStyle: { color: "#1E293B" },
+          itemStyle: { color: FUEL_META.coal.color },
           showSymbol: false,
           data: emissionsData.map((d) => d.coal),
         },
