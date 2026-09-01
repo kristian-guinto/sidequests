@@ -9,7 +9,7 @@ import {
   FuelTech,
 } from "@/lib/types";
 import { getFuelMeta } from "@/lib/colors";
-import { ChevronDown, PieChart as PieIcon, List, Globe } from "lucide-react";
+import { ChevronDown, PieChart as PieIcon, List, Globe, Zap, CloudFog, TrendingUp } from "lucide-react";
 import ReactECharts from "echarts-for-react";
 import { format, parseISO } from "date-fns";
 import { useTheme } from "@/components/ThemeProvider";
@@ -80,6 +80,13 @@ export function DataSidebar({
       const pt = hoveredPoint;
       const totalGen = pt.totalGeneration || 1;
       const ptPrice = pt.price || summary?.avgPricePHPMWh || 0;
+      const demandVal = pt.demand || 0;
+
+      // Calculate emissions for point in time (5-minute interval)
+      const coalT = (pt.coal || 0) * (5.0 / 60.0) * 0.9;
+      const gasT = (pt.gas || 0) * (5.0 / 60.0) * 0.38;
+      const oilT = (pt.oil || 0) * (5.0 / 60.0) * 0.75;
+      const totalEmissionsT = coalT + gasT + oilT;
 
       const rows = FUEL_DISPLAY_ORDER.map((fKey) => {
         const meta = getFuelMeta(fKey, isDark);
@@ -109,6 +116,8 @@ export function DataSidebar({
         renValDisplay: `${Math.round(renVal).toLocaleString()} MW`,
         renPctDisplay: `${renPct.toFixed(1)}%`,
         priceDisplay: `${currencySymbol}${Math.round(ptPrice).toLocaleString()}`,
+        emissionsDisplay: `${totalEmissionsT.toFixed(1)} tCO₂e`,
+        demandDisplay: demandVal > 0 ? `${Math.round(demandVal).toLocaleString()} MW` : null,
         columnUnit: "Power",
         unitSub: "MW",
       };
@@ -116,6 +125,8 @@ export function DataSidebar({
       const isEnergy = unit === "GWh";
       const totalGWh = summary?.totalGenerationGWh || 0;
       const avgPrice = summary?.avgPricePHPMWh || 0;
+      const totalEmissions = summary?.totalEmissionsTonnes || 0;
+      const peakDemand = summary?.peakDemandMW || 0;
 
       const rows = FUEL_DISPLAY_ORDER.map((fKey) => {
         const meta = getFuelMeta(fKey, isDark);
@@ -150,13 +161,15 @@ export function DataSidebar({
         totalDisplay: isEnergy
           ? `${totalGWh.toFixed(1)} GWh`
           : `${Math.round(
-            rows.reduce((acc, r) => acc + (isEnergy ? 0 : r.rawVal), 0)
-          ).toLocaleString()} MW`,
+              rows.reduce((acc, r) => acc + (isEnergy ? 0 : r.rawVal), 0)
+            ).toLocaleString()} MW`,
         renValDisplay: isEnergy
           ? `${renVal.toFixed(1)} GWh`
           : `${Math.round(renVal).toLocaleString()} MW`,
         renPctDisplay: `${renPct.toFixed(1)}%`,
         priceDisplay: `${currencySymbol}${Math.round(avgPrice).toLocaleString()}`,
+        emissionsDisplay: totalEmissions > 0 ? `${Math.round(totalEmissions).toLocaleString()} tCO₂e` : null,
+        demandDisplay: peakDemand > 0 ? `Peak ${Math.round(peakDemand).toLocaleString()} MW` : null,
         columnUnit: isEnergy ? "Energy" : "Power",
         unitSub: isEnergy ? "GWh" : "MW",
       };
@@ -210,7 +223,7 @@ export function DataSidebar({
         <div className="flex flex-col">
           <div className="flex items-center space-x-1.5">
             {isHovered ? (
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border border-amber-300 dark:border-amber-700 animate-pulse">
                 POINT IN TIME
               </span>
             ) : (
@@ -228,20 +241,22 @@ export function DataSidebar({
         <div className="flex items-center border border-neutral-200 dark:border-[#27272A] rounded p-0.5 bg-white dark:bg-[#121215]">
           <button
             onClick={() => setActiveView("table")}
-            className={`p-1 rounded transition ${activeView === "table"
+            className={`p-1 rounded transition ${
+              activeView === "table"
                 ? "bg-neutral-100 dark:bg-[#27272A] text-neutral-900 dark:text-white font-bold"
                 : "text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
-              }`}
+            }`}
             title="Table View"
           >
             <List className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={() => setActiveView("donut")}
-            className={`p-1 rounded transition ${activeView === "donut"
+            className={`p-1 rounded transition ${
+              activeView === "donut"
                 ? "bg-neutral-100 dark:bg-[#27272A] text-neutral-900 dark:text-white font-bold"
                 : "text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
-              }`}
+            }`}
             title="Donut Chart View"
           >
             <PieIcon className="h-3.5 w-3.5" />
@@ -293,8 +308,9 @@ export function DataSidebar({
               {tableData.rows.map((row) => (
                 <tr
                   key={row.fuelTech}
-                  className={`hover:bg-neutral-50/90 dark:hover:bg-[#18181B]/70 transition-colors group cursor-default ${row.rawVal === 0 ? "opacity-40" : ""
-                    }`}
+                  className={`hover:bg-neutral-50/90 dark:hover:bg-[#18181B]/70 transition-colors group cursor-default ${
+                    row.rawVal === 0 ? "opacity-40" : ""
+                  }`}
                 >
                   <td className="py-1.5 px-3 flex items-center space-x-2">
                     <span
@@ -317,10 +333,10 @@ export function DataSidebar({
                 </tr>
               ))}
 
-              {/* Summary Totals */}
+              {/* Summary Totals: Net Generation */}
               <tr className="border-t-2 border-neutral-200 dark:border-[#27272A] bg-neutral-50/40 dark:bg-[#121215]/50 font-bold text-neutral-900 dark:text-white">
                 <td className="py-2 px-3 text-[11px] flex items-center space-x-1.5">
-                  <span className="text-neutral-400 dark:text-neutral-500 font-normal">—</span>
+                  <Zap className="h-3 w-3 text-amber-500" />
                   <span>Net {isHovered ? "Power" : "Generation"}</span>
                 </td>
                 <td className="py-2 px-2 text-right font-mono text-[11px]">
@@ -332,6 +348,7 @@ export function DataSidebar({
                 </td>
               </tr>
 
+              {/* Renewables Row */}
               <tr className="bg-emerald-50/30 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-300 font-bold">
                 <td className="py-2 px-3 text-[11px] flex items-center space-x-1.5">
                   <span className="text-emerald-500 font-normal">—</span>
@@ -347,6 +364,35 @@ export function DataSidebar({
                   {tableData.priceDisplay}
                 </td>
               </tr>
+
+              {/* Emissions Row */}
+              {tableData.emissionsDisplay && (
+                <tr className="bg-neutral-50/20 dark:bg-[#121215]/30 text-neutral-700 dark:text-neutral-300 font-medium">
+                  <td className="py-1.5 px-3 text-[11px] flex items-center space-x-1.5">
+                    <CloudFog className="h-3 w-3 text-neutral-400" />
+                    <span>Emissions</span>
+                  </td>
+                  <td colSpan={2} className="py-1.5 px-2 text-right font-mono text-[11px] text-neutral-800 dark:text-neutral-200">
+                    {tableData.emissionsDisplay}
+                  </td>
+                  <td className="py-1.5 px-3 text-right font-mono text-[10px] text-neutral-400 dark:text-neutral-500">
+                    {isHovered ? "Interval" : "Total Period"}
+                  </td>
+                </tr>
+              )}
+
+              {/* Demand Row */}
+              {tableData.demandDisplay && (
+                <tr className="bg-neutral-50/20 dark:bg-[#121215]/30 text-neutral-700 dark:text-neutral-300 font-medium">
+                  <td className="py-1.5 px-3 text-[11px] flex items-center space-x-1.5">
+                    <TrendingUp className="h-3 w-3 text-neutral-400" />
+                    <span>Demand</span>
+                  </td>
+                  <td colSpan={3} className="py-1.5 px-3 text-right font-mono text-[11px] text-neutral-800 dark:text-neutral-200">
+                    {tableData.demandDisplay}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

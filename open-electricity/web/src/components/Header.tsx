@@ -164,11 +164,10 @@ export function Header({
                     <div key={cCode} className="border-b border-neutral-100 dark:border-[#27272A]/60 last:border-0 py-1">
                       <button
                         onClick={() => handleCountrySelect(cCode)}
-                        className={`w-full flex items-center justify-between px-3 py-1.5 text-left transition ${
-                          isCurrentC
+                        className={`w-full flex items-center justify-between px-3 py-1.5 text-left transition ${isCurrentC
                             ? "font-bold text-neutral-950 dark:text-white bg-neutral-50 dark:bg-[#18181B]"
                             : "text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-[#121215]"
-                        }`}
+                          }`}
                       >
                         <span className="flex items-center space-x-2">
                           <span className="text-sm">{cInfo.flag}</span>
@@ -185,11 +184,10 @@ export function Header({
                             <button
                               key={reg.id}
                               onClick={() => handleRegionSelect(reg.id)}
-                              className={`w-full text-left px-2 py-1 rounded text-xs transition ${
-                                region === reg.id
+                              className={`w-full text-left px-2 py-1 rounded text-xs transition ${region === reg.id
                                   ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 font-medium"
                                   : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-[#18181B]"
-                              }`}
+                                }`}
                             >
                               {reg.label}
                             </button>
@@ -209,11 +207,10 @@ export function Header({
           <div className="flex items-center border border-neutral-200 dark:border-[#27272A] rounded p-0.5 bg-neutral-50/50 dark:bg-[#121215]">
             <button
               onClick={() => onViewModeChange("stacked")}
-              className={`flex items-center space-x-1 px-2.5 py-0.5 rounded text-xs font-medium transition ${
-                viewMode === "stacked" || viewMode === "cumulative"
+              className={`flex items-center space-x-1 px-2.5 py-0.5 rounded text-xs font-medium transition ${viewMode === "stacked" || viewMode === "cumulative"
                   ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold shadow-sm"
                   : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white"
-              }`}
+                }`}
               title="Absolute Value (MW / GWh)"
             >
               <AreaIcon className="h-3.5 w-3.5" />
@@ -221,11 +218,10 @@ export function Header({
             </button>
             <button
               onClick={() => onViewModeChange("percentage")}
-              className={`flex items-center space-x-1 px-2.5 py-0.5 rounded text-xs font-medium transition ${
-                viewMode === "percentage"
+              className={`flex items-center space-x-1 px-2.5 py-0.5 rounded text-xs font-medium transition ${viewMode === "percentage"
                   ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold shadow-sm"
                   : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white"
-              }`}
+                }`}
               title="Percentage Contribution Share (%)"
             >
               <Percent className="h-3.5 w-3.5" />
@@ -239,11 +235,10 @@ export function Header({
               <button
                 key={rng.id}
                 onClick={() => handleRangeClick(rng.id)}
-                className={`px-2.5 py-0.5 rounded transition ${
-                  range === rng.id
+                className={`px-2.5 py-0.5 rounded transition ${range === rng.id
                     ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold border border-neutral-300 dark:border-neutral-700 shadow-sm"
                     : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-                }`}
+                  }`}
               >
                 {rng.label}
               </button>
@@ -256,11 +251,10 @@ export function Header({
               <button
                 key={inv.id}
                 onClick={() => onIntervalChange(inv.id)}
-                className={`px-2.5 py-0.5 rounded transition ${
-                  interval === inv.id
+                className={`px-2.5 py-0.5 rounded transition ${interval === inv.id
                     ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold border border-neutral-300 dark:border-neutral-700 shadow-sm"
                     : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-                }`}
+                  }`}
               >
                 {inv.label}
               </button>

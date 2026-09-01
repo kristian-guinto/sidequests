@@ -126,7 +126,7 @@ export function GenerationChart({
           if (rawPt?.timestamp) {
             try {
               formattedTime = format(parseISO(rawPt.timestamp), "d MMM yyyy, h:mm a");
-            } catch {}
+            } catch { }
           }
 
           let total = rawPt?.totalGeneration || 0;
