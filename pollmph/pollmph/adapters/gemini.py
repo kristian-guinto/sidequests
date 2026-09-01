@@ -49,8 +49,12 @@ class GeminiAdapter:
             search_config = types.GenerateContentConfig(
                 system_instruction=system_prompt,
                 tools=sdk_tools if sdk_tools else None,
-                response_mime_type="application/json" if (response_model and not sdk_tools) else None,
-                response_schema=response_model if (response_model and not sdk_tools) else None,
+                response_mime_type="application/json"
+                if (response_model and not sdk_tools)
+                else None,
+                response_schema=response_model
+                if (response_model and not sdk_tools)
+                else None,
             )
 
             for chunk in self.client.models.generate_content_stream(
@@ -64,16 +68,17 @@ class GeminiAdapter:
                 if chunk.candidates:
                     candidate = chunk.candidates[0]
 
-                    for part in candidate.content.parts:
-                        if hasattr(part, "function_call") and part.function_call:
-                            tool_calls.append(
-                                ToolCall(
-                                    name=part.function_call.name,
-                                    arguments=str(part.function_call.args),
+                    if candidate.content and candidate.content.parts:
+                        for part in candidate.content.parts:
+                            if hasattr(part, "function_call") and part.function_call:
+                                tool_calls.append(
+                                    ToolCall(
+                                        name=part.function_call.name,
+                                        arguments=str(part.function_call.args),
+                                    )
                                 )
-                            )
-                        elif hasattr(part, "text") and part.text:
-                            content += part.text
+                            elif hasattr(part, "text") and part.text:
+                                content += part.text
 
                     grounding = getattr(candidate, "grounding_metadata", None)
                     if grounding and getattr(grounding, "grounding_chunks", None):
@@ -100,11 +105,21 @@ class GeminiAdapter:
                         response_schema=response_model,
                     ),
                 )
-                final_content = format_response.text or ""
+                final_content = (format_response.text or "").strip()
             else:
-                final_content = raw_content
+                final_content = raw_content.strip()
 
-            completion.response = ChatResponse(content=final_content, citations=citations)
+            if final_content.startswith("```json"):
+                final_content = final_content[7:]
+            elif final_content.startswith("```"):
+                final_content = final_content[3:]
+            if final_content.endswith("```"):
+                final_content = final_content[:-3]
+            final_content = final_content.strip()
+
+            completion.response = ChatResponse(
+                content=final_content, citations=citations
+            )
 
         completion._iterator = _generate()
         return completion
