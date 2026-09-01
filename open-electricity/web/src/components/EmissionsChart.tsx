@@ -19,7 +19,7 @@ export function EmissionsChart({
   height = "180px",
   onHoverPoint,
 }: EmissionsChartProps) {
-  const xAxisConfig = useMemo(() => computeXAxisConfig(data, false), [data]);
+  const xAxisConfig = useMemo(() => computeXAxisConfig(data), [data]);
 
   const emissionsData = useMemo(() => {
     return data.map((d) => {

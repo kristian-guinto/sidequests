@@ -42,7 +42,7 @@ export function GenerationChart({
     return Math.round(totalSum / data.length);
   }, [data]);
 
-  const xAxisConfig = useMemo(() => computeXAxisConfig(data, false), [data]);
+  const xAxisConfig = useMemo(() => computeXAxisConfig(data), [data]);
 
   const option = useMemo(() => {
     const isCumulative = viewMode === "cumulative";

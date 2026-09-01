@@ -22,7 +22,7 @@ export function PriceChart({
   height = "180px",
   onHoverPoint,
 }: PriceChartProps) {
-  const xAxisConfig = useMemo(() => computeXAxisConfig(data, true), [data]);
+  const xAxisConfig = useMemo(() => computeXAxisConfig(data), [data]);
 
   const prices = useMemo(() => {
     return data.map((d) => d.price || 0);
