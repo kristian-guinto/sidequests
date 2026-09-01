@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'Ingestion Mode (daily, backfill, sync-facilities)'
+        description: 'Ingestion Mode (daily, backfill, sync-facilities, migrate)'
         required: true
         default: 'daily'
         type: choice
@@ -15,6 +15,7 @@ on:
           - daily
           - backfill
           - sync-facilities
+          - migrate
       start_date:
         description: 'Start Date for backfill (YYYY-MM-DD)'
         required: false
@@ -48,24 +49,31 @@ jobs:
       - name: Run Daily Sync
         if: "${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'daily') }}"
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN }}
+          MOTHERDUCK_DATABASE: ${{ secrets.MOTHERDUCK_DATABASE || 'open_nem_ph' }}
         run: |
           uv run ingest --mode daily --days 2
 
       - name: Run Manual Backfill
         if: "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'backfill' }}"
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN }}
+          MOTHERDUCK_DATABASE: ${{ secrets.MOTHERDUCK_DATABASE || 'open_nem_ph' }}
         run: |
           uv run ingest --mode backfill --start-date ${{ github.event.inputs.start_date }} --end-date ${{ github.event.inputs.end_date }}
 
       - name: Sync Facilities
         if: "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'sync-facilities' }}"
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN }}
+          MOTHERDUCK_DATABASE: ${{ secrets.MOTHERDUCK_DATABASE || 'open_nem_ph' }}
         run: |
           uv run ingest --mode sync-facilities
 
+      - name: Migrate Database
+        if: "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'migrate' }}"
+        env:
+          MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN }}
+          MOTHERDUCK_DATABASE: ${{ secrets.MOTHERDUCK_DATABASE || 'open_nem_ph' }}
+        run: |
+          uv run ingest migrate

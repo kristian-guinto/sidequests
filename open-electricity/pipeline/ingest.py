@@ -126,13 +126,13 @@ def app():
         "command",
         nargs="?",
         default=None,
-        help="Command to run: 'daily', 'backfill', 'inspect', or 'sync-facilities'",
+        help="Command to run: 'daily', 'backfill', 'inspect', 'migrate', or 'sync-facilities'",
     )
     parser.add_argument(
         "--mode",
-        choices=["daily", "backfill", "sync-facilities", "inspect"],
+        choices=["daily", "backfill", "sync-facilities", "inspect", "migrate"],
         default=None,
-        help="Run mode (daily, backfill, sync-facilities, inspect)",
+        help="Run mode (daily, backfill, sync-facilities, inspect, migrate)",
     )
     parser.add_argument(
         "--table",
@@ -169,6 +169,11 @@ def app():
 
     # Allow positional or flagged mode
     mode = args.command or args.mode or "daily"
+
+    if mode == "migrate":
+        from pipeline.migrate_sqlite_to_duckdb import migrate
+        migrate()
+        return
 
     if mode == "inspect":
         db = Database()

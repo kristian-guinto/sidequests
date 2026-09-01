@@ -11,9 +11,10 @@ try:
 except ImportError:
     pass
 
-SUPABASE_URL = os.getenv("SUPABASE_URL", "")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
-DB_MODE = os.getenv("DB_MODE", "auto")  # "supabase", "sqlite", or "auto"
+MOTHERDUCK_TOKEN = os.getenv("MOTHERDUCK_TOKEN", "")
+MOTHERDUCK_DATABASE = os.getenv("MOTHERDUCK_DATABASE", "open_nem_ph")
+DB_MODE = os.getenv("DB_MODE", "auto")  # "motherduck", "duckdb", or "auto"
+DUCKDB_PATH = BASE_DIR / "open_nem_ph.duckdb"
 SQLITE_DB_PATH = BASE_DIR / "open_nem_ph.db"
 
 # IEMOP Constants

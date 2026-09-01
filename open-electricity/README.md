@@ -66,6 +66,9 @@ uv run ingest --mode daily
 # Run historical backfill for custom date range
 uv run ingest --mode backfill --start-date 2026-08-01 --end-date 2026-08-31
 
+# Migrate data from SQLite to DuckDB / MotherDuck (Zero Data Loss)
+uv run ingest migrate
+
 # Inspect database tables, row counts, and data samples
 uv run ingest inspect
 uv run ingest inspect --table dispatch --region LUZON --limit 10
@@ -74,7 +77,7 @@ uv run ingest inspect --table regional --limit 10
 uv run ingest inspect --table daily --limit 10
 ```
 
-> **Note**: If `SUPABASE_URL` and `SUPABASE_KEY` are not configured in `.env`, the pipeline automatically saves to a local SQLite database (`open_nem_ph.db`).
+> **Note**: For local development, the pipeline and frontend automatically use `open_nem_ph.duckdb`. When `MOTHERDUCK_TOKEN` is configured in `.env`, it seamlessly connects to MotherDuck Cloud (`md:open_nem_ph`).
 
 ---
 
@@ -94,18 +97,17 @@ Visit [`http://localhost:3000`](http://localhost:3000) to explore the tracker!
 
 ---
 
-## 🗄️ Database Setup (Supabase)
+## 🗄️ Database Setup (DuckDB & MotherDuck)
 
-1. Create a project at [Supabase](https://supabase.com/).
-2. Navigate to the **SQL Editor** and run the SQL migration script:
-   [`db/schema.sql`](file:///home/ian/open-nem-ph/db/schema.sql)
-3. Copy your project URL and service role / anon keys into `.env`:
-   ```env
-   SUPABASE_URL=https://your-project-id.supabase.co
-   SUPABASE_KEY=your-supabase-key
-   NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-key
-   ```
+- **Local Development**: Runs out of the box using embedded [DuckDB](https://duckdb.org/) (`open_nem_ph.duckdb`). No database server installation required.
+- **Cloud Deployment (MotherDuck)**:
+  1. Create a database token on [MotherDuck](https://motherduck.com/).
+  2. Set your environment variable in `.env` (and Vercel / GitHub Actions secrets):
+     ```env
+     MOTHERDUCK_TOKEN=your-motherduck-token-here
+     MOTHERDUCK_DATABASE=open_nem_ph
+     ```
+  3. Run `uv run ingest migrate` to sync your local data directly to MotherDuck!
 
 ---
 
@@ -113,6 +115,7 @@ Visit [`http://localhost:3000`](http://localhost:3000) to explore the tracker!
 
 The repository includes a GitHub Action in [`.github/workflows/daily_pipeline.yml`](file:///home/ian/open-nem-ph/.github/workflows/daily_pipeline.yml):
 - **Schedule**: Automatically runs daily at `01:00 UTC` (`09:00 AM PHT`), right after IEMOP completes daily data publishing.
+- **MotherDuck Sync**: Automatically writes to MotherDuck Cloud using the `MOTHERDUCK_TOKEN` secret.
 - **Manual Trigger**: Can be triggered anytime with custom date inputs under GitHub's **Actions** tab (`workflow_dispatch`).
 - **Secrets Needed**: Add `SUPABASE_URL` and `SUPABASE_KEY` under **Settings > Secrets and variables > Actions**.
 
