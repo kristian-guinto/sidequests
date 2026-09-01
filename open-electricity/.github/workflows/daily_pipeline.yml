@@ -1,0 +1,71 @@
+name: Daily OpenNEM-PH Ingestion Pipeline
+
+on:
+  schedule:
+    # Runs daily at 01:00 UTC (09:00 AM Philippine Standard Time)
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Ingestion Mode (daily, backfill, sync-facilities)'
+        required: true
+        default: 'daily'
+        type: choice
+        options:
+          - daily
+          - backfill
+          - sync-facilities
+      start_date:
+        description: 'Start Date for backfill (YYYY-MM-DD)'
+        required: false
+        default: ''
+      end_date:
+        description: 'End Date for backfill (YYYY-MM-DD)'
+        required: false
+        default: ''
+
+jobs:
+  ingest:
+    name: Ingest IEMOP / WESM Data
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install Dependencies
+        run: uv sync --frozen || uv sync
+
+      - name: Run Daily Sync
+        if: "${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'daily') }}"
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          uv run ingest --mode daily --days 2
+
+      - name: Run Manual Backfill
+        if: "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'backfill' }}"
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          uv run ingest --mode backfill --start-date ${{ github.event.inputs.start_date }} --end-date ${{ github.event.inputs.end_date }}
+
+      - name: Sync Facilities
+        if: "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'sync-facilities' }}"
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          uv run ingest --mode sync-facilities
+
