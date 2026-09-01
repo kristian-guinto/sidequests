@@ -58,7 +58,7 @@ export function PriceChart({
           if (rawPt?.timestamp) {
             try {
               formattedTime = format(parseISO(rawPt.timestamp), "d MMM yyyy, h:mm a");
-            } catch {}
+            } catch { }
           }
 
           const val = Number(params[0].value) || 0;

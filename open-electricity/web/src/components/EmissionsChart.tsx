@@ -69,7 +69,7 @@ export function EmissionsChart({
           if (rawPt?.timestamp) {
             try {
               formattedTime = format(parseISO(rawPt.timestamp), "d MMM yyyy, h:mm a");
-            } catch {}
+            } catch { }
           }
 
           let total = 0;
