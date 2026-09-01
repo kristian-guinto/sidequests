@@ -88,7 +88,7 @@ export function EmissionsChart({
               <span class="font-bold text-neutral-900">${total.toFixed(1)} tCO₂e</span>
             </div>`;
 
-          rows.forEach((r) => {
+          rows.reverse().forEach((r) => {
             if (r.val > 0) {
               html += `<div class="flex justify-between items-center py-0.5 text-[11px]">
                 <span class="flex items-center text-neutral-600">
@@ -145,34 +145,34 @@ export function EmissionsChart({
       },
       series: [
         {
-          name: "Distillate / Oil",
+          name: "Coal",
           type: "line",
           stack: "Emissions",
-          areaStyle: { color: FUEL_META.oil.color, opacity: 0.95 },
+          areaStyle: { color: FUEL_META.coal.color, opacity: 0.98 },
           lineStyle: { width: 0.3, color: "#fff" },
-          itemStyle: { color: FUEL_META.oil.color },
+          itemStyle: { color: FUEL_META.coal.color },
           showSymbol: false,
-          data: emissionsData.map((d) => d.oil),
+          data: emissionsData.map((d) => d.coal),
         },
         {
           name: "Gas",
           type: "line",
           stack: "Emissions",
-          areaStyle: { color: FUEL_META.gas.color, opacity: 0.95 },
+          areaStyle: { color: FUEL_META.gas.color, opacity: 0.98 },
           lineStyle: { width: 0.3, color: "#fff" },
           itemStyle: { color: FUEL_META.gas.color },
           showSymbol: false,
           data: emissionsData.map((d) => d.gas),
         },
         {
-          name: "Coal",
+          name: "Distillate",
           type: "line",
           stack: "Emissions",
-          areaStyle: { color: FUEL_META.coal.color, opacity: 0.95 },
+          areaStyle: { color: FUEL_META.oil.color, opacity: 0.98 },
           lineStyle: { width: 0.3, color: "#fff" },
-          itemStyle: { color: FUEL_META.coal.color },
+          itemStyle: { color: FUEL_META.oil.color },
           showSymbol: false,
-          data: emissionsData.map((d) => d.coal),
+          data: emissionsData.map((d) => d.oil),
         },
       ],
     };

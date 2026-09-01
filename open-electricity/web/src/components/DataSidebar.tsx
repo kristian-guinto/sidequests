@@ -28,12 +28,12 @@ const FUEL_DISPLAY_ORDER: FuelTech[] = [
   "solar",
   "wind",
   "hydro",
-  "geothermal",
-  "biomass",
-  "gas",
-  "coal",
-  "oil",
   "battery",
+  "gas",
+  "oil",
+  "biomass",
+  "geothermal",
+  "coal",
 ];
 
 export function DataSidebar({
@@ -93,7 +93,7 @@ export function DataSidebar({
           priceDisplay: `${currencySymbol}${Math.round(ptPrice).toLocaleString()}`,
           isRenewable: meta.isRenewable,
         };
-      }).sort((a, b) => b.rawVal - a.rawVal);
+      });
 
       let renVal = 0;
       rows.forEach((r) => {
@@ -118,29 +118,33 @@ export function DataSidebar({
     const renPct = summary?.renewablesPct || 0;
     const avgPrice = summary?.avgPricePHPMWh || 0;
 
-    const rows = breakdown.map((b) => {
-      const meta = FUEL_META[b.fuelTech] || { color: b.color, label: b.label, isRenewable: b.isRenewable };
+    const rows = FUEL_DISPLAY_ORDER.map((fKey) => {
+      const meta = FUEL_META[fKey];
+      const match = breakdown.find((b) => b.fuelTech === fKey);
+      const energyGWh = match ? match.energyGWh : 0;
+      const pct = match ? match.percentage : 0;
+
       const estimatedPrice = Math.round(
-        b.fuelTech === "solar"
+        fKey === "solar"
           ? avgPrice * 0.75
-          : b.fuelTech === "wind"
+          : fKey === "wind"
           ? avgPrice * 0.85
-          : b.fuelTech === "hydro"
+          : fKey === "hydro"
           ? avgPrice * 1.05
-          : b.fuelTech === "coal"
+          : fKey === "coal"
           ? avgPrice * 0.95
-          : b.fuelTech === "gas"
+          : fKey === "gas"
           ? avgPrice * 1.15
           : avgPrice * 1.3
       );
 
       return {
-        fuelTech: b.fuelTech,
+        fuelTech: fKey,
         label: meta.label,
         color: meta.color,
-        valueDisplay: b.energyGWh.toLocaleString(),
-        rawVal: b.energyGWh,
-        pct: b.percentage,
+        valueDisplay: energyGWh.toLocaleString(),
+        rawVal: energyGWh,
+        pct: pct,
         priceDisplay: `${currencySymbol}${estimatedPrice.toLocaleString()}`,
         isRenewable: meta.isRenewable,
       };
@@ -160,11 +164,13 @@ export function DataSidebar({
 
   // Donut chart option
   const donutOption = useMemo(() => {
-    const dataItems = tableData.rows.map((r) => ({
-      name: r.label,
-      value: r.rawVal,
-      itemStyle: { color: r.color },
-    }));
+    const dataItems = tableData.rows
+      .filter((r) => r.rawVal > 0)
+      .map((r) => ({
+        name: r.label,
+        value: r.rawVal,
+        itemStyle: { color: r.color },
+      }));
 
     return {
       backgroundColor: "#FFFFFF",

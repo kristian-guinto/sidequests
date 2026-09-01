@@ -15,13 +15,14 @@ interface GenerationChartProps {
   onHoverPoint?: (pt: FuelGenerationPoint | null) => void;
 }
 
+// Exact bottom-to-top stacking order from OpenElectricity diagram
 const FUEL_ORDER = [
-  "battery",
-  "oil",
   "coal",
+  "oil",
   "gas",
   "biomass",
   "geothermal",
+  "battery",
   "hydro",
   "wind",
   "solar",
@@ -69,11 +70,11 @@ export function GenerationChart({
         stack: "TotalGeneration",
         areaStyle: {
           color: meta.color,
-          opacity: 0.95,
+          opacity: 0.98,
         },
         lineStyle: {
-          width: 0.4,
-          color: "#ffffff55",
+          width: 0.3,
+          color: "#ffffff33",
         },
         itemStyle: {
           color: meta.color,
@@ -91,7 +92,7 @@ export function GenerationChart({
         stack: undefined as any,
         areaStyle: undefined as any,
         lineStyle: {
-          width: 2.0,
+          width: 1.8,
           color: "#0F172A",
           type: "solid",
         },
