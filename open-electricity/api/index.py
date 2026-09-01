@@ -552,7 +552,6 @@ def generate_simulation_data(
 # ---------------------------------------------------------
 
 
-@app.get("/")
 @app.get("/api")
 def get_root():
     return {
