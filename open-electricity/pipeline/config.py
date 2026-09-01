@@ -17,7 +17,51 @@ DB_MODE = os.getenv("DB_MODE", "auto")  # "motherduck", "duckdb", or "auto"
 DUCKDB_PATH = BASE_DIR / "open_nem_ph.duckdb"
 SQLITE_DB_PATH = BASE_DIR / "open_nem_ph.db"
 
-# IEMOP Constants
+# Southeast Asia Countries Configuration
+COUNTRIES_CONFIG = {
+    "PH": {
+        "name": "Philippines",
+        "currency": "PHP",
+        "currency_symbol": "₱",
+        "timezone": "Asia/Manila",
+        "default_region": "ALL",
+        "regions": ["ALL", "LUZON", "VISAYAS", "MINDANAO"],
+    },
+    "SG": {
+        "name": "Singapore",
+        "currency": "SGD",
+        "currency_symbol": "S$",
+        "timezone": "Asia/Singapore",
+        "default_region": "SINGAPORE",
+        "regions": ["SINGAPORE"],
+    },
+    "MY": {
+        "name": "Malaysia",
+        "currency": "MYR",
+        "currency_symbol": "RM",
+        "timezone": "Asia/Kuala_Lumpur",
+        "default_region": "PENINSULAR",
+        "regions": ["PENINSULAR", "SABAH", "SARAWAK"],
+    },
+    "TH": {
+        "name": "Thailand",
+        "currency": "THB",
+        "currency_symbol": "฿",
+        "timezone": "Asia/Bangkok",
+        "default_region": "THAILAND",
+        "regions": ["THAILAND", "CENTRAL", "NORTH", "NORTHEAST", "SOUTH"],
+    },
+    "VN": {
+        "name": "Vietnam",
+        "currency": "VND",
+        "currency_symbol": "₫",
+        "timezone": "Asia/Ho_Chi_Minh",
+        "default_region": "VIETNAM",
+        "regions": ["VIETNAM", "NORTH", "CENTRAL", "SOUTH"],
+    },
+}
+
+# IEMOP Constants (Philippines)
 IEMOP_AJAX_URL = "https://www.iemop.ph/wp-admin/admin-ajax.php"
 POST_ID_RTD_PRICES_SCHEDULES = 5777
 POST_ID_RTD_REGIONAL_SUMMARIES = 5760

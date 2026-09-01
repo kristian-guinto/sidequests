@@ -10,6 +10,8 @@ interface SummaryCardsProps {
 }
 
 export function SummaryCards({ metrics, region }: SummaryCardsProps) {
+  const symbol = metrics.currencySymbol || "₱";
+
   const cards = [
     {
       title: "Renewables Share",
@@ -22,7 +24,7 @@ export function SummaryCards({ metrics, region }: SummaryCardsProps) {
     {
       title: "Energy Generated",
       value: `${metrics.totalGenerationGWh.toLocaleString()} GWh`,
-      subtext: `${region === "ALL" ? "Philippines" : region} Output`,
+      subtext: `${region} Total Output`,
       icon: Zap,
       iconBg: "bg-amber-50 text-amber-600 border-amber-200",
       accent: "text-slate-900",
@@ -37,8 +39,8 @@ export function SummaryCards({ metrics, region }: SummaryCardsProps) {
     },
     {
       title: "Avg Spot Price",
-      value: `₱${metrics.avgPricePHPMWh.toLocaleString()} /MWh`,
-      subtext: `≈ ₱${(metrics.avgPricePHPMWh / 1000).toFixed(2)} /kWh wholesale`,
+      value: `${symbol}${metrics.avgPricePHPMWh.toLocaleString()} /MWh`,
+      subtext: `≈ ${symbol}${(metrics.avgPricePHPMWh / 1000).toFixed(2)} /kWh wholesale`,
       icon: DollarSign,
       iconBg: "bg-rose-50 text-rose-600 border-rose-200",
       accent: "text-slate-900",

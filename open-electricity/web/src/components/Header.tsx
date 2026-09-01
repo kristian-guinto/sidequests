@@ -1,10 +1,20 @@
 "use client";
 
-import React from "react";
-import { Region, TimeRange, TimeInterval, ViewMode, RANGE_CONFIG } from "@/lib/types";
-import { Zap, RefreshCw, BarChart2, Layers } from "lucide-react";
+import React, { useState } from "react";
+import {
+  CountryCode,
+  Region,
+  TimeRange,
+  TimeInterval,
+  ViewMode,
+  RANGE_CONFIG,
+  COUNTRIES_METADATA,
+} from "@/lib/types";
+import { Zap, RefreshCw, BarChart2, Layers, ChevronDown, Globe } from "lucide-react";
 
 interface HeaderProps {
+  country: CountryCode;
+  onCountryChange: (c: CountryCode) => void;
   region: Region;
   onRegionChange: (r: Region) => void;
   range: TimeRange;
@@ -17,13 +27,6 @@ interface HeaderProps {
   isLoading: boolean;
 }
 
-const REGIONS: { id: Region; label: string }[] = [
-  { id: "ALL", label: "Philippines (NEM)" },
-  { id: "LUZON", label: "Luzon" },
-  { id: "VISAYAS", label: "Visayas" },
-  { id: "MINDANAO", label: "Mindanao" },
-];
-
 const RANGES: { id: TimeRange; label: string }[] = [
   { id: "1d", label: "1D" },
   { id: "3d", label: "3D" },
@@ -33,6 +36,8 @@ const RANGES: { id: TimeRange; label: string }[] = [
 ];
 
 export function Header({
+  country,
+  onCountryChange,
   region,
   onRegionChange,
   range,
@@ -44,6 +49,19 @@ export function Header({
   onRefresh,
   isLoading,
 }: HeaderProps) {
+  const [isCountryMenuOpen, setIsCountryMenuOpen] = useState(false);
+  const currentCountry = COUNTRIES_METADATA[country] || COUNTRIES_METADATA["PH"];
+  const availableRegions = currentCountry.regions;
+
+  const handleCountrySelect = (newCountry: CountryCode) => {
+    onCountryChange(newCountry);
+    const info = COUNTRIES_METADATA[newCountry];
+    if (info) {
+      onRegionChange(info.defaultRegion);
+    }
+    setIsCountryMenuOpen(false);
+  };
+
   const handleRangeClick = (newRange: TimeRange) => {
     onRangeChange(newRange);
     const config = RANGE_CONFIG[newRange];
@@ -72,34 +90,81 @@ export function Header({
                   Open<span className="text-emerald-600">Electricity</span>
                 </span>
                 <span className="text-[11px] bg-emerald-50 text-emerald-700 font-semibold px-1.5 py-0.5 rounded border border-emerald-200">
-                  PH
+                  SEA
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500 font-medium -mt-0.5">Philippine Power System Tracker</p>
+              <p className="text-[11px] text-slate-500 font-medium -mt-0.5">
+                Southeast Asia Energy Market Tracker
+              </p>
             </div>
           </div>
 
-          {/* Region Tabs (Desktop) */}
-          <div className="hidden md:flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200">
-            {REGIONS.map((r) => (
+          {/* Center: Country Selector & Regional Tabs */}
+          <div className="hidden lg:flex items-center space-x-3">
+            {/* Country Selector Dropdown */}
+            <div className="relative">
               <button
-                key={r.id}
-                onClick={() => onRegionChange(r.id)}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${region === r.id
-                    ? "bg-white text-slate-900 font-semibold shadow-sm"
-                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
-                  }`}
+                onClick={() => setIsCountryMenuOpen(!isCountryMenuOpen)}
+                className="flex items-center space-x-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200/80 border border-slate-200 rounded-lg text-xs font-semibold text-slate-900 transition shadow-sm"
               >
-                {r.label}
+                <span className="text-base">{currentCountry.flag}</span>
+                <span>{currentCountry.name}</span>
+                <ChevronDown className="h-3.5 w-3.5 text-slate-500" />
               </button>
-            ))}
+
+              {isCountryMenuOpen && (
+                <div className="absolute left-0 mt-1.5 w-52 bg-white rounded-lg shadow-lg border border-slate-200 py-1.5 z-50">
+                  <div className="px-3 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                    Select Country
+                  </div>
+                  {(Object.keys(COUNTRIES_METADATA) as CountryCode[]).map((cCode) => {
+                    const cInfo = COUNTRIES_METADATA[cCode];
+                    const isSelected = country === cCode;
+                    return (
+                      <button
+                        key={cCode}
+                        onClick={() => handleCountrySelect(cCode)}
+                        className={`w-full flex items-center justify-between px-3 py-1.5 text-xs text-left hover:bg-slate-50 transition ${
+                          isSelected ? "bg-emerald-50 text-emerald-900 font-bold" : "text-slate-700"
+                        }`}
+                      >
+                        <span className="flex items-center space-x-2">
+                          <span className="text-base">{cInfo.flag}</span>
+                          <span>{cInfo.name}</span>
+                        </span>
+                        <span className="text-[10px] font-mono text-slate-400">
+                          {cInfo.currencyCode}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Region Tabs (Desktop) */}
+            <div className="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200">
+              {availableRegions.map((r) => (
+                <button
+                  key={r.id}
+                  onClick={() => onRegionChange(r.id)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                    region === r.id
+                      ? "bg-white text-slate-900 font-semibold shadow-sm"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
+                  }`}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* Actions & Status */}
+          {/* Right Actions & Status */}
           <div className="flex items-center space-x-2.5">
             <div className="hidden sm:flex items-center space-x-1.5 text-xs text-slate-600 bg-slate-50 px-2.5 py-1 rounded-md border border-slate-200">
               <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="font-medium">WESM Live</span>
+              <span className="font-medium">{currentCountry.currencyCode} Market</span>
             </div>
 
             <button
@@ -108,23 +173,44 @@ export function Header({
               className="p-1.5 rounded-md bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 transition disabled:opacity-50 shadow-sm"
               title="Refresh Data"
             >
-              <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin text-emerald-600" : ""}`} />
+              <RefreshCw
+                className={`h-4 w-4 ${isLoading ? "animate-spin text-emerald-600" : ""}`}
+              />
             </button>
           </div>
         </div>
 
-        {/* Mobile Region Tabs */}
-        <div className="flex md:hidden py-2 border-t border-slate-100 overflow-x-auto space-x-1.5">
-          {REGIONS.map((r) => (
-            <button
-              key={r.id}
-              onClick={() => onRegionChange(r.id)}
-              className={`px-3 py-1 rounded-md text-xs font-medium whitespace-nowrap transition ${region === r.id ? "bg-slate-900 text-white font-semibold" : "text-slate-600 bg-slate-100"
+        {/* Mobile Country & Region Bar */}
+        <div className="flex lg:hidden py-2 border-t border-slate-100 items-center justify-between gap-2 overflow-x-auto">
+          {/* Mobile Country Selector */}
+          <select
+            value={country}
+            onChange={(e) => handleCountrySelect(e.target.value as CountryCode)}
+            className="text-xs bg-slate-100 border border-slate-200 rounded-md px-2 py-1 font-semibold text-slate-800"
+          >
+            {(Object.keys(COUNTRIES_METADATA) as CountryCode[]).map((cCode) => (
+              <option key={cCode} value={cCode}>
+                {COUNTRIES_METADATA[cCode].flag} {COUNTRIES_METADATA[cCode].name}
+              </option>
+            ))}
+          </select>
+
+          {/* Mobile Region Tabs */}
+          <div className="flex space-x-1 overflow-x-auto">
+            {availableRegions.map((r) => (
+              <button
+                key={r.id}
+                onClick={() => onRegionChange(r.id)}
+                className={`px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap transition ${
+                  region === r.id
+                    ? "bg-slate-900 text-white font-semibold"
+                    : "text-slate-600 bg-slate-100"
                 }`}
-            >
-              {r.label}
-            </button>
-          ))}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Control Sub-bar: Range, Interval, View Mode */}
@@ -137,8 +223,11 @@ export function Header({
                 <button
                   key={rng.id}
                   onClick={() => handleRangeClick(rng.id)}
-                  className={`px-2.5 py-0.5 rounded text-xs transition ${range === rng.id ? "bg-white text-slate-900 font-semibold shadow-sm" : "hover:text-slate-900"
-                    }`}
+                  className={`px-2.5 py-0.5 rounded text-xs transition ${
+                    range === rng.id
+                      ? "bg-white text-slate-900 font-semibold shadow-sm"
+                      : "hover:text-slate-900"
+                  }`}
                 >
                   {rng.label}
                 </button>
@@ -146,7 +235,7 @@ export function Header({
             </div>
           </div>
 
-          {/* Time Interval Resolution (Filtered by current Range) */}
+          {/* Time Interval Resolution */}
           <div className="flex items-center space-x-2">
             <span className="text-slate-400 font-medium">Interval:</span>
             <div className="flex bg-slate-100 rounded-md p-0.5 border border-slate-200/80">
@@ -154,8 +243,11 @@ export function Header({
                 <button
                   key={inv.id}
                   onClick={() => onIntervalChange(inv.id)}
-                  className={`px-2 py-0.5 rounded text-xs transition ${interval === inv.id ? "bg-white text-slate-900 font-semibold shadow-sm" : "hover:text-slate-900"
-                    }`}
+                  className={`px-2 py-0.5 rounded text-xs transition ${
+                    interval === inv.id
+                      ? "bg-white text-slate-900 font-semibold shadow-sm"
+                      : "hover:text-slate-900"
+                  }`}
                 >
                   {inv.label}
                 </button>
@@ -169,16 +261,22 @@ export function Header({
             <div className="flex bg-slate-100 rounded-md p-0.5 border border-slate-200/80">
               <button
                 onClick={() => onViewModeChange("discrete")}
-                className={`flex items-center space-x-1 px-2.5 py-0.5 rounded text-xs transition ${viewMode === "discrete" ? "bg-white text-slate-900 font-semibold shadow-sm" : "hover:text-slate-900"
-                  }`}
+                className={`flex items-center space-x-1 px-2.5 py-0.5 rounded text-xs transition ${
+                  viewMode === "discrete"
+                    ? "bg-white text-slate-900 font-semibold shadow-sm"
+                    : "hover:text-slate-900"
+                }`}
               >
                 <BarChart2 className="h-3 w-3" />
                 <span>Discrete</span>
               </button>
               <button
                 onClick={() => onViewModeChange("cumulative")}
-                className={`flex items-center space-x-1 px-2.5 py-0.5 rounded text-xs transition ${viewMode === "cumulative" ? "bg-white text-slate-900 font-semibold shadow-sm" : "hover:text-slate-900"
-                  }`}
+                className={`flex items-center space-x-1 px-2.5 py-0.5 rounded text-xs transition ${
+                  viewMode === "cumulative"
+                    ? "bg-white text-slate-900 font-semibold shadow-sm"
+                    : "hover:text-slate-900"
+                }`}
               >
                 <Layers className="h-3 w-3" />
                 <span>Cumulative</span>
