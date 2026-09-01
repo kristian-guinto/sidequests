@@ -18,6 +18,7 @@ import {
   RotateCw,
   Check,
   Zap,
+  Percent,
 } from "lucide-react";
 
 interface HeaderProps {
@@ -202,31 +203,31 @@ export function Header({
 
           <div className="h-4 w-[1px] bg-neutral-200 mx-1 hidden sm:block" />
 
-          {/* Chart Style Toggle (Area / Line) */}
+          {/* Chart Mode Toggle (Stacked vs 100% Stacked Area) */}
           <div className="flex items-center border border-neutral-200 rounded p-0.5 bg-neutral-50/50">
             <button
-              onClick={() => onViewModeChange("cumulative")}
-              className={`flex items-center space-x-1 px-2 py-0.5 rounded text-xs font-medium transition ${
-                viewMode === "cumulative"
+              onClick={() => onViewModeChange("stacked")}
+              className={`flex items-center space-x-1 px-2.5 py-0.5 rounded text-xs font-medium transition ${
+                viewMode === "stacked" || viewMode === "cumulative"
                   ? "bg-white text-neutral-950 font-bold shadow-sm"
                   : "text-neutral-500 hover:text-neutral-800"
               }`}
-              title="Stacked Area View"
+              title="Standard Stacked Area Chart (MW / GWh)"
             >
               <AreaIcon className="h-3.5 w-3.5" />
               <span>Stacked</span>
             </button>
             <button
-              onClick={() => onViewModeChange("discrete")}
-              className={`flex items-center space-x-1 px-2 py-0.5 rounded text-xs font-medium transition ${
-                viewMode === "discrete"
+              onClick={() => onViewModeChange("percentage")}
+              className={`flex items-center space-x-1 px-2.5 py-0.5 rounded text-xs font-medium transition ${
+                viewMode === "percentage"
                   ? "bg-white text-neutral-950 font-bold shadow-sm"
                   : "text-neutral-500 hover:text-neutral-800"
               }`}
-              title="Discrete Line View with Demand"
+              title="100% Stacked Area Chart (%)"
             >
-              <TrendingUp className="h-3.5 w-3.5" />
-              <span>Discrete</span>
+              <Percent className="h-3.5 w-3.5" />
+              <span>100% Stacked</span>
             </button>
           </div>
 

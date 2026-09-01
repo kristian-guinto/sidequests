@@ -26,7 +26,7 @@ export default function DashboardPage() {
   const [region, setRegion] = useState<Region>("ALL");
   const [range, setRange] = useState<TimeRange>("7d");
   const [interval, setInterval] = useState<TimeInterval>("30m");
-  const [viewMode, setViewMode] = useState<ViewMode>("cumulative");
+  const [viewMode, setViewMode] = useState<ViewMode>("stacked");
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const [points, setPoints] = useState<FuelGenerationPoint[]>([]);
@@ -135,6 +135,7 @@ export default function DashboardPage() {
             {/* Chart 2: Emissions Volume (tCO2e/interval) */}
             <EmissionsChart
               data={points}
+              viewMode={viewMode}
               height="170px"
               onHoverPoint={setHoveredPoint}
             />
