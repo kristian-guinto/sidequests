@@ -3,9 +3,16 @@
 import React, { useMemo } from "react";
 import ReactECharts from "echarts-for-react";
 import { FuelGenerationPoint } from "@/lib/types";
-import { computeXAxisConfig } from "@/lib/chartUtils";
+import { computeXAxisConfig, createShadcnGradient, SHADCN_TOOLTIP_CONFIG } from "@/lib/chartUtils";
+import {
+  ChartCard,
+  ChartCardHeader,
+  ChartCardTitle,
+  ChartCardDescription,
+  ChartCardContent,
+} from "@/components/ui/ChartCard";
 import { format, parseISO } from "date-fns";
-import { Menu } from "lucide-react";
+import { TrendingUp } from "lucide-react";
 
 interface PriceChartProps {
   data: FuelGenerationPoint[];
@@ -36,20 +43,10 @@ export function PriceChart({
 
   const option = useMemo(() => {
     return {
-      backgroundColor: "#FFFFFF",
+      backgroundColor: "transparent",
       animation: false,
       tooltip: {
-        trigger: "axis",
-        axisPointer: {
-          type: "line",
-          lineStyle: { color: "#64748B", width: 1, type: "dashed" },
-        },
-        backgroundColor: "rgba(255, 255, 255, 0.98)",
-        borderColor: "#E2E8F0",
-        borderWidth: 1,
-        padding: [6, 10],
-        extraCssText: "box-shadow: 0 4px 12px rgba(0,0,0,0.08); border-radius: 6px; z-index: 100;",
-        textStyle: { color: "#0F172A", fontSize: 11 },
+        ...SHADCN_TOOLTIP_CONFIG,
         formatter: (params: any[]) => {
           if (!params || params.length === 0) return "";
           const idx = params[0].dataIndex;
@@ -58,14 +55,17 @@ export function PriceChart({
           if (rawPt?.timestamp) {
             try {
               formattedTime = format(parseISO(rawPt.timestamp), "d MMM yyyy, h:mm a");
-            } catch { }
+            } catch {}
           }
 
           const val = Number(params[0].value) || 0;
-          return `<div class="font-sans min-w-[170px]">
-            <div class="text-neutral-500 font-medium text-[11px] mb-1">${formattedTime}</div>
-            <div class="flex items-center justify-between space-x-3 text-xs border-t border-neutral-100 pt-1">
-              <span class="font-semibold text-rose-600">Spot Price:</span>
+          return `<div class="font-sans min-w-[180px]">
+            <div class="text-neutral-500 font-medium text-xs mb-1.5">${formattedTime}</div>
+            <div class="flex items-center justify-between space-x-3 text-xs border-t border-neutral-100 pt-1.5">
+              <span class="font-semibold text-rose-600 flex items-center">
+                <span class="w-2 h-2 rounded-full mr-1.5 bg-rose-500"></span>
+                Spot Price:
+              </span>
               <span class="font-mono font-bold text-neutral-900">${currencySymbol}${Math.round(
             val
           ).toLocaleString()} /MWh</span>
@@ -78,12 +78,12 @@ export function PriceChart({
         type: "category",
         boundaryGap: false,
         data: xAxisConfig.timestamps,
-        axisLine: { lineStyle: { color: "#E2E8F0" } },
+        axisLine: { show: false },
         axisTick: { show: false },
         axisLabel: xAxisConfig.axisLabel,
         splitLine: {
           show: true,
-          lineStyle: { color: "#F8FAFC", type: "solid" },
+          lineStyle: { color: "#F1F5F9", type: "dashed" },
         },
       },
       yAxis: {
@@ -109,21 +109,11 @@ export function PriceChart({
           smooth: true,
           showSymbol: false,
           lineStyle: {
-            width: 1.6,
+            width: 2.0,
             color: "#E11D48",
           },
           areaStyle: {
-            color: {
-              type: "linear",
-              x: 0,
-              y: 0,
-              x2: 0,
-              y2: 1,
-              colorStops: [
-                { offset: 0, color: "rgba(225, 29, 72, 0.12)" },
-                { offset: 1, color: "rgba(225, 29, 72, 0.00)" },
-              ],
-            },
+            color: createShadcnGradient("#E11D48", 0.35, 0.02),
           },
         },
       ],
@@ -145,30 +135,30 @@ export function PriceChart({
   }, [data, onHoverPoint]);
 
   return (
-    <div
-      className="bg-white border border-neutral-200 rounded-sm overflow-hidden"
-      onMouseLeave={() => onHoverPoint?.(null)}
-    >
-      {/* Chart Header Bar */}
-      <div className="flex items-center justify-between px-3.5 py-2 border-b border-neutral-100 bg-neutral-50/50">
-        <div className="flex items-center space-x-2 text-xs font-semibold text-neutral-800">
-          <Menu className="h-3.5 w-3.5 text-neutral-400" />
-          <span>Wholesale Spot Price</span>
-          <span className="text-[11px] font-normal text-neutral-500 font-mono">
-            ({currencyCode} / MWh)
-          </span>
-        </div>
-        <div className="text-[11px] font-medium text-neutral-500 font-mono">
-          Av.{" "}
-          <strong className="text-neutral-900 font-bold">
-            {currencySymbol}
-            {avgPrice.toLocaleString()} /MWh
-          </strong>
-        </div>
-      </div>
+    <ChartCard onMouseLeave={() => onHoverPoint?.(null)}>
+      <ChartCardHeader>
+        <ChartCardTitle>
+          <div className="flex items-center space-x-2">
+            <TrendingUp className="h-4 w-4 text-rose-500" />
+            <span>Wholesale Spot Price</span>
+            <span className="text-xs font-normal text-neutral-400 font-mono">
+              ({currencyCode} / MWh)
+            </span>
+          </div>
+          <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-100 text-neutral-800 border border-neutral-200/60 font-mono shadow-xs">
+            Av.{" "}
+            <strong className="ml-1 text-neutral-950 font-bold">
+              {currencySymbol}
+              {avgPrice.toLocaleString()} /MWh
+            </strong>
+          </div>
+        </ChartCardTitle>
+        <ChartCardDescription>
+          Interval clearing market settlement price for wholesale electricity dispatch
+        </ChartCardDescription>
+      </ChartCardHeader>
 
-      {/* Chart Canvas with proper vertical spacing */}
-      <div className="pt-2 pb-2 px-1">
+      <ChartCardContent>
         <ReactECharts
           option={option}
           onEvents={onEvents}
@@ -176,7 +166,7 @@ export function PriceChart({
           notMerge={true}
           lazyUpdate={false}
         />
-      </div>
-    </div>
+      </ChartCardContent>
+    </ChartCard>
   );
 }

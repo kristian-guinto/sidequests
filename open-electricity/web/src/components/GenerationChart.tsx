@@ -4,9 +4,16 @@ import React, { useMemo } from "react";
 import ReactECharts from "echarts-for-react";
 import { FuelGenerationPoint, ViewMode } from "@/lib/types";
 import { FUEL_META } from "@/lib/colors";
-import { computeXAxisConfig } from "@/lib/chartUtils";
+import { computeXAxisConfig, createShadcnGradient, SHADCN_TOOLTIP_CONFIG } from "@/lib/chartUtils";
+import {
+  ChartCard,
+  ChartCardHeader,
+  ChartCardTitle,
+  ChartCardDescription,
+  ChartCardContent,
+} from "@/components/ui/ChartCard";
 import { format, parseISO } from "date-fns";
-import { Menu } from "lucide-react";
+import { Zap } from "lucide-react";
 
 interface GenerationChartProps {
   data: FuelGenerationPoint[];
@@ -55,21 +62,22 @@ export function GenerationChart({
       return {
         name: meta.label,
         type: "line",
-        stack: "TotalGeneration",
+        stack: isCumulative ? "TotalGeneration" : undefined,
         areaStyle: {
-          color: meta.color,
-          opacity: 0.98,
+          color: isCumulative
+            ? createShadcnGradient(meta.color, 0.92, 0.78)
+            : createShadcnGradient(meta.color, 0.4, 0.02),
         },
         lineStyle: {
-          width: 0.3,
-          color: "#ffffff33",
+          width: isCumulative ? 1.0 : 1.8,
+          color: isCumulative ? "#ffffffaa" : meta.color,
         },
         itemStyle: {
           color: meta.color,
         },
         showSymbol: false,
         data: seriesData,
-        smooth: false,
+        smooth: !isCumulative,
       };
     });
 
@@ -80,7 +88,7 @@ export function GenerationChart({
         stack: undefined as any,
         areaStyle: undefined as any,
         lineStyle: {
-          width: 1.8,
+          width: 2.0,
           color: "#0F172A",
         } as any,
         itemStyle: {
@@ -93,27 +101,10 @@ export function GenerationChart({
     }
 
     return {
-      backgroundColor: "#FFFFFF",
+      backgroundColor: "transparent",
       animation: false,
       tooltip: {
-        trigger: "axis",
-        axisPointer: {
-          type: "line",
-          lineStyle: {
-            color: "#64748B",
-            width: 1,
-            type: "dashed",
-          },
-        },
-        backgroundColor: "rgba(255, 255, 255, 0.98)",
-        borderColor: "#E2E8F0",
-        borderWidth: 1,
-        padding: [8, 12],
-        extraCssText: "box-shadow: 0 4px 12px rgba(0,0,0,0.08); border-radius: 6px; z-index: 100;",
-        textStyle: {
-          color: "#0F172A",
-          fontSize: 11,
-        },
+        ...SHADCN_TOOLTIP_CONFIG,
         formatter: (params: any[]) => {
           if (!params || params.length === 0) return "";
           const idx = params[0].dataIndex;
@@ -122,7 +113,7 @@ export function GenerationChart({
           if (rawPt?.timestamp) {
             try {
               formattedTime = format(parseISO(rawPt.timestamp), "d MMM yyyy, h:mm a");
-            } catch { }
+            } catch {}
           }
 
           let total = 0;
@@ -142,17 +133,17 @@ export function GenerationChart({
           const unitStr = isEnergy ? "GWh" : "MW";
           const formattedTotal = isEnergy ? total.toFixed(2) : Math.round(total).toLocaleString();
 
-          let html = `<div class="font-sans min-w-[200px]">
-            <div class="border-b border-neutral-200 pb-1 mb-1.5 flex justify-between items-center text-[11px]">
+          let html = `<div class="font-sans min-w-[210px]">
+            <div class="border-b border-neutral-100 pb-1.5 mb-2 flex justify-between items-center text-xs">
               <span class="text-neutral-500 font-medium">${formattedTime}</span>
-              <span class="font-bold text-neutral-900">${formattedTotal} ${unitStr}</span>
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-neutral-100 font-bold text-neutral-900 font-mono">${formattedTotal} ${unitStr}</span>
             </div>`;
 
           if (demandVal > 0) {
             const formattedDemand = isEnergy ? demandVal.toFixed(2) : Math.round(demandVal).toLocaleString();
-            html += `<div class="flex justify-between items-center py-0.5 text-[11px] text-neutral-700 font-medium">
-              <span class="flex items-center"><span class="w-2 h-2 rounded-full mr-1.5 bg-neutral-900"></span>Demand:</span>
-              <span class="font-bold text-neutral-900">${formattedDemand} ${unitStr}</span>
+            html += `<div class="flex justify-between items-center py-0.5 text-xs text-neutral-700 font-medium">
+              <span class="flex items-center"><span class="w-2 h-2 rounded-full mr-2 bg-neutral-900"></span>Demand:</span>
+              <span class="font-bold text-neutral-900 font-mono">${formattedDemand} ${unitStr}</span>
             </div><div class="border-b border-neutral-100 my-1"></div>`;
           }
 
@@ -160,12 +151,12 @@ export function GenerationChart({
             if (r.val > 0) {
               const pct = total > 0 ? ((r.val / total) * 100).toFixed(1) : "0";
               const valStr = isEnergy ? r.val.toFixed(2) : Math.round(r.val).toLocaleString();
-              html += `<div class="flex justify-between items-center py-0.5 text-[11px]">
+              html += `<div class="flex justify-between items-center py-0.5 text-xs">
                 <span class="flex items-center text-neutral-600">
-                  <span class="w-2 h-2 rounded-sm mr-1.5" style="background-color:${r.color}"></span>
-                  ${r.name}:
+                  <span class="w-2.5 h-2.5 rounded-[3px] mr-2" style="background-color:${r.color}"></span>
+                  ${r.name}
                 </span>
-                <span class="font-mono text-neutral-800 font-medium">${valStr} ${unitStr} <span class="text-neutral-400 text-[10px]">(${pct}%)</span></span>
+                <span class="font-mono text-neutral-900 font-medium">${valStr} ${unitStr} <span class="text-neutral-400 text-[10px] ml-1">(${pct}%)</span></span>
               </div>`;
             }
           });
@@ -179,12 +170,12 @@ export function GenerationChart({
         type: "category",
         boundaryGap: false,
         data: xAxisConfig.timestamps,
-        axisLine: { lineStyle: { color: "#E2E8F0" } },
+        axisLine: { show: false },
         axisTick: { show: false },
         axisLabel: xAxisConfig.axisLabel,
         splitLine: {
           show: true,
-          lineStyle: { color: "#F8FAFC", type: "solid" },
+          lineStyle: { color: "#F1F5F9", type: "dashed" },
         },
       },
       yAxis: {
@@ -220,24 +211,24 @@ export function GenerationChart({
   }, [data, onHoverPoint]);
 
   return (
-    <div
-      className="bg-white border border-neutral-200 rounded-sm overflow-hidden"
-      onMouseLeave={() => onHoverPoint?.(null)}
-    >
-      {/* Chart Header Bar */}
-      <div className="flex items-center justify-between px-3.5 py-2 border-b border-neutral-100 bg-neutral-50/50">
-        <div className="flex items-center space-x-2 text-xs font-semibold text-neutral-800">
-          <Menu className="h-3.5 w-3.5 text-neutral-400" />
-          <span>Generation</span>
-          <span className="text-[11px] font-normal text-neutral-500 font-mono">({unit})</span>
-        </div>
-        <div className="text-[11px] font-medium text-neutral-500 font-mono">
-          Av. <strong className="text-neutral-900 font-bold">{avgGeneration.toLocaleString()} {unit}</strong>
-        </div>
-      </div>
+    <ChartCard onMouseLeave={() => onHoverPoint?.(null)}>
+      <ChartCardHeader>
+        <ChartCardTitle>
+          <div className="flex items-center space-x-2">
+            <Zap className="h-4 w-4 text-amber-500" />
+            <span>Generation &amp; Fuel Mix</span>
+            <span className="text-xs font-normal text-neutral-400 font-mono">({unit})</span>
+          </div>
+          <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-100 text-neutral-800 border border-neutral-200/60 font-mono shadow-xs">
+            Av. <strong className="ml-1 text-neutral-950 font-bold">{avgGeneration.toLocaleString()} {unit}</strong>
+          </div>
+        </ChartCardTitle>
+        <ChartCardDescription>
+          Real-time electricity dispatch aggregated across all connected power facilities
+        </ChartCardDescription>
+      </ChartCardHeader>
 
-      {/* Chart Canvas with proper padding */}
-      <div className="pt-2 pb-1 px-1">
+      <ChartCardContent>
         <ReactECharts
           option={option}
           onEvents={onEvents}
@@ -245,7 +236,7 @@ export function GenerationChart({
           notMerge={true}
           lazyUpdate={false}
         />
-      </div>
-    </div>
+      </ChartCardContent>
+    </ChartCard>
   );
 }
