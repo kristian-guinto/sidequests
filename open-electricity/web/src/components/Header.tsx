@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Region, TimeRange, TimeInterval, ViewMode } from "@/lib/types";
-import { Zap, Activity, Globe, RefreshCw, BarChart2, Layers } from "lucide-react";
+import { Zap, RefreshCw, BarChart2, Layers } from "lucide-react";
 
 interface HeaderProps {
   region: Region;
@@ -52,69 +52,71 @@ export function Header({
   isLoading,
 }: HeaderProps) {
   return (
-    <header className="bg-slate-900 border-b border-slate-800 sticky top-0 z-50 text-slate-100 shadow-md">
+    <header className="bg-white border-b border-slate-200 sticky top-0 z-50 text-slate-800 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo & Branding */}
           <div className="flex items-center space-x-3">
-            <div className="h-9 w-9 rounded-lg bg-gradient-to-tr from-amber-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-              <Zap className="h-5 w-5 text-white" />
+            <div className="h-8 w-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white shadow-sm">
+              <Zap className="h-4 w-4 fill-white" />
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <span className="font-bold text-lg tracking-tight text-white">
-                  Open<span className="text-emerald-400">Electricity</span>
+                <span className="font-bold text-lg tracking-tight text-slate-900">
+                  Open<span className="text-emerald-600">Electricity</span>
                 </span>
-                <span className="text-xs bg-emerald-500/20 text-emerald-300 font-semibold px-1.5 py-0.5 rounded border border-emerald-500/30">
+                <span className="text-[11px] bg-emerald-50 text-emerald-700 font-semibold px-1.5 py-0.5 rounded border border-emerald-200">
                   PH
                 </span>
               </div>
-              <p className="text-xs text-slate-400 font-medium">Philippines Power Market Tracker</p>
+              <p className="text-[11px] text-slate-500 font-medium -mt-0.5">Philippine Power System Tracker</p>
             </div>
           </div>
 
-          {/* Region Tabs */}
-          <div className="hidden md:flex items-center bg-slate-800/80 p-1 rounded-lg border border-slate-700">
+          {/* Region Tabs (Desktop) */}
+          <div className="hidden md:flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200">
             {REGIONS.map((r) => (
               <button
                 key={r.id}
                 onClick={() => onRegionChange(r.id)}
-                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${region === r.id
-                    ? "bg-emerald-600 text-white shadow-sm"
-                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-700/50"
-                  }`}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                  region === r.id
+                    ? "bg-white text-slate-900 font-semibold shadow-sm"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
+                }`}
               >
                 {r.label}
               </button>
             ))}
           </div>
 
-          {/* Actions & Live Indicator */}
-          <div className="flex items-center space-x-3">
-            <div className="hidden lg:flex items-center space-x-2 text-xs font-medium text-slate-400 bg-slate-800/60 px-2.5 py-1.5 rounded-md border border-slate-700/60">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>WESM Live Data</span>
+          {/* Actions & Status */}
+          <div className="flex items-center space-x-2.5">
+            <div className="hidden sm:flex items-center space-x-1.5 text-xs text-slate-600 bg-slate-50 px-2.5 py-1 rounded-md border border-slate-200">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="font-medium">WESM Live</span>
             </div>
 
             <button
               onClick={onRefresh}
               disabled={isLoading}
-              className="p-2 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition disabled:opacity-50"
+              className="p-1.5 rounded-md bg-white hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200 transition disabled:opacity-50 shadow-sm"
               title="Refresh Data"
             >
-              <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin text-emerald-400" : ""}`} />
+              <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin text-emerald-600" : ""}`} />
             </button>
           </div>
         </div>
 
-        {/* Mobile Region Bar */}
-        <div className="flex md:hidden py-2 border-t border-slate-800 overflow-x-auto space-x-2">
+        {/* Mobile Region Tabs */}
+        <div className="flex md:hidden py-2 border-t border-slate-100 overflow-x-auto space-x-1.5">
           {REGIONS.map((r) => (
             <button
               key={r.id}
               onClick={() => onRegionChange(r.id)}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium whitespace-nowrap ${region === r.id ? "bg-emerald-600 text-white" : "text-slate-400 bg-slate-800"
-                }`}
+              className={`px-3 py-1 rounded-md text-xs font-medium whitespace-nowrap transition ${
+                region === r.id ? "bg-slate-900 text-white font-semibold" : "text-slate-600 bg-slate-100"
+              }`}
             >
               {r.label}
             </button>
@@ -122,17 +124,18 @@ export function Header({
         </div>
 
         {/* Control Sub-bar: Range, Interval, View Mode */}
-        <div className="flex flex-wrap items-center justify-between py-2.5 border-t border-slate-800/80 text-xs text-slate-300 gap-2">
+        <div className="flex flex-wrap items-center justify-between py-2 border-t border-slate-100 text-xs text-slate-600 gap-2">
           {/* Time Range */}
-          <div className="flex items-center space-x-1.5">
-            <span className="text-slate-400 font-medium mr-1">Range:</span>
-            <div className="flex bg-slate-800 rounded-md p-0.5 border border-slate-700">
+          <div className="flex items-center space-x-2">
+            <span className="text-slate-400 font-medium">Range:</span>
+            <div className="flex bg-slate-100 rounded-md p-0.5 border border-slate-200/80">
               {RANGES.map((rng) => (
                 <button
                   key={rng.id}
                   onClick={() => onRangeChange(rng.id)}
-                  className={`px-2.5 py-1 rounded text-xs font-medium transition ${range === rng.id ? "bg-slate-700 text-emerald-400 font-semibold shadow-sm" : "hover:text-white"
-                    }`}
+                  className={`px-2.5 py-0.5 rounded text-xs transition ${
+                    range === rng.id ? "bg-white text-slate-900 font-semibold shadow-sm" : "hover:text-slate-900"
+                  }`}
                 >
                   {rng.label}
                 </button>
@@ -141,15 +144,16 @@ export function Header({
           </div>
 
           {/* Time Interval Resolution */}
-          <div className="flex items-center space-x-1.5">
-            <span className="text-slate-400 font-medium mr-1">Interval:</span>
-            <div className="flex bg-slate-800 rounded-md p-0.5 border border-slate-700">
+          <div className="flex items-center space-x-2">
+            <span className="text-slate-400 font-medium">Interval:</span>
+            <div className="flex bg-slate-100 rounded-md p-0.5 border border-slate-200/80">
               {INTERVALS.map((inv) => (
                 <button
                   key={inv.id}
                   onClick={() => onIntervalChange(inv.id)}
-                  className={`px-2 py-1 rounded text-xs font-medium transition ${interval === inv.id ? "bg-slate-700 text-emerald-400 font-semibold shadow-sm" : "hover:text-white"
-                    }`}
+                  className={`px-2 py-0.5 rounded text-xs transition ${
+                    interval === inv.id ? "bg-white text-slate-900 font-semibold shadow-sm" : "hover:text-slate-900"
+                  }`}
                 >
                   {inv.label}
                 </button>
@@ -157,24 +161,26 @@ export function Header({
             </div>
           </div>
 
-          {/* View Mode Toggle (Discrete vs Cumulative) */}
-          <div className="flex items-center space-x-1.5">
-            <span className="text-slate-400 font-medium mr-1">View:</span>
-            <div className="flex bg-slate-800 rounded-md p-0.5 border border-slate-700">
+          {/* View Mode Toggle */}
+          <div className="flex items-center space-x-2">
+            <span className="text-slate-400 font-medium">View:</span>
+            <div className="flex bg-slate-100 rounded-md p-0.5 border border-slate-200/80">
               <button
                 onClick={() => onViewModeChange("discrete")}
-                className={`flex items-center space-x-1 px-2.5 py-1 rounded text-xs font-medium transition ${viewMode === "discrete" ? "bg-slate-700 text-emerald-400 font-semibold shadow-sm" : "hover:text-white"
-                  }`}
+                className={`flex items-center space-x-1 px-2.5 py-0.5 rounded text-xs transition ${
+                  viewMode === "discrete" ? "bg-white text-slate-900 font-semibold shadow-sm" : "hover:text-slate-900"
+                }`}
               >
-                <BarChart2 className="h-3.5 w-3.5" />
+                <BarChart2 className="h-3 w-3" />
                 <span>Discrete</span>
               </button>
               <button
                 onClick={() => onViewModeChange("cumulative")}
-                className={`flex items-center space-x-1 px-2.5 py-1 rounded text-xs font-medium transition ${viewMode === "cumulative" ? "bg-slate-700 text-emerald-400 font-semibold shadow-sm" : "hover:text-white"
-                  }`}
+                className={`flex items-center space-x-1 px-2.5 py-0.5 rounded text-xs transition ${
+                  viewMode === "cumulative" ? "bg-white text-slate-900 font-semibold shadow-sm" : "hover:text-slate-900"
+                }`}
               >
-                <Layers className="h-3.5 w-3.5" />
+                <Layers className="h-3 w-3" />
                 <span>Cumulative</span>
               </button>
             </div>
@@ -184,4 +190,3 @@ export function Header({
     </header>
   );
 }
-

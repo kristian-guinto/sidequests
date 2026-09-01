@@ -56,7 +56,7 @@ export default function DashboardPage() {
   }, [fetchData]);
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen bg-slate-50 text-slate-900">
       <Header
         region={region}
         onRegionChange={setRegion}
@@ -70,41 +70,41 @@ export default function DashboardPage() {
         isLoading={isLoading}
       />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-5 space-y-5">
         {/* KPI Metrics */}
         {summary && <SummaryCards metrics={summary} region={region} />}
 
         {/* Main Charts Area */}
-        <div className="space-y-4">
-          <GenerationChart data={points} viewMode={viewMode} height="440px" />
+        <div className="space-y-3.5">
+          <GenerationChart data={points} viewMode={viewMode} height="430px" />
           <PriceChart data={points} height="170px" />
         </div>
 
-        {/* Two-column Layout: Interconnectors + Fuel Table */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        {/* Two-column Layout: Fuel Table + Interconnectors */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
           <div className="lg:col-span-2">
             <FuelTable breakdown={breakdown} />
           </div>
 
-          <div className="space-y-6">
+          <div className="space-y-4">
             <InterconnectorCard interconnectors={interconnectors} />
 
             {/* Information Card */}
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-xs text-slate-400 space-y-2">
-              <div className="flex items-center space-x-2 text-slate-300 font-semibold">
-                <Info className="h-4 w-4 text-emerald-400" />
+            <div className="bg-white border border-slate-200/90 rounded-xl p-4 text-xs text-slate-600 space-y-2 shadow-sm">
+              <div className="flex items-center space-x-2 text-slate-900 font-semibold">
+                <Info className="h-4 w-4 text-emerald-600" />
                 <span>About OpenElectricity Philippines</span>
               </div>
-              <p>
-                An open-source energy transition and spot market tracker for the Philippine Wholesale Electricity Spot Market (WESM), replicating the OpenNEM platform.
+              <p className="leading-relaxed">
+                An open-source energy transition and spot market tracker for the Philippine Wholesale Electricity Spot Market (WESM), inspired by the OpenNEM platform.
               </p>
-              <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[11px]">
-                <span>Data Source: <strong className="text-slate-300">IEMOP / WESM</strong></span>
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                <span className="text-slate-500">Source: <strong className="text-slate-700 font-semibold">IEMOP / WESM</strong></span>
                 <a
                   href="https://www.iemop.ph/the-market/market-data/"
                   target="_blank"
                   rel="noreferrer"
-                  className="flex items-center space-x-1 text-emerald-400 hover:underline"
+                  className="flex items-center space-x-1 text-emerald-600 hover:text-emerald-700 font-medium"
                 >
                   <span>iemop.ph</span>
                   <ExternalLink className="h-3 w-3" />
@@ -115,7 +115,7 @@ export default function DashboardPage() {
         </div>
       </main>
 
-      <footer className="border-t border-slate-800/80 bg-slate-950 py-6 text-center text-xs text-slate-500">
+      <footer className="border-t border-slate-200 bg-white py-5 text-center text-xs text-slate-500 mt-8">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <span>
             OpenElectricity PH &copy; {new Date().getFullYear()} &bull; Built with Next.js, Tailwind CSS &amp; ECharts.
@@ -125,15 +125,15 @@ export default function DashboardPage() {
               href="https://explore.openelectricity.org.au/"
               target="_blank"
               rel="noreferrer"
-              className="text-slate-400 hover:text-slate-300 transition"
+              className="text-slate-600 hover:text-slate-900 transition"
             >
-              Inspired by OpenNEM
+              OpenNEM Australia
             </a>
             <a
               href="https://www.iemop.ph"
               target="_blank"
               rel="noreferrer"
-              className="text-slate-400 hover:text-slate-300 transition"
+              className="text-slate-600 hover:text-slate-900 transition"
             >
               IEMOP WESM
             </a>
@@ -143,4 +143,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-

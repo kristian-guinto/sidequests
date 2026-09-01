@@ -10,7 +10,7 @@ interface PriceChartProps {
   height?: string;
 }
 
-export function PriceChart({ data, height = "180px" }: PriceChartProps) {
+export function PriceChart({ data, height = "170px" }: PriceChartProps) {
   const timestamps = useMemo(() => {
     return data.map((d) => {
       try {
@@ -27,25 +27,28 @@ export function PriceChart({ data, height = "180px" }: PriceChartProps) {
 
   const option = useMemo(() => {
     return {
-      backgroundColor: "transparent",
+      backgroundColor: "#FFFFFF",
       tooltip: {
         trigger: "axis",
         axisPointer: {
           type: "cross",
-          label: { backgroundColor: "#374151" },
+          lineStyle: { color: "#94A3B8", type: "dashed" },
+          label: { backgroundColor: "#0F172A", color: "#FFFFFF" },
         },
-        backgroundColor: "rgba(17, 24, 39, 0.95)",
-        borderColor: "#374151",
-        textStyle: { color: "#F3F4F6", fontSize: 12 },
+        backgroundColor: "rgba(255, 255, 255, 0.98)",
+        borderColor: "#E2E8F0",
+        borderWidth: 1,
+        extraCssText: "box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); border-radius: 8px;",
+        textStyle: { color: "#0F172A", fontSize: 12 },
         formatter: (params: any[]) => {
           if (!params || params.length === 0) return "";
           const p = params[0];
           const val = Number(p.value) || 0;
           return `<div class="p-1 font-sans">
-            <div class="text-slate-400 text-xs mb-1">${p.axisValue}</div>
+            <div class="text-slate-500 text-xs mb-1">${p.axisValue}</div>
             <div class="flex items-center justify-between space-x-3 text-xs">
-              <span class="font-semibold text-rose-400">Spot Price (LMP):</span>
-              <span class="font-mono font-bold text-white">₱${Math.round(val).toLocaleString()} /MWh</span>
+              <span class="font-semibold text-rose-600">Spot Price (LMP):</span>
+              <span class="font-mono font-bold text-slate-900">₱${Math.round(val).toLocaleString()} /MWh</span>
             </div>
           </div>`;
         },
@@ -61,21 +64,22 @@ export function PriceChart({ data, height = "180px" }: PriceChartProps) {
         type: "category",
         boundaryGap: false,
         data: timestamps,
-        axisLine: { lineStyle: { color: "#4B5563" } },
-        axisLabel: { show: false }, // synchronized with above chart
+        axisLine: { lineStyle: { color: "#CBD5E1" } },
+        axisLabel: { show: false },
         splitLine: { show: false },
       },
       yAxis: {
         type: "value",
         name: "Price (₱/MWh)",
-        nameTextStyle: { color: "#9CA3AF", fontSize: 10 },
-        axisLine: { lineStyle: { color: "#4B5563" } },
+        nameTextStyle: { color: "#64748B", fontSize: 10 },
+        axisLine: { show: false },
+        axisTick: { show: false },
         axisLabel: {
-          color: "#9CA3AF",
+          color: "#64748B",
           fontSize: 10,
           formatter: (v: number) => `₱${v}`,
         },
-        splitLine: { lineStyle: { color: "#1F2937", type: "dashed" } },
+        splitLine: { lineStyle: { color: "#F1F5F9", type: "solid" } },
       },
       series: [
         {
@@ -83,10 +87,10 @@ export function PriceChart({ data, height = "180px" }: PriceChartProps) {
           type: "line",
           lineStyle: {
             width: 1.8,
-            color: "#EF4444",
+            color: "#DC2626",
           },
           itemStyle: {
-            color: "#EF4444",
+            color: "#DC2626",
           },
           areaStyle: {
             color: {
@@ -96,8 +100,8 @@ export function PriceChart({ data, height = "180px" }: PriceChartProps) {
               x2: 0,
               y2: 1,
               colorStops: [
-                { offset: 0, color: "rgba(239, 68, 68, 0.25)" },
-                { offset: 1, color: "rgba(239, 68, 68, 0.0)" },
+                { offset: 0, color: "rgba(220, 38, 38, 0.15)" },
+                { offset: 1, color: "rgba(220, 38, 38, 0.0)" },
               ],
             },
           },
@@ -110,15 +114,14 @@ export function PriceChart({ data, height = "180px" }: PriceChartProps) {
   }, [timestamps, prices]);
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm mt-3">
+    <div className="bg-white border border-slate-200/90 rounded-xl p-4 shadow-sm mt-3">
       <div className="flex items-center justify-between mb-1">
-        <h3 className="text-xs font-bold text-slate-300 tracking-tight flex items-center space-x-2">
+        <h3 className="text-xs font-bold text-slate-800 tracking-tight flex items-center space-x-2">
           <span>Wholesale Spot Price (WESM Average LMP)</span>
-          <span className="text-[11px] font-normal text-slate-400">(PHP / MWh)</span>
+          <span className="text-[11px] font-normal text-slate-500">(PHP / MWh)</span>
         </h3>
       </div>
       <ReactECharts option={option} style={{ height, width: "100%" }} notMerge={true} lazyUpdate={true} />
     </div>
   );
 }
-
