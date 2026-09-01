@@ -64,13 +64,12 @@ export function GenerationChart({
         type: "line",
         stack: isCumulative ? "TotalGeneration" : undefined,
         areaStyle: {
-          color: isCumulative
-            ? createShadcnGradient(meta.color, 0.92, 0.78)
-            : createShadcnGradient(meta.color, 0.4, 0.02),
+          color: isCumulative ? meta.color : createShadcnGradient(meta.color, 0.4, 0.02),
+          opacity: isCumulative ? 0.98 : 1.0,
         },
         lineStyle: {
-          width: isCumulative ? 1.0 : 1.8,
-          color: isCumulative ? "#ffffffaa" : meta.color,
+          width: isCumulative ? 0.3 : 1.8,
+          color: isCumulative ? "#ffffff33" : meta.color,
         },
         itemStyle: {
           color: meta.color,
