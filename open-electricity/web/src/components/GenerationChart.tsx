@@ -3,8 +3,8 @@
 import React, { useMemo } from "react";
 import ReactECharts from "echarts-for-react";
 import { FuelGenerationPoint, ViewMode } from "@/lib/types";
-import { FUEL_META } from "@/lib/colors";
-import { computeXAxisConfig, SHADCN_TOOLTIP_CONFIG } from "@/lib/chartUtils";
+import { getFuelMeta } from "@/lib/colors";
+import { computeXAxisConfig, getShadcnTooltipConfig } from "@/lib/chartUtils";
 import {
   ChartCard,
   ChartCardHeader,
@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/ChartCard";
 import { format, parseISO } from "date-fns";
 import { Zap, Percent } from "lucide-react";
+import { useTheme } from "@/components/ThemeProvider";
 
 interface GenerationChartProps {
   data: FuelGenerationPoint[];
@@ -43,6 +44,7 @@ export function GenerationChart({
   height = "330px",
   onHoverPoint,
 }: GenerationChartProps) {
+  const { isDark } = useTheme();
   const isPercentage = viewMode === "percentage";
   const isEnergy = unit === "GWh";
 
@@ -71,11 +73,12 @@ export function GenerationChart({
     return totSum > 0 ? Math.round((renSum / totSum) * 1000) / 10 : 0;
   }, [data]);
 
-  const xAxisConfig = useMemo(() => computeXAxisConfig(data), [data]);
+  const xAxisConfig = useMemo(() => computeXAxisConfig(data, isDark), [data, isDark]);
+  const tooltipConfig = useMemo(() => getShadcnTooltipConfig(isDark), [isDark]);
 
   const option = useMemo(() => {
     const series = FUEL_ORDER.map((fuel) => {
-      const meta = FUEL_META[fuel];
+      const meta = getFuelMeta(fuel, isDark);
 
       const seriesData = data.map((d) => {
         const rawVal = Number(d[fuel] || 0);
@@ -95,8 +98,8 @@ export function GenerationChart({
           opacity: 0.98,
         },
         lineStyle: {
-          width: 0.3,
-          color: "#ffffff33",
+          width: 0.5,
+          color: isDark ? "#3F3F46" : "#ffffff33",
         },
         itemStyle: {
           color: meta.color,
@@ -107,11 +110,13 @@ export function GenerationChart({
       };
     });
 
+    const gridLineColor = isDark ? "rgba(255, 255, 255, 0.07)" : "#F1F5F9";
+
     return {
       backgroundColor: "transparent",
       animation: false,
       tooltip: {
-        ...SHADCN_TOOLTIP_CONFIG,
+        ...tooltipConfig,
         formatter: (params: any[]) => {
           if (!params || params.length === 0) return "";
           const idx = params[0].dataIndex;
@@ -146,10 +151,19 @@ export function GenerationChart({
             };
           });
 
+          const borderCls = isDark ? "border-[#27272A]" : "border-neutral-100";
+          const textMuted = isDark ? "text-neutral-400" : "text-neutral-500";
+          const pillBg = isDark
+            ? "bg-[#27272A] text-neutral-100 border border-neutral-700"
+            : "bg-neutral-100 text-neutral-900";
+          const textPrimary = isDark ? "text-neutral-100" : "text-neutral-900";
+          const textSecondary = isDark ? "text-neutral-300" : "text-neutral-600";
+          const textSubPct = isDark ? "text-neutral-500" : "text-neutral-400";
+
           let html = `<div class="font-sans min-w-[210px]">
-            <div class="border-b border-neutral-100 pb-1.5 mb-2 flex justify-between items-center text-xs">
-              <span class="text-neutral-500 font-medium">${formattedTime}</span>
-              <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-neutral-100 font-bold text-neutral-900 font-mono">${isPercentage ? "100%" : `${formattedTotal} ${unitStr}`}</span>
+            <div class="border-b ${borderCls} pb-1.5 mb-2 flex justify-between items-center text-xs">
+              <span class="${textMuted} font-medium">${formattedTime}</span>
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded ${pillBg} font-bold font-mono">${isPercentage ? "100%" : `${formattedTotal} ${unitStr}`}</span>
             </div>`;
 
           rows.sort((a, b) => b.pct - a.pct).forEach((r) => {
@@ -157,14 +171,14 @@ export function GenerationChart({
               const displayVal = isPercentage
                 ? `${r.pct.toFixed(1)}%`
                 : `${isEnergy ? r.val.toFixed(2) : Math.round(r.val).toLocaleString()} ${unitStr}`;
-              const subPct = !isPercentage ? `<span class="text-neutral-400 text-[10px] ml-1">(${r.pct.toFixed(1)}%)</span>` : "";
+              const subPct = !isPercentage ? `<span class="${textSubPct} text-[10px] ml-1">(${r.pct.toFixed(1)}%)</span>` : "";
 
               html += `<div class="flex justify-between items-center py-0.5 text-xs">
-                <span class="flex items-center text-neutral-600">
+                <span class="flex items-center ${textSecondary}">
                   <span class="w-2.5 h-2.5 rounded-[3px] mr-2" style="background-color:${r.color}"></span>
                   ${r.name}
                 </span>
-                <span class="font-mono text-neutral-900 font-medium">${displayVal} ${subPct}</span>
+                <span class="font-mono ${textPrimary} font-medium">${displayVal} ${subPct}</span>
               </div>`;
             }
           });
@@ -183,7 +197,7 @@ export function GenerationChart({
         axisLabel: xAxisConfig.axisLabel,
         splitLine: {
           show: true,
-          lineStyle: { color: "#F1F5F9", type: "dashed" },
+          lineStyle: { color: gridLineColor, type: "dashed" },
         },
       },
       yAxis: {
@@ -193,19 +207,19 @@ export function GenerationChart({
         axisLine: { show: false },
         axisTick: { show: false },
         axisLabel: {
-          color: "#64748B",
+          color: isDark ? "#A1A1AA" : "#64748B",
           fontSize: 10,
           margin: 12,
           formatter: (v: number) =>
             isPercentage ? `${v}%` : isEnergy ? `${v}` : `${v.toLocaleString()}`,
         },
         splitLine: {
-          lineStyle: { color: "#F1F5F9", type: "dashed" },
+          lineStyle: { color: gridLineColor, type: "dashed" },
         },
       },
       series,
     };
-  }, [data, isPercentage, isEnergy, xAxisConfig]);
+  }, [data, isPercentage, isEnergy, xAxisConfig, tooltipConfig, isDark]);
 
   const onEvents = useMemo(() => {
     return {
@@ -227,29 +241,29 @@ export function GenerationChart({
         <ChartCardTitle>
           <div className="flex items-center space-x-2">
             {isPercentage ? (
-              <Percent className="h-4 w-4 text-emerald-600" />
+              <Percent className="h-4 w-4 text-emerald-500 dark:text-emerald-400" />
             ) : (
-              <Zap className="h-4 w-4 text-amber-500" />
+              <Zap className="h-4 w-4 text-amber-500 dark:text-amber-400" />
             )}
             <span>
               {isPercentage ? "Generation Fuel Mix Share" : "Generation & Fuel Mix"}
             </span>
-            <span className="text-xs font-normal text-neutral-400 font-mono">
+            <span className="text-xs font-normal text-neutral-400 dark:text-neutral-500 font-mono">
               ({isPercentage ? "% Share" : unit})
             </span>
           </div>
-          <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-100 text-neutral-800 border border-neutral-200/60 font-mono shadow-xs">
+          <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-100 dark:bg-[#18181B] text-neutral-800 dark:text-neutral-200 border border-neutral-200/60 dark:border-neutral-800 font-mono shadow-xs">
             {isPercentage ? (
               <>
                 Renewables:{" "}
-                <strong className="ml-1 text-emerald-700 font-bold">
+                <strong className="ml-1 text-emerald-600 dark:text-emerald-400 font-bold">
                   {avgRenewablesPct}%
                 </strong>
               </>
             ) : (
               <>
                 Av.{" "}
-                <strong className="ml-1 text-neutral-950 font-bold">
+                <strong className="ml-1 text-neutral-950 dark:text-white font-bold">
                   {avgGeneration.toLocaleString()} {unit}
                 </strong>
               </>

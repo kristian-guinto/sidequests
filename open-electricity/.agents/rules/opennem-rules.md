@@ -14,3 +14,4 @@
 * **Grid Containment**: All vertically stacked charts must specify `containLabel: true`, `left: 55`, `right: 20`, and `bottom: 26` to guarantee zero text clipping and vertical gridline synchronization.
 * **Chart Views**: Support both absolute capacity (MW / GWh) and normalized 100% Stacked share (`0% – 100%`).
 * **Solid Area Contrast**: Stacked area charts must use solid 0.98 opacity with 0.3px boundary separators to preserve distinct fuel colors and contrast.
+

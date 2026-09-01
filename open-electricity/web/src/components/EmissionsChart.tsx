@@ -3,8 +3,8 @@
 import React, { useMemo } from "react";
 import ReactECharts from "echarts-for-react";
 import { FuelGenerationPoint, ViewMode } from "@/lib/types";
-import { FUEL_META } from "@/lib/colors";
-import { computeXAxisConfig, SHADCN_TOOLTIP_CONFIG } from "@/lib/chartUtils";
+import { getFuelMeta } from "@/lib/colors";
+import { computeXAxisConfig, getShadcnTooltipConfig } from "@/lib/chartUtils";
 import {
   ChartCard,
   ChartCardHeader,
@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/ChartCard";
 import { format, parseISO } from "date-fns";
 import { CloudFog } from "lucide-react";
+import { useTheme } from "@/components/ThemeProvider";
 
 interface EmissionsChartProps {
   data: FuelGenerationPoint[];
@@ -28,8 +29,10 @@ export function EmissionsChart({
   height = "180px",
   onHoverPoint,
 }: EmissionsChartProps) {
+  const { isDark } = useTheme();
   const isPercentage = viewMode === "percentage";
-  const xAxisConfig = useMemo(() => computeXAxisConfig(data), [data]);
+  const xAxisConfig = useMemo(() => computeXAxisConfig(data, isDark), [data, isDark]);
+  const tooltipConfig = useMemo(() => getShadcnTooltipConfig(isDark), [isDark]);
 
   const emissionsData = useMemo(() => {
     return data.map((d) => {
@@ -74,11 +77,17 @@ export function EmissionsChart({
   }, [emissionsData]);
 
   const option = useMemo(() => {
+    const coalMeta = getFuelMeta("coal", isDark);
+    const oilMeta = getFuelMeta("oil", isDark);
+    const gasMeta = getFuelMeta("gas", isDark);
+
+    const gridLineColor = isDark ? "rgba(255, 255, 255, 0.07)" : "#F1F5F9";
+
     return {
       backgroundColor: "transparent",
       animation: false,
       tooltip: {
-        ...SHADCN_TOOLTIP_CONFIG,
+        ...tooltipConfig,
         formatter: (params: any[]) => {
           if (!params || params.length === 0) return "";
           const idx = params[0].dataIndex;
@@ -96,21 +105,29 @@ export function EmissionsChart({
             return { name: p.seriesName, val, color: p.color };
           });
 
+          const borderCls = isDark ? "border-[#27272A]" : "border-neutral-100";
+          const textMuted = isDark ? "text-neutral-400" : "text-neutral-500";
+          const pillBg = isDark
+            ? "bg-[#27272A] text-neutral-100 border border-neutral-700"
+            : "bg-neutral-100 text-neutral-900";
+          const textPrimary = isDark ? "text-neutral-100" : "text-neutral-900";
+          const textSecondary = isDark ? "text-neutral-300" : "text-neutral-600";
+
           let html = `<div class="font-sans min-w-[190px]">
-            <div class="border-b border-neutral-100 pb-1.5 mb-2 flex justify-between items-center text-xs">
-              <span class="text-neutral-500 font-medium">${formattedTime}</span>
-              <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-neutral-100 font-bold text-neutral-900 font-mono">${isPercentage ? "100%" : `${item.total.toFixed(1)} tCO₂e`}</span>
+            <div class="border-b ${borderCls} pb-1.5 mb-2 flex justify-between items-center text-xs">
+              <span class="${textMuted} font-medium">${formattedTime}</span>
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded ${pillBg} font-bold font-mono">${isPercentage ? "100%" : `${item.total.toFixed(1)} tCO₂e`}</span>
             </div>`;
 
           rows.reverse().forEach((r) => {
             if (r.val > 0) {
               const displayVal = isPercentage ? `${r.val.toFixed(1)}%` : `${r.val.toFixed(1)} tCO₂e`;
               html += `<div class="flex justify-between items-center py-0.5 text-xs">
-                <span class="flex items-center text-neutral-600">
+                <span class="flex items-center ${textSecondary}">
                   <span class="w-2.5 h-2.5 rounded-[3px] mr-2" style="background-color:${r.color}"></span>
                   ${r.name}
                 </span>
-                <span class="font-mono text-neutral-900 font-medium">${displayVal}</span>
+                <span class="font-mono ${textPrimary} font-medium">${displayVal}</span>
               </div>`;
             }
           });
@@ -129,7 +146,7 @@ export function EmissionsChart({
         axisLabel: xAxisConfig.axisLabel,
         splitLine: {
           show: true,
-          lineStyle: { color: "#F1F5F9", type: "dashed" },
+          lineStyle: { color: gridLineColor, type: "dashed" },
         },
       },
       yAxis: {
@@ -139,13 +156,13 @@ export function EmissionsChart({
         axisLine: { show: false },
         axisTick: { show: false },
         axisLabel: {
-          color: "#64748B",
+          color: isDark ? "#A1A1AA" : "#64748B",
           fontSize: 10,
           margin: 12,
           formatter: (v: number) => (isPercentage ? `${v}%` : `${v.toLocaleString()}`),
         },
         splitLine: {
-          lineStyle: { color: "#F1F5F9", type: "dashed" },
+          lineStyle: { color: gridLineColor, type: "dashed" },
         },
       },
       series: [
@@ -153,9 +170,9 @@ export function EmissionsChart({
           name: "Coal",
           type: "line",
           stack: "Emissions",
-          areaStyle: { color: FUEL_META.coal.color, opacity: 0.98 },
-          lineStyle: { width: 0.3, color: "#ffffff33" },
-          itemStyle: { color: FUEL_META.coal.color },
+          areaStyle: { color: coalMeta.color, opacity: 0.98 },
+          lineStyle: { width: 0.5, color: isDark ? "#3F3F46" : "#ffffff33" },
+          itemStyle: { color: coalMeta.color },
           showSymbol: false,
           data: emissionsData.map((d) => d.coal),
         },
@@ -163,9 +180,9 @@ export function EmissionsChart({
           name: "Distillate",
           type: "line",
           stack: "Emissions",
-          areaStyle: { color: FUEL_META.oil.color, opacity: 0.98 },
-          lineStyle: { width: 0.3, color: "#ffffff33" },
-          itemStyle: { color: FUEL_META.oil.color },
+          areaStyle: { color: oilMeta.color, opacity: 0.98 },
+          lineStyle: { width: 0.5, color: isDark ? "#3F3F46" : "#ffffff33" },
+          itemStyle: { color: oilMeta.color },
           showSymbol: false,
           data: emissionsData.map((d) => d.oil),
         },
@@ -173,15 +190,15 @@ export function EmissionsChart({
           name: "Gas",
           type: "line",
           stack: "Emissions",
-          areaStyle: { color: FUEL_META.gas.color, opacity: 0.98 },
-          lineStyle: { width: 0.3, color: "#ffffff33" },
-          itemStyle: { color: FUEL_META.gas.color },
+          areaStyle: { color: gasMeta.color, opacity: 0.98 },
+          lineStyle: { width: 0.5, color: isDark ? "#3F3F46" : "#ffffff33" },
+          itemStyle: { color: gasMeta.color },
           showSymbol: false,
           data: emissionsData.map((d) => d.gas),
         },
       ],
     };
-  }, [data, emissionsData, isPercentage, xAxisConfig]);
+  }, [data, emissionsData, isPercentage, xAxisConfig, tooltipConfig, isDark]);
 
   const onEvents = useMemo(() => {
     return {
@@ -202,17 +219,17 @@ export function EmissionsChart({
       <ChartCardHeader>
         <ChartCardTitle>
           <div className="flex items-center space-x-2">
-            <CloudFog className="h-4 w-4 text-neutral-500" />
+            <CloudFog className="h-4 w-4 text-neutral-500 dark:text-neutral-400" />
             <span>
               {isPercentage ? "Emissions Contribution Share" : "Emissions Volume"}
             </span>
-            <span className="text-xs font-normal text-neutral-400 font-mono">
+            <span className="text-xs font-normal text-neutral-400 dark:text-neutral-500 font-mono">
               ({isPercentage ? "% Share" : "tCO₂e/5m"})
             </span>
           </div>
-          <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-100 text-neutral-800 border border-neutral-200/60 font-mono shadow-xs">
+          <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-100 dark:bg-[#18181B] text-neutral-800 dark:text-neutral-200 border border-neutral-200/60 dark:border-neutral-800 font-mono shadow-xs">
             Av.{" "}
-            <strong className="ml-1 text-neutral-950 font-bold">
+            <strong className="ml-1 text-neutral-950 dark:text-white font-bold">
               {avgEmissions.toLocaleString()} tCO₂e
             </strong>
           </div>

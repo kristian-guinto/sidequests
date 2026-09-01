@@ -14,12 +14,13 @@ import {
   ChevronDown,
   Share2,
   AreaChart as AreaIcon,
-  TrendingUp,
   RotateCw,
   Check,
-  Zap,
   Percent,
+  Sun,
+  Moon,
 } from "lucide-react";
+import { useTheme } from "@/components/ThemeProvider";
 
 interface HeaderProps {
   country: CountryCode;
@@ -58,6 +59,7 @@ export function Header({
   onRefresh,
   isLoading,
 }: HeaderProps) {
+  const { isDark, toggleTheme } = useTheme();
   const [isRegionMenuOpen, setIsRegionMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -101,31 +103,31 @@ export function Header({
   ];
 
   return (
-    <header className="bg-white border-b border-neutral-200 sticky top-0 z-50 text-neutral-800">
+    <header className="bg-white dark:bg-[#000000] border-b border-neutral-200 dark:border-[#27272A] sticky top-0 z-50 text-neutral-800 dark:text-neutral-200 transition-colors">
       {/* Top Bar: Brand & Live Status */}
-      <div className="w-full px-4 sm:px-6 lg:px-8 border-b border-neutral-100">
+      <div className="w-full px-4 sm:px-6 lg:px-8 border-b border-neutral-100 dark:border-[#27272A]/80">
         <div className="flex items-center justify-between h-13 py-2.5">
           {/* Logo */}
           <div className="flex items-center space-x-3">
             <div className="flex items-baseline space-x-1.5 cursor-pointer">
-              <span className="font-serif font-bold text-xl tracking-tight text-neutral-900">
+              <span className="font-serif font-bold text-xl tracking-tight text-neutral-900 dark:text-white">
                 Open
               </span>
-              <span className="text-emerald-600 font-sans font-light text-xl">~</span>
-              <span className="font-sans font-bold text-xl tracking-tight text-neutral-900">
+              <span className="text-emerald-500 font-sans font-light text-xl">~</span>
+              <span className="font-sans font-bold text-xl tracking-tight text-neutral-900 dark:text-white">
                 Electricity
               </span>
             </div>
-            <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-600 border border-neutral-200 uppercase tracking-wider">
+            <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-[#18181B] text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-[#27272A] uppercase tracking-wider">
               SEA Tracker
             </span>
           </div>
 
           {/* Right Status Pill */}
-          <div className="flex items-center space-x-2 text-xs text-neutral-600">
-            <div className="flex items-center space-x-1.5 bg-neutral-50 px-2.5 py-1 rounded-md border border-neutral-200 text-[11px] font-medium">
+          <div className="flex items-center space-x-2 text-xs text-neutral-600 dark:text-neutral-400">
+            <div className="flex items-center space-x-1.5 bg-neutral-50 dark:bg-[#121215] px-2.5 py-1 rounded-md border border-neutral-200 dark:border-[#27272A] text-[11px] font-medium">
               <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>
+              <span className="text-neutral-800 dark:text-neutral-200">
                 {currentCountry.name} ({currentCountry.currencyCode})
               </span>
             </div>
@@ -134,38 +136,38 @@ export function Header({
       </div>
 
       {/* Main Toolbar: Controls */}
-      <div className="w-full px-4 sm:px-6 lg:px-8 py-2 flex flex-wrap items-center justify-between gap-3 bg-white">
+      <div className="w-full px-4 sm:px-6 lg:px-8 py-2 flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-[#000000]">
         {/* Left: Country / Region Dropdown */}
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {/* Country & Region Menu */}
           <div className="relative">
             <button
               onClick={() => setIsRegionMenuOpen(!isRegionMenuOpen)}
-              className="flex items-center space-x-2 px-2.5 py-1 bg-neutral-50 hover:bg-neutral-100 border border-neutral-200 rounded text-xs font-semibold text-neutral-900 transition shadow-sm"
+              className="flex items-center space-x-2 px-2.5 py-1 bg-neutral-50 dark:bg-[#121215] hover:bg-neutral-100 dark:hover:bg-[#18181B] border border-neutral-200 dark:border-[#27272A] rounded text-xs font-semibold text-neutral-900 dark:text-neutral-100 transition shadow-sm"
             >
               <span className="text-sm">{currentCountry.flag}</span>
               <span>
                 {currentCountry.name} &bull; {currentRegionObj.label}
               </span>
-              <ChevronDown className="h-3.5 w-3.5 text-neutral-500" />
+              <ChevronDown className="h-3.5 w-3.5 text-neutral-500 dark:text-neutral-400" />
             </button>
 
             {isRegionMenuOpen && (
-              <div className="absolute left-0 mt-1.5 w-64 bg-white rounded-lg shadow-xl border border-neutral-200 py-2 z-50 text-xs">
-                <div className="px-3 py-1 text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
+              <div className="absolute left-0 mt-1.5 w-64 bg-white dark:bg-[#09090B] rounded-lg shadow-xl border border-neutral-200 dark:border-[#27272A] py-2 z-50 text-xs">
+                <div className="px-3 py-1 text-[10px] font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider">
                   Select Country &amp; Region
                 </div>
                 {(Object.keys(COUNTRIES_METADATA) as CountryCode[]).map((cCode) => {
                   const cInfo = COUNTRIES_METADATA[cCode];
                   const isCurrentC = country === cCode;
                   return (
-                    <div key={cCode} className="border-b border-neutral-100 last:border-0 py-1">
+                    <div key={cCode} className="border-b border-neutral-100 dark:border-[#27272A]/60 last:border-0 py-1">
                       <button
                         onClick={() => handleCountrySelect(cCode)}
                         className={`w-full flex items-center justify-between px-3 py-1.5 text-left transition ${
                           isCurrentC
-                            ? "font-bold text-neutral-950 bg-neutral-50"
-                            : "text-neutral-700 hover:bg-neutral-50"
+                            ? "font-bold text-neutral-950 dark:text-white bg-neutral-50 dark:bg-[#18181B]"
+                            : "text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-[#121215]"
                         }`}
                       >
                         <span className="flex items-center space-x-2">
@@ -185,8 +187,8 @@ export function Header({
                               onClick={() => handleRegionSelect(reg.id)}
                               className={`w-full text-left px-2 py-1 rounded text-xs transition ${
                                 region === reg.id
-                                  ? "bg-neutral-900 text-white font-medium"
-                                  : "text-neutral-600 hover:bg-neutral-100"
+                                  ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 font-medium"
+                                  : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-[#18181B]"
                               }`}
                             >
                               {reg.label}
@@ -201,16 +203,16 @@ export function Header({
             )}
           </div>
 
-          <div className="h-4 w-[1px] bg-neutral-200 mx-1 hidden sm:block" />
+          <div className="h-4 w-[1px] bg-neutral-200 dark:bg-[#27272A] mx-1 hidden sm:block" />
 
           {/* Chart Mode Toggle (Stacked vs 100% Stacked Area) */}
-          <div className="flex items-center border border-neutral-200 rounded p-0.5 bg-neutral-50/50">
+          <div className="flex items-center border border-neutral-200 dark:border-[#27272A] rounded p-0.5 bg-neutral-50/50 dark:bg-[#121215]">
             <button
               onClick={() => onViewModeChange("stacked")}
               className={`flex items-center space-x-1 px-2.5 py-0.5 rounded text-xs font-medium transition ${
                 viewMode === "stacked" || viewMode === "cumulative"
-                  ? "bg-white text-neutral-950 font-bold shadow-sm"
-                  : "text-neutral-500 hover:text-neutral-800"
+                  ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold shadow-sm"
+                  : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white"
               }`}
               title="Standard Stacked Area Chart (MW / GWh)"
             >
@@ -221,8 +223,8 @@ export function Header({
               onClick={() => onViewModeChange("percentage")}
               className={`flex items-center space-x-1 px-2.5 py-0.5 rounded text-xs font-medium transition ${
                 viewMode === "percentage"
-                  ? "bg-white text-neutral-950 font-bold shadow-sm"
-                  : "text-neutral-500 hover:text-neutral-800"
+                  ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold shadow-sm"
+                  : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white"
               }`}
               title="100% Stacked Area Chart (%)"
             >
@@ -232,15 +234,15 @@ export function Header({
           </div>
 
           {/* Range Pills (1D, 3D, 7D, 30D, 1Y) */}
-          <div className="flex border border-neutral-200 rounded p-0.5 text-xs font-medium bg-neutral-50/50">
+          <div className="flex border border-neutral-200 dark:border-[#27272A] rounded p-0.5 text-xs font-medium bg-neutral-50/50 dark:bg-[#121215]">
             {RANGES.map((rng) => (
               <button
                 key={rng.id}
                 onClick={() => handleRangeClick(rng.id)}
                 className={`px-2.5 py-0.5 rounded transition ${
                   range === rng.id
-                    ? "bg-white text-neutral-950 font-bold border border-neutral-300 shadow-sm"
-                    : "text-neutral-500 hover:text-neutral-900"
+                    ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold border border-neutral-300 dark:border-neutral-700 shadow-sm"
+                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
                 }`}
               >
                 {rng.label}
@@ -249,15 +251,15 @@ export function Header({
           </div>
 
           {/* Interval Resolution Pills */}
-          <div className="flex border border-neutral-200 rounded p-0.5 text-xs font-medium bg-neutral-50/50">
+          <div className="flex border border-neutral-200 dark:border-[#27272A] rounded p-0.5 text-xs font-medium bg-neutral-50/50 dark:bg-[#121215]">
             {allowedIntervals.map((inv) => (
               <button
                 key={inv.id}
                 onClick={() => onIntervalChange(inv.id)}
                 className={`px-2.5 py-0.5 rounded transition ${
                   interval === inv.id
-                    ? "bg-white text-neutral-950 font-bold border border-neutral-300 shadow-sm"
-                    : "text-neutral-500 hover:text-neutral-900"
+                    ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold border border-neutral-300 dark:border-neutral-700 shadow-sm"
+                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
                 }`}
               >
                 {inv.label}
@@ -266,29 +268,43 @@ export function Header({
           </div>
         </div>
 
-        {/* Right Controls: Refresh & Share */}
+        {/* Right Controls: Theme Switcher, Refresh & Share */}
         <div className="flex items-center space-x-2">
+          {/* Theme Toggle Button */}
+          <button
+            onClick={toggleTheme}
+            className="flex items-center justify-center p-1.5 rounded border border-neutral-200 dark:border-[#27272A] hover:bg-neutral-50 dark:hover:bg-[#121215] text-neutral-700 dark:text-neutral-300 text-xs transition"
+            title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            aria-label="Toggle Theme"
+          >
+            {isDark ? (
+              <Sun className="h-3.5 w-3.5 text-amber-400" />
+            ) : (
+              <Moon className="h-3.5 w-3.5 text-neutral-600" />
+            )}
+          </button>
+
           <button
             onClick={onRefresh}
             disabled={isLoading}
-            className="flex items-center space-x-1.5 px-2.5 py-1 rounded border border-neutral-200 hover:bg-neutral-50 text-neutral-700 text-xs font-medium transition disabled:opacity-50"
+            className="flex items-center space-x-1.5 px-2.5 py-1 rounded border border-neutral-200 dark:border-[#27272A] hover:bg-neutral-50 dark:hover:bg-[#121215] text-neutral-700 dark:text-neutral-300 text-xs font-medium transition disabled:opacity-50"
             title="Refresh Data"
           >
             <RotateCw
-              className={`h-3.5 w-3.5 ${isLoading ? "animate-spin text-emerald-600" : ""}`}
+              className={`h-3.5 w-3.5 ${isLoading ? "animate-spin text-emerald-500" : ""}`}
             />
             <span>Refresh</span>
           </button>
 
           <button
             onClick={handleShare}
-            className="flex items-center space-x-1.5 px-2.5 py-1 rounded border border-neutral-200 hover:bg-neutral-50 text-neutral-700 text-xs font-medium transition"
+            className="flex items-center space-x-1.5 px-2.5 py-1 rounded border border-neutral-200 dark:border-[#27272A] hover:bg-neutral-50 dark:hover:bg-[#121215] text-neutral-700 dark:text-neutral-300 text-xs font-medium transition"
             title="Copy Page Link"
           >
             {copied ? (
               <>
-                <Check className="h-3.5 w-3.5 text-emerald-600" />
-                <span className="text-emerald-700 font-semibold">Copied!</span>
+                <Check className="h-3.5 w-3.5 text-emerald-500" />
+                <span className="text-emerald-500 font-semibold">Copied!</span>
               </>
             ) : (
               <>

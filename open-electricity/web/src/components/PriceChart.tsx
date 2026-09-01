@@ -3,7 +3,7 @@
 import React, { useMemo } from "react";
 import ReactECharts from "echarts-for-react";
 import { FuelGenerationPoint } from "@/lib/types";
-import { computeXAxisConfig, createShadcnGradient, SHADCN_TOOLTIP_CONFIG } from "@/lib/chartUtils";
+import { computeXAxisConfig, createShadcnGradient, getShadcnTooltipConfig } from "@/lib/chartUtils";
 import {
   ChartCard,
   ChartCardHeader,
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/ChartCard";
 import { format, parseISO } from "date-fns";
 import { TrendingUp } from "lucide-react";
+import { useTheme } from "@/components/ThemeProvider";
 
 interface PriceChartProps {
   data: FuelGenerationPoint[];
@@ -29,7 +30,9 @@ export function PriceChart({
   height = "180px",
   onHoverPoint,
 }: PriceChartProps) {
-  const xAxisConfig = useMemo(() => computeXAxisConfig(data), [data]);
+  const { isDark } = useTheme();
+  const xAxisConfig = useMemo(() => computeXAxisConfig(data, isDark), [data, isDark]);
+  const tooltipConfig = useMemo(() => getShadcnTooltipConfig(isDark), [isDark]);
 
   const prices = useMemo(() => {
     return data.map((d) => d.price || 0);
@@ -42,11 +45,13 @@ export function PriceChart({
   }, [prices]);
 
   const option = useMemo(() => {
+    const gridLineColor = isDark ? "rgba(255, 255, 255, 0.07)" : "#F1F5F9";
+
     return {
       backgroundColor: "transparent",
       animation: false,
       tooltip: {
-        ...SHADCN_TOOLTIP_CONFIG,
+        ...tooltipConfig,
         formatter: (params: any[]) => {
           if (!params || params.length === 0) return "";
           const idx = params[0].dataIndex;
@@ -59,14 +64,18 @@ export function PriceChart({
           }
 
           const val = Number(params[0].value) || 0;
+          const borderCls = isDark ? "border-[#27272A]" : "border-neutral-100";
+          const textMuted = isDark ? "text-neutral-400" : "text-neutral-500";
+          const textPrimary = isDark ? "text-neutral-100" : "text-neutral-900";
+
           return `<div class="font-sans min-w-[180px]">
-            <div class="text-neutral-500 font-medium text-xs mb-1.5">${formattedTime}</div>
-            <div class="flex items-center justify-between space-x-3 text-xs border-t border-neutral-100 pt-1.5">
-              <span class="font-semibold text-rose-600 flex items-center">
+            <div class="${textMuted} font-medium text-xs mb-1.5">${formattedTime}</div>
+            <div class="flex items-center justify-between space-x-3 text-xs border-t ${borderCls} pt-1.5">
+              <span class="font-semibold text-rose-500 flex items-center">
                 <span class="w-2 h-2 rounded-full mr-1.5 bg-rose-500"></span>
                 Spot Price:
               </span>
-              <span class="font-mono font-bold text-neutral-900">${currencySymbol}${Math.round(
+              <span class="font-mono font-bold ${textPrimary}">${currencySymbol}${Math.round(
             val
           ).toLocaleString()} /MWh</span>
             </div>
@@ -83,7 +92,7 @@ export function PriceChart({
         axisLabel: xAxisConfig.axisLabel,
         splitLine: {
           show: true,
-          lineStyle: { color: "#F1F5F9", type: "dashed" },
+          lineStyle: { color: gridLineColor, type: "dashed" },
         },
       },
       yAxis: {
@@ -91,14 +100,14 @@ export function PriceChart({
         axisLine: { show: false },
         axisTick: { show: false },
         axisLabel: {
-          color: "#64748B",
+          color: isDark ? "#A1A1AA" : "#64748B",
           fontSize: 10,
           margin: 12,
           formatter: (v: number) =>
             `${v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`}`,
         },
         splitLine: {
-          lineStyle: { color: "#F1F5F9", type: "dashed" },
+          lineStyle: { color: gridLineColor, type: "dashed" },
         },
       },
       series: [
@@ -110,15 +119,15 @@ export function PriceChart({
           showSymbol: false,
           lineStyle: {
             width: 2.0,
-            color: "#E11D48",
+            color: "#FB7185",
           },
           areaStyle: {
-            color: createShadcnGradient("#E11D48", 0.35, 0.02),
+            color: createShadcnGradient("#E11D48", isDark ? 0.25 : 0.35, 0.01),
           },
         },
       ],
     };
-  }, [data, prices, currencySymbol, xAxisConfig]);
+  }, [data, prices, currencySymbol, xAxisConfig, tooltipConfig, isDark]);
 
   const onEvents = useMemo(() => {
     return {
@@ -141,13 +150,13 @@ export function PriceChart({
           <div className="flex items-center space-x-2">
             <TrendingUp className="h-4 w-4 text-rose-500" />
             <span>Wholesale Spot Price</span>
-            <span className="text-xs font-normal text-neutral-400 font-mono">
+            <span className="text-xs font-normal text-neutral-400 dark:text-neutral-500 font-mono">
               ({currencyCode} / MWh)
             </span>
           </div>
-          <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-100 text-neutral-800 border border-neutral-200/60 font-mono shadow-xs">
+          <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-100 dark:bg-[#18181B] text-neutral-800 dark:text-neutral-200 border border-neutral-200/60 dark:border-neutral-800 font-mono shadow-xs">
             Av.{" "}
-            <strong className="ml-1 text-neutral-950 font-bold">
+            <strong className="ml-1 text-neutral-950 dark:text-white font-bold">
               {currencySymbol}
               {avgPrice.toLocaleString()} /MWh
             </strong>

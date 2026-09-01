@@ -101,7 +101,7 @@ export default function DashboardPage() {
   }, [fetchData]);
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#FAFAFA] text-neutral-900 font-sans">
+    <div className="flex flex-col min-h-screen bg-[#FAFAFA] dark:bg-[#000000] text-neutral-900 dark:text-neutral-100 font-sans transition-colors duration-150">
       {/* OpenNEM Two-Tier Header */}
       <Header
         country={country}
@@ -167,7 +167,7 @@ export default function DashboardPage() {
       </main>
 
       {/* Sleek Bottom OpenNEM Status Bar */}
-      <footer className="border-t border-neutral-200 bg-neutral-900 text-neutral-300 py-1 px-4 text-[11px] font-mono select-none">
+      <footer className="border-t border-neutral-200 dark:border-[#27272A] bg-neutral-900 dark:bg-[#09090B] text-neutral-300 py-1 px-4 text-[11px] font-mono select-none">
         <div className="w-full flex items-center justify-between">
           <div className="flex items-center space-x-3 text-neutral-400">
             <span className="text-neutral-200 font-semibold">v4.54.10</span>

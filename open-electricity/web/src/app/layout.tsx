@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { ThemeProvider } from "@/components/ThemeProvider";
 
 export const metadata: Metadata = {
   title: "OpenElectricity Southeast Asia | Live Grid & Market Tracker",
@@ -28,9 +29,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="h-full bg-white">
-      <body className="min-h-screen bg-white text-slate-900 flex flex-col antialiased selection:bg-emerald-500 selection:text-white">
-        {children}
+    <html lang="en" className="h-full">
+      <body className="min-h-screen bg-white dark:bg-[#000000] text-neutral-900 dark:text-neutral-100 flex flex-col antialiased selection:bg-emerald-500 selection:text-white transition-colors duration-150">
+        <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
   );
