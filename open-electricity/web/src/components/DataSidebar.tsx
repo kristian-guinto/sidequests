@@ -19,6 +19,8 @@ interface DataSidebarProps {
   summary: SummaryMetrics | null;
   interconnectors: InterconnectorFlow[];
   hoveredPoint: FuelGenerationPoint | null;
+  hoveredFuel?: FuelTech | null;
+  onHoverFuel?: (fuel: FuelTech | null) => void;
   timeSpan?: { start: string; end: string };
   currencySymbol?: string;
   currencyCode?: string;
@@ -42,6 +44,8 @@ export function DataSidebar({
   summary,
   interconnectors,
   hoveredPoint,
+  hoveredFuel,
+  onHoverFuel,
   timeSpan,
   currencySymbol = "₱",
   currencyCode = "PHP",
@@ -294,33 +298,53 @@ export function DataSidebar({
                 </td>
               </tr>
 
-              {tableData.rows.map((row) => (
-                <tr
-                  key={row.fuelTech}
-                  className={`hover:bg-neutral-50/90 dark:hover:bg-[#18181B]/70 transition-colors group cursor-default ${
-                    row.rawVal === 0 ? "opacity-40" : ""
-                  }`}
-                >
-                  <td className="py-1.5 px-3 flex items-center space-x-2">
-                    <span
-                      className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
-                      style={{ backgroundColor: row.color }}
-                    />
-                    <span className="font-medium text-neutral-800 dark:text-neutral-200 text-[11px] group-hover:text-neutral-950 dark:group-hover:text-white">
-                      {row.label}
-                    </span>
-                  </td>
-                  <td className="py-1.5 px-2 text-right font-mono font-medium text-[11px] text-neutral-900 dark:text-neutral-100">
-                    {row.valueDisplay}
-                  </td>
-                  <td className="py-1.5 px-2 text-right font-mono text-[11px] text-neutral-600 dark:text-neutral-400">
-                    {row.pct.toFixed(1)}%
-                  </td>
-                  <td className="py-1.5 px-3 text-right font-mono text-[11px] text-neutral-500 dark:text-neutral-400">
-                    {row.priceDisplay}
-                  </td>
-                </tr>
-              ))}
+              {tableData.rows.map((row) => {
+                const isThisRowHovered = hoveredFuel === row.fuelTech;
+                const isAnyRowHovered = hoveredFuel !== null && hoveredFuel !== undefined;
+                return (
+                  <tr
+                    key={row.fuelTech}
+                    onMouseEnter={() => onHoverFuel?.(row.fuelTech)}
+                    onMouseLeave={() => onHoverFuel?.(null)}
+                    className={`transition-all duration-150 cursor-pointer ${
+                      isThisRowHovered
+                        ? "bg-neutral-100 dark:bg-[#27272A] font-bold shadow-xs scale-[1.005]"
+                        : isAnyRowHovered
+                        ? "opacity-40 hover:opacity-100 hover:bg-neutral-50/90 dark:hover:bg-[#18181B]/70"
+                        : row.rawVal === 0
+                        ? "opacity-40 hover:bg-neutral-50/90 dark:hover:bg-[#18181B]/70"
+                        : "hover:bg-neutral-50/90 dark:hover:bg-[#18181B]/70"
+                    }`}
+                  >
+                    <td className="py-1.5 px-3 flex items-center space-x-2">
+                      <span
+                        className={`w-2.5 h-2.5 rounded-sm flex-shrink-0 transition-transform ${
+                          isThisRowHovered ? "scale-125 ring-1 ring-neutral-400" : ""
+                        }`}
+                        style={{ backgroundColor: row.color }}
+                      />
+                      <span
+                        className={`text-[11px] ${
+                          isThisRowHovered
+                            ? "text-neutral-950 dark:text-white font-bold"
+                            : "font-medium text-neutral-800 dark:text-neutral-200"
+                        }`}
+                      >
+                        {row.label}
+                      </span>
+                    </td>
+                    <td className="py-1.5 px-2 text-right font-mono font-medium text-[11px] text-neutral-900 dark:text-neutral-100">
+                      {row.valueDisplay}
+                    </td>
+                    <td className="py-1.5 px-2 text-right font-mono text-[11px] text-neutral-600 dark:text-neutral-400">
+                      {row.pct.toFixed(1)}%
+                    </td>
+                    <td className="py-1.5 px-3 text-right font-mono text-[11px] text-neutral-500 dark:text-neutral-400">
+                      {row.priceDisplay}
+                    </td>
+                  </tr>
+                );
+              })}
 
               {/* Summary Totals: Net Generation */}
               <tr className="border-t-2 border-neutral-200 dark:border-[#27272A] bg-neutral-50/40 dark:bg-[#121215]/50 font-bold text-neutral-900 dark:text-white">

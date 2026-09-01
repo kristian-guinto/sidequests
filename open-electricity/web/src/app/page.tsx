@@ -8,6 +8,7 @@ import {
   TimeInterval,
   ViewMode,
   FuelGenerationPoint,
+  FuelTech,
   SummaryMetrics,
   FuelBreakdownRow,
   InterconnectorFlow,
@@ -37,6 +38,7 @@ export default function DashboardPage() {
 
   // Real-time hover cursor interaction state
   const [hoveredPoint, setHoveredPoint] = useState<FuelGenerationPoint | null>(null);
+  const [hoveredFuel, setHoveredFuel] = useState<FuelTech | null>(null);
 
   const countryInfo = COUNTRIES_METADATA[country] || COUNTRIES_METADATA["PH"];
   const unit = RANGE_CONFIG[range]?.unit || "MW";
@@ -129,6 +131,7 @@ export default function DashboardPage() {
               viewMode={viewMode}
               unit={unit}
               height="310px"
+              hoveredFuel={hoveredFuel}
               onHoverPoint={setHoveredPoint}
             />
 
@@ -137,6 +140,7 @@ export default function DashboardPage() {
               data={points}
               viewMode={viewMode}
               height="170px"
+              hoveredFuel={hoveredFuel}
               onHoverPoint={setHoveredPoint}
             />
 
@@ -157,6 +161,8 @@ export default function DashboardPage() {
               summary={summary}
               interconnectors={interconnectors}
               hoveredPoint={hoveredPoint}
+              hoveredFuel={hoveredFuel}
+              onHoverFuel={setHoveredFuel}
               timeSpan={timeSpan}
               currencySymbol={countryInfo.currencySymbol}
               currencyCode={countryInfo.currencyCode}

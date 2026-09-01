@@ -3,7 +3,7 @@
 import React, { useMemo, useCallback } from "react";
 import ReactECharts from "echarts-for-react";
 import * as echarts from "echarts";
-import { FuelGenerationPoint, ViewMode } from "@/lib/types";
+import { FuelGenerationPoint, ViewMode, FuelTech } from "@/lib/types";
 import { getFuelMeta } from "@/lib/colors";
 import { computeXAxisConfig, getShadcnTooltipConfig } from "@/lib/chartUtils";
 import {
@@ -22,6 +22,7 @@ interface GenerationChartProps {
   viewMode: ViewMode;
   unit?: "MW" | "GWh";
   height?: string;
+  hoveredFuel?: FuelTech | null;
   onHoverPoint?: (pt: FuelGenerationPoint | null) => void;
 }
 
@@ -43,6 +44,7 @@ export function GenerationChart({
   viewMode,
   unit = "MW",
   height = "330px",
+  hoveredFuel,
   onHoverPoint,
 }: GenerationChartProps) {
   const { isDark } = useTheme();
@@ -78,8 +80,11 @@ export function GenerationChart({
   const tooltipConfig = useMemo(() => getShadcnTooltipConfig(isDark), [isDark]);
 
   const option = useMemo(() => {
+    const isAnyFuelFocused = Boolean(hoveredFuel);
+
     const series = FUEL_ORDER.map((fuel) => {
       const meta = getFuelMeta(fuel, isDark);
+      const isFocused = hoveredFuel === fuel;
 
       const seriesData = data.map((d) => {
         const rawVal = Number(d[fuel] || 0);
@@ -90,17 +95,40 @@ export function GenerationChart({
         return rawVal;
       });
 
+      let areaColor = meta.color;
+      let areaOpacity = 0.98;
+      let lineWidth = 0.5;
+      let lineColor = isDark ? "#3F3F46" : "#ffffff33";
+      let zLevel = 2;
+
+      if (isAnyFuelFocused) {
+        if (isFocused) {
+          areaColor = meta.color;
+          areaOpacity = 1.0;
+          lineWidth = 2.0;
+          lineColor = isDark ? "#FFFFFF" : "#0F172A";
+          zLevel = 10;
+        } else {
+          areaColor = isDark ? "#27272A" : "#CBD5E1";
+          areaOpacity = isDark ? 0.15 : 0.22;
+          lineWidth = 0;
+          lineColor = "transparent";
+          zLevel = 1;
+        }
+      }
+
       return {
         name: meta.label,
         type: "line",
         stack: "TotalGeneration",
+        z: zLevel,
         areaStyle: {
-          color: meta.color,
-          opacity: 0.98,
+          color: areaColor,
+          opacity: areaOpacity,
         },
         lineStyle: {
-          width: 0.5,
-          color: isDark ? "#3F3F46" : "#ffffff33",
+          width: lineWidth,
+          color: lineColor,
         },
         itemStyle: {
           color: meta.color,
@@ -220,7 +248,7 @@ export function GenerationChart({
       },
       series,
     };
-  }, [data, isPercentage, isEnergy, xAxisConfig, tooltipConfig, isDark]);
+  }, [data, isPercentage, isEnergy, xAxisConfig, tooltipConfig, isDark, hoveredFuel]);
 
   const onEvents = useMemo(() => {
     return {

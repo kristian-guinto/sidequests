@@ -3,7 +3,7 @@
 import React, { useMemo, useCallback } from "react";
 import ReactECharts from "echarts-for-react";
 import * as echarts from "echarts";
-import { FuelGenerationPoint, ViewMode } from "@/lib/types";
+import { FuelGenerationPoint, ViewMode, FuelTech } from "@/lib/types";
 import { getFuelMeta } from "@/lib/colors";
 import { computeXAxisConfig, getShadcnTooltipConfig } from "@/lib/chartUtils";
 import {
@@ -21,6 +21,7 @@ interface EmissionsChartProps {
   data: FuelGenerationPoint[];
   viewMode?: ViewMode;
   height?: string;
+  hoveredFuel?: FuelTech | null;
   onHoverPoint?: (pt: FuelGenerationPoint | null) => void;
 }
 
@@ -28,6 +29,7 @@ export function EmissionsChart({
   data,
   viewMode = "stacked",
   height = "180px",
+  hoveredFuel,
   onHoverPoint,
 }: EmissionsChartProps) {
   const { isDark } = useTheme();
@@ -84,6 +86,40 @@ export function EmissionsChart({
 
     const gridLineColor = isDark ? "rgba(255, 255, 255, 0.07)" : "#F1F5F9";
 
+    const isAnyFuelFocused = Boolean(hoveredFuel);
+
+    const getSeriesStyle = (fuel: "coal" | "oil" | "gas", defaultColor: string) => {
+      if (!isAnyFuelFocused) {
+        return {
+          color: defaultColor,
+          opacity: 0.98,
+          lineWidth: 0.5,
+          lineColor: isDark ? "#3F3F46" : "#ffffff33",
+          z: 2,
+        };
+      }
+      if (hoveredFuel === fuel) {
+        return {
+          color: defaultColor,
+          opacity: 1.0,
+          lineWidth: 2.0,
+          lineColor: isDark ? "#FFFFFF" : "#0F172A",
+          z: 10,
+        };
+      }
+      return {
+        color: isDark ? "#27272A" : "#CBD5E1",
+        opacity: isDark ? 0.15 : 0.22,
+        lineWidth: 0,
+        lineColor: "transparent",
+        z: 1,
+      };
+    };
+
+    const coalStyle = getSeriesStyle("coal", coalMeta.color);
+    const oilStyle = getSeriesStyle("oil", oilMeta.color);
+    const gasStyle = getSeriesStyle("gas", gasMeta.color);
+
     return {
       backgroundColor: "transparent",
       animation: false,
@@ -98,7 +134,7 @@ export function EmissionsChart({
           if (rawPt?.timestamp) {
             try {
               formattedTime = format(parseISO(rawPt.timestamp), "d MMM yyyy, h:mm a");
-            } catch { }
+            } catch {}
           }
 
           const rows = params.map((p) => {
@@ -171,8 +207,9 @@ export function EmissionsChart({
           name: "Coal",
           type: "line",
           stack: "Emissions",
-          areaStyle: { color: coalMeta.color, opacity: 0.98 },
-          lineStyle: { width: 0.5, color: isDark ? "#3F3F46" : "#ffffff33" },
+          z: coalStyle.z,
+          areaStyle: { color: coalStyle.color, opacity: coalStyle.opacity },
+          lineStyle: { width: coalStyle.lineWidth, color: coalStyle.lineColor },
           itemStyle: { color: coalMeta.color },
           showSymbol: false,
           data: emissionsData.map((d) => d.coal),
@@ -181,8 +218,9 @@ export function EmissionsChart({
           name: "Distillate",
           type: "line",
           stack: "Emissions",
-          areaStyle: { color: oilMeta.color, opacity: 0.98 },
-          lineStyle: { width: 0.5, color: isDark ? "#3F3F46" : "#ffffff33" },
+          z: oilStyle.z,
+          areaStyle: { color: oilStyle.color, opacity: oilStyle.opacity },
+          lineStyle: { width: oilStyle.lineWidth, color: oilStyle.lineColor },
           itemStyle: { color: oilMeta.color },
           showSymbol: false,
           data: emissionsData.map((d) => d.oil),
@@ -191,15 +229,16 @@ export function EmissionsChart({
           name: "Gas",
           type: "line",
           stack: "Emissions",
-          areaStyle: { color: gasMeta.color, opacity: 0.98 },
-          lineStyle: { width: 0.5, color: isDark ? "#3F3F46" : "#ffffff33" },
+          z: gasStyle.z,
+          areaStyle: { color: gasStyle.color, opacity: gasStyle.opacity },
+          lineStyle: { width: gasStyle.lineWidth, color: gasStyle.lineColor },
           itemStyle: { color: gasMeta.color },
           showSymbol: false,
           data: emissionsData.map((d) => d.gas),
         },
       ],
     };
-  }, [data, emissionsData, isPercentage, xAxisConfig, tooltipConfig, isDark]);
+  }, [data, emissionsData, isPercentage, xAxisConfig, tooltipConfig, isDark, hoveredFuel]);
 
   const onEvents = useMemo(() => {
     return {
