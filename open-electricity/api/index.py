@@ -15,6 +15,12 @@ from dotenv import load_dotenv
 # Base directory
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Ensure DuckDB temp files and extensions use writable /tmp on serverless environments
+if not os.getenv("HOME") or os.getenv("HOME") == "/" or not os.access(os.getenv("HOME", ""), os.W_OK):
+    os.environ["HOME"] = "/tmp"
+
+os.environ.setdefault("DUCKDB_EXTENSION_DIRECTORY", "/tmp/.duckdb/extensions")
+
 # Load environment variables
 load_dotenv(BASE_DIR / ".env")
 
@@ -226,7 +232,11 @@ def get_duckdb_connection():
 
     if token:
         try:
-            conn = duckdb.connect(f"md:{database}", config={"motherduck_token": token})
+            config = {
+                "motherduck_token": token,
+                "extension_directory": "/tmp/.duckdb/extensions",
+            }
+            conn = duckdb.connect(f"md:{database}", config=config)
             return conn, "motherduck_cloud"
         except Exception as e:
             print(f"[DuckDB] MotherDuck connection failed: {e}")
@@ -536,6 +546,17 @@ def generate_simulation_data(
 # ---------------------------------------------------------
 # API Endpoints
 # ---------------------------------------------------------
+
+
+@app.get("/")
+@app.get("/api")
+def get_root():
+    return {
+        "status": "healthy",
+        "service": "OpenElectricity API",
+        "version": "1.0.0",
+        "docs": "/api/docs",
+    }
 
 
 @app.get("/api/health")
