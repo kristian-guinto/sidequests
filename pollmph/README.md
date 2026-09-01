@@ -11,7 +11,7 @@ The core idea is to obtain objective, quantitative metrics for subjective politi
 ### How It Works
 
 1.  **Proposition Validation**: The system tracks specific claims or future events (e.g., *"Sara Duterte will win the 2028 election"*).
-2.  **LLM Analysis**: A daily pipeline triggers an LLM (Grok/xAI) to perform deep web searches on the topic.
+2.  **LLM Analysis**: A daily pipeline triggers an LLM (Google Gemini) to perform deep web searches and social discourse analysis via Google Search grounding.
 3.  **Scoring**: The model evaluates the gathered data on two strictly defined metrics:
     *   **Consensus (0.00 - 1.00)**: Does the public agree with the proposition?
     *   **Attention (0.00 - 1.00)**: How loudly is the public talking about it?
@@ -28,22 +28,24 @@ The core idea is to obtain objective, quantitative metrics for subjective politi
 
 This project is designed to be **serverless and effectively cost-free** by leveraging the free tiers of modern infrastructure providers.
 
-*   **LLM Intelligence**: [Grok (xAI)](https://x.ai/api) for high-speed reasoning and real-time web search capabilities.
+*   **LLM Intelligence**: [Google Gemini](https://ai.google.dev/) (`gemini-2.5-flash`) for reasoning and real-time Google Search grounding.
 *   **Database**: [Supabase](https://supabase.com) (PostgreSQL) for storing propositions and sentiment history with indexed queries.
 *   **Frontend** (vibe-coded): React 19 + Vite + Tailwind CSS 4 + shadcn/ui components, hosted on [Vercel](https://vercel.com).
 *   **Automation**: [GitHub Actions](https://github.com/features/actions) runs the Python analysis pipeline daily at 11:59 PM PHT.
 *   **Package Management**: `uv` for extremely fast Python dependency management.
 
-## 🧠 System Prompt
+## 🔑 How to Generate a Google Gemini API Key
 
-Transparency is key. The [System Prompt](pipeline/system_prompt.txt) used to strictly instruct the AI enables it to act as an objective market oracle rather than a chatbot. It enforces strict JSON output and specific scoring rubrics to ensure consistency across days.
+The Google Gemini API offers a generous **Free Tier** (up to 15 requests/min and 1,500 requests/day at $0 cost, no credit card / GCP billing required):
 
-## 📦 Project Structure
+1. Go to **[Google AI Studio](https://aistudio.google.com/)**.
+2. Sign in with your Google account.
+3. Click on **"Get API key"** in the left sidebar (or go directly to [aistudio.google.com/apikey](https://aistudio.google.com/apikey)).
+4. Click **"Create API key"**.
+5. Select **"Create API key in new project"** (or select an existing project).
+6. Copy the generated key (starts with `AIzaSy...`) and add it to your `.env` file as `GEMINI_API_KEY`.
 
-*   `frontend/`: The React application dashboard.
-*   `pipeline/`: Python scripts for backfilling data and running daily analysis.
-*   `supabase/`: Database migrations and configuration.
-*   `.github/workflows/`: Automated cron jobs for daily updates.
+---
 
 ## 🏃‍♂️ Getting Started
 
@@ -51,7 +53,7 @@ Transparency is key. The [System Prompt](pipeline/system_prompt.txt) used to str
 *   Node.js 18+
 *   Python 3.13+
 *   Reference to a Supabase project
-*   xAI API Key
+*   Google Gemini API Key
 
 ### Local Setup
 
@@ -85,10 +87,13 @@ Transparency is key. The [System Prompt](pipeline/system_prompt.txt) used to str
     # Create a .env file in root with:
     # SUPABASE_URL=...
     # SUPABASE_KEY=...
-    # XAI_API_KEY=...
+    # GEMINI_API_KEY=...
     
-    # Run a backfill
-    uv run pipeline/main.py --backfill-start 2024-01-01 --backfill-end 2024-01-31
+    # Run sentiment analysis for today
+    uv run pollmph run-today --limit 5 --llm gemini
+    
+    # Backfill sentiment over past N days
+    uv run pollmph backfill --days-back 7 --llm gemini
     ```
 
 ## 📄 License
