@@ -1,12 +1,9 @@
 import csv
-import io
 from datetime import datetime
 from collections import defaultdict
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any
 from pipeline.generator_registry import GeneratorRegistry, REGION_MAP
 from pipeline.config import (
-    FUEL_TECH_CATEGORIES,
-    RENEWABLE_FUELS,
     DEFAULT_EMISSIONS_FACTOR,
 )
 

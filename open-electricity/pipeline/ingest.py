@@ -1,8 +1,6 @@
-import sys
 import argparse
 from datetime import datetime, date, timedelta
 from typing import Optional
-from pipeline.config import TIMEZONE
 from pipeline.generator_registry import GeneratorRegistry
 from pipeline.iemop_client import IEMOPClient
 from pipeline.data_processor import DataProcessor
@@ -16,10 +14,10 @@ def run_ph_sync(
     end_date: Optional[date] = None,
     max_files: Optional[int] = None,
 ):
-    print(f"==================================================")
-    print(f"  OpenNEM-SEA: 🇵🇭 Philippines Pipeline (IEMOP/WESM)")
+    print("==================================================")
+    print("  OpenNEM-SEA: 🇵🇭 Philippines Pipeline (IEMOP/WESM)")
     print(f"  Date Range: {start_date or 'Latest'} -> {end_date or 'Latest'}")
-    print(f"==================================================")
+    print("==================================================")
 
     registry = GeneratorRegistry()
     client = IEMOPClient()
@@ -27,7 +25,7 @@ def run_ph_sync(
     db = Database()
 
     # 1. Facilities
-    print(f"\n[1/4] Syncing Generator Catalog (PH)...")
+    print("\n[1/4] Syncing Generator Catalog (PH)...")
     facilities = registry.get_all_facilities()
     for f in facilities:
         f["country_code"] = "PH"
@@ -35,7 +33,7 @@ def run_ph_sync(
     print(f"  ✓ Synced {synced_fac} facilities to database.")
 
     # 2. Regional Summaries
-    print(f"\n[2/4] Fetching RTD Regional Summaries (Macro Grid)...")
+    print("\n[2/4] Fetching RTD Regional Summaries (Macro Grid)...")
     reg_files = client.get_rtd_regional_summary_files(start_date, end_date)
     total_reg = len(reg_files)
     if max_files:
@@ -58,7 +56,9 @@ def run_ph_sync(
             all_regional_records.extend(records)
 
             if len(all_regional_records) >= 5000 or idx == len(reg_files):
-                synced = db.upsert_regional_summary_5m(all_regional_records, country_code="PH")
+                synced = db.upsert_regional_summary_5m(
+                    all_regional_records, country_code="PH"
+                )
                 total_reg_synced += synced
                 all_regional_records = []
         except Exception as e:
@@ -67,12 +67,14 @@ def run_ph_sync(
     print(f"  ✓ Synced {total_reg_synced} 5-minute regional balance records.")
 
     # 3. Unit Dispatch & Prices
-    print(f"\n[3/4] Fetching RTD Unit Dispatch Files (Fuel Mix & Prices)...")
+    print("\n[3/4] Fetching RTD Unit Dispatch Files (Fuel Mix & Prices)...")
     disp_files = client.get_rtd_dispatch_files(start_date, end_date)
     total_disp = len(disp_files)
     if max_files:
         disp_files = disp_files[:max_files]
-    print(f"  Found {total_disp} dispatch archive files (Processing {len(disp_files)}).")
+    print(
+        f"  Found {total_disp} dispatch archive files (Processing {len(disp_files)})."
+    )
 
     all_dispatch_records = []
     batch_records = []
@@ -94,7 +96,9 @@ def run_ph_sync(
             if idx % 24 == 0 or idx == len(disp_files):
                 synced = db.upsert_dispatch_5m(batch_records, country_code="PH")
                 total_disp_synced += synced
-                print(f"     [Saved batch: +{synced} dispatch records (Total: {total_disp_synced})]")
+                print(
+                    f"     [Saved batch: +{synced} dispatch records (Total: {total_disp_synced})]"
+                )
                 batch_records = []
         except Exception as e:
             print(f"    ⚠️ Failed to process {f_info['filename']}: {e}")
@@ -102,7 +106,7 @@ def run_ph_sync(
     print(f"  ✓ Synced total {total_disp_synced} 5-minute fuel generation records.")
 
     # 4. Daily Rollups
-    print(f"\n[4/4] Computing Daily Rollups & Emissions...")
+    print("\n[4/4] Computing Daily Rollups & Emissions...")
     total_daily_synced = 0
     if all_dispatch_records:
         daily_stats = processor.compute_daily_rollups(all_dispatch_records, [])
@@ -112,11 +116,16 @@ def run_ph_sync(
     print(f"  ✓ Synced {total_daily_synced} daily rollup records.")
 
 
-def run_provider_sync(provider, start_date: Optional[str] = None, end_date: Optional[str] = None, days: int = 7):
+def run_provider_sync(
+    provider,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    days: int = 7,
+):
     country = provider.country_code
-    print(f"==================================================")
+    print("==================================================")
     print(f"  OpenNEM-SEA: Country [{country}] Pipeline")
-    print(f"==================================================")
+    print("==================================================")
 
     db = Database()
 
@@ -147,7 +156,13 @@ def run_provider_sync(provider, start_date: Optional[str] = None, end_date: Opti
             fuel = row["fuel_tech"]
             key = (dt_key, region, fuel)
             if key not in fuel_daily:
-                fuel_daily[key] = {"mwh": 0.0, "price_sum": 0.0, "price_cnt": 0, "max_mw": 0.0, "min_mw": float("inf")}
+                fuel_daily[key] = {
+                    "mwh": 0.0,
+                    "price_sum": 0.0,
+                    "price_cnt": 0,
+                    "max_mw": 0.0,
+                    "min_mw": float("inf"),
+                }
             b = fuel_daily[key]
             # 30-min interval: mwh = mw * 0.5
             mw = row["generation_mw"]
@@ -159,22 +174,32 @@ def run_provider_sync(provider, start_date: Optional[str] = None, end_date: Opti
                 b["price_cnt"] += 1
 
         daily_records = []
-        em_factors = {"coal": 0.90, "gas": 0.38, "oil": 0.75, "biomass": 0.02, "geothermal": 0.05}
+        em_factors = {
+            "coal": 0.90,
+            "gas": 0.38,
+            "oil": 0.75,
+            "biomass": 0.02,
+            "geothermal": 0.05,
+        }
 
         for (d_str, reg, fuel), v in fuel_daily.items():
             avg_p = (v["price_sum"] / v["price_cnt"]) if v["price_cnt"] > 0 else None
             em_t = v["mwh"] * em_factors.get(fuel, 0.0)
-            daily_records.append({
-                "country_code": country,
-                "date": d_str,
-                "region": reg,
-                "fuel_tech": fuel,
-                "energy_mwh": round(v["mwh"], 2),
-                "avg_price_local": round(avg_p, 2) if avg_p is not None else None,
-                "peak_demand_mw": round(v["max_mw"], 1),
-                "min_demand_mw": round(v["min_mw"], 1) if v["min_mw"] != float("inf") else 0.0,
-                "emissions_tco2": round(em_t, 2),
-            })
+            daily_records.append(
+                {
+                    "country_code": country,
+                    "date": d_str,
+                    "region": reg,
+                    "fuel_tech": fuel,
+                    "energy_mwh": round(v["mwh"], 2),
+                    "avg_price_local": round(avg_p, 2) if avg_p is not None else None,
+                    "peak_demand_mw": round(v["max_mw"], 1),
+                    "min_demand_mw": round(v["min_mw"], 1)
+                    if v["min_mw"] != float("inf")
+                    else 0.0,
+                    "emissions_tco2": round(em_t, 2),
+                }
+            )
 
         synced_daily = db.upsert_daily_stats(daily_records, country_code=country)
         print(f"  ✓ Computed and synced {synced_daily} daily rollup records.")
@@ -242,14 +267,17 @@ def app():
     mode = args.command or args.mode or "daily"
     country = (args.country or "PH").upper()
 
-    if mode == "migrate":
-        from pipeline.migrate_sqlite_to_duckdb import migrate
-        migrate()
+    if mode in ("migrate", "sync-cloud"):
+        from pipeline.sync_motherduck import sync_local_to_motherduck
+
+        sync_local_to_motherduck()
         return
 
     if mode == "inspect":
         db = Database()
-        db.inspect_database(country_code=country, table=args.table, region=args.region, limit=args.limit)
+        db.inspect_database(
+            country_code=country, table=args.table, region=args.region, limit=args.limit
+        )
         return
 
     if mode == "sync-facilities":
@@ -259,10 +287,14 @@ def app():
             db.upsert_facilities(registry.get_all_facilities(), country_code="PH")
         if country in ("SG", "ALL"):
             db = Database()
-            db.upsert_facilities(SingaporeEMCProvider().fetch_facilities(), country_code="SG")
+            db.upsert_facilities(
+                SingaporeEMCProvider().fetch_facilities(), country_code="SG"
+            )
         if country in ("MY", "ALL"):
             db = Database()
-            db.upsert_facilities(MalaysiaSingleBuyerProvider().fetch_facilities(), country_code="MY")
+            db.upsert_facilities(
+                MalaysiaSingleBuyerProvider().fetch_facilities(), country_code="MY"
+            )
         print("Facilities synced successfully.")
         return
 
@@ -288,9 +320,9 @@ def app():
         my_provider = MalaysiaSingleBuyerProvider()
         run_provider_sync(my_provider, args.start_date, args.end_date, days=args.days)
 
-    print(f"\n==================================================")
-    print(f"  ✓ OpenNEM-SEA Pipeline Run Complete!")
-    print(f"==================================================")
+    print("\n==================================================")
+    print("  ✓ OpenNEM-SEA Pipeline Run Complete!")
+    print("==================================================")
 
 
 if __name__ == "__main__":

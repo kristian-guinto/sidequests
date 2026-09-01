@@ -7,7 +7,7 @@
 
 ## 2. Database Queries & Timezone Invariance
 * **Local Timestamp Format**: All 5-minute dispatch rows store ISO 8601 strings with local timezone offset (e.g. `YYYY-MM-DDTHH:mm:ss+08:00`).
-* **Timezone Continuity in SQL**: When generating SQL cutoff strings for range queries (`1d`, `3d`, `7d`, `30d`), never use `new Date().toISOString()`. Always use `date-fns` `parseISO` + `subDays` + `format(cutoff, "yyyy-MM-dd'T'HH:mm:ssXXX")` to preserve local timezone string comparability in DuckDB and SQLite.
+* **Timezone Continuity in SQL**: When generating SQL cutoff strings for range queries (`1d`, `3d`, `7d`, `30d`), never use `new Date().toISOString()`. Always use proper datetime formatting with timezone offset to preserve local timezone string comparability in DuckDB and MotherDuck.
 
 ## 3. High-Density Charting & Axis Alignment
 * **Clock-Locked Ticks**: In 1D view (288 points), tick intervals must lock strictly to round 3-hour boundaries (`00:00`, `03:00`, `06:00`, `09:00`, `12:00`, `15:00`, `18:00`, `21:00`).

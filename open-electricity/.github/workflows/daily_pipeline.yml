@@ -50,7 +50,7 @@ jobs:
         if: "${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'daily') }}"
         env:
           MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN }}
-          MOTHERDUCK_DATABASE: ${{ secrets.MOTHERDUCK_DATABASE || 'open_nem_ph' }}
+          MOTHERDUCK_DATABASE: ${{ secrets.MOTHERDUCK_DATABASE || 'open_electricity_db' }}
         run: |
           uv run ingest --mode daily --days 2
 
@@ -58,7 +58,7 @@ jobs:
         if: "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'backfill' }}"
         env:
           MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN }}
-          MOTHERDUCK_DATABASE: ${{ secrets.MOTHERDUCK_DATABASE || 'open_nem_ph' }}
+          MOTHERDUCK_DATABASE: ${{ secrets.MOTHERDUCK_DATABASE || 'open_electricity_db' }}
         run: |
           uv run ingest --mode backfill --start-date ${{ github.event.inputs.start_date }} --end-date ${{ github.event.inputs.end_date }}
 
@@ -66,7 +66,7 @@ jobs:
         if: "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'sync-facilities' }}"
         env:
           MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN }}
-          MOTHERDUCK_DATABASE: ${{ secrets.MOTHERDUCK_DATABASE || 'open_nem_ph' }}
+          MOTHERDUCK_DATABASE: ${{ secrets.MOTHERDUCK_DATABASE || 'open_electricity_db' }}
         run: |
           uv run ingest --mode sync-facilities
 
@@ -74,6 +74,6 @@ jobs:
         if: "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'migrate' }}"
         env:
           MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN }}
-          MOTHERDUCK_DATABASE: ${{ secrets.MOTHERDUCK_DATABASE || 'open_nem_ph' }}
+          MOTHERDUCK_DATABASE: ${{ secrets.MOTHERDUCK_DATABASE || 'open_electricity_db' }}
         run: |
           uv run ingest migrate

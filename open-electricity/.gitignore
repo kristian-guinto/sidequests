@@ -19,8 +19,6 @@
 *.duckdb.*
 /data/downloads/
 /data/temp/
-supabase/.temp/
-supabase/.branches/
 *.zip
 *.csv
 

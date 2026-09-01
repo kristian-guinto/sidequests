@@ -168,8 +168,8 @@ export function Header({
                       <button
                         onClick={() => handleCountrySelect(cCode)}
                         className={`w-full flex items-center justify-between px-3 py-1.5 text-left transition ${isCurrentC
-                            ? "font-bold text-neutral-950 dark:text-white bg-neutral-50 dark:bg-[#18181B]"
-                            : "text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-[#121215]"
+                          ? "font-bold text-neutral-950 dark:text-white bg-neutral-50 dark:bg-[#18181B]"
+                          : "text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-[#121215]"
                           }`}
                       >
                         <span className="flex items-center space-x-2">
@@ -188,8 +188,8 @@ export function Header({
                               key={reg.id}
                               onClick={() => handleRegionSelect(reg.id)}
                               className={`w-full text-left px-2 py-1 rounded text-xs transition ${region === reg.id
-                                  ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 font-medium"
-                                  : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-[#18181B]"
+                                ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 font-medium"
+                                : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-[#18181B]"
                                 }`}
                             >
                               {reg.label}
@@ -211,8 +211,8 @@ export function Header({
             <button
               onClick={() => onViewModeChange("stacked")}
               className={`flex items-center space-x-1 px-2.5 py-0.5 rounded text-xs font-medium transition ${viewMode === "stacked" || viewMode === "cumulative"
-                  ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold shadow-sm"
-                  : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white"
+                ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold shadow-sm"
+                : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white"
                 }`}
               title="Absolute Value (MW / GWh)"
             >
@@ -222,8 +222,8 @@ export function Header({
             <button
               onClick={() => onViewModeChange("percentage")}
               className={`flex items-center space-x-1 px-2.5 py-0.5 rounded text-xs font-medium transition ${viewMode === "percentage"
-                  ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold shadow-sm"
-                  : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white"
+                ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold shadow-sm"
+                : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white"
                 }`}
               title="Percentage Contribution Share (%)"
             >
@@ -239,8 +239,8 @@ export function Header({
                 key={rng.id}
                 onClick={() => handleRangeClick(rng.id)}
                 className={`px-2.5 py-0.5 rounded transition ${range === rng.id
-                    ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold border border-neutral-300 dark:border-neutral-700 shadow-sm"
-                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                  ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold border border-neutral-300 dark:border-neutral-700 shadow-sm"
+                  : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
                   }`}
               >
                 {rng.label}
@@ -255,8 +255,8 @@ export function Header({
                 key={inv.id}
                 onClick={() => onIntervalChange(inv.id)}
                 className={`px-2.5 py-0.5 rounded transition ${interval === inv.id
-                    ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold border border-neutral-300 dark:border-neutral-700 shadow-sm"
-                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                  ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold border border-neutral-300 dark:border-neutral-700 shadow-sm"
+                  : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
                   }`}
               >
                 {inv.label}

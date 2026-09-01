@@ -4,14 +4,12 @@ import json
 import base64
 import zipfile
 import io
-import re
 from typing import List, Dict, Any, Optional
-from datetime import datetime, date
+from datetime import date
 from pipeline.config import (
     IEMOP_AJAX_URL,
     POST_ID_RTD_PRICES_SCHEDULES,
     POST_ID_RTD_REGIONAL_SUMMARIES,
-    POST_ID_REGISTERED_CAPACITY,
 )
 
 

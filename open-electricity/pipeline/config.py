@@ -12,10 +12,9 @@ except ImportError:
     pass
 
 MOTHERDUCK_TOKEN = os.getenv("MOTHERDUCK_TOKEN", "")
-MOTHERDUCK_DATABASE = os.getenv("MOTHERDUCK_DATABASE", "open_nem_ph")
+MOTHERDUCK_DATABASE = os.getenv("MOTHERDUCK_DATABASE", "open_electricity_db")
 DB_MODE = os.getenv("DB_MODE", "auto")  # "motherduck", "duckdb", or "auto"
 DUCKDB_PATH = BASE_DIR / "open_nem_ph.duckdb"
-SQLITE_DB_PATH = BASE_DIR / "open_nem_ph.db"
 
 # Southeast Asia Countries Configuration
 COUNTRIES_CONFIG = {
