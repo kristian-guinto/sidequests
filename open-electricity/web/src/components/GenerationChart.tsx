@@ -94,8 +94,7 @@ export function GenerationChart({
         lineStyle: {
           width: 1.8,
           color: "#0F172A",
-          type: "solid",
-        },
+        } as any,
         itemStyle: {
           color: "#0F172A",
         },
