@@ -9,9 +9,14 @@ import { Menu } from "lucide-react";
 interface EmissionsChartProps {
   data: FuelGenerationPoint[];
   height?: string;
+  onHoverPoint?: (pt: FuelGenerationPoint | null) => void;
 }
 
-export function EmissionsChart({ data, height = "180px" }: EmissionsChartProps) {
+export function EmissionsChart({
+  data,
+  height = "180px",
+  onHoverPoint,
+}: EmissionsChartProps) {
   const timestamps = useMemo(() => {
     return data.map((d) => {
       try {
@@ -27,13 +32,11 @@ export function EmissionsChart({ data, height = "180px" }: EmissionsChartProps) 
     });
   }, [data]);
 
-  // Compute emissions per point (tCO2e)
-  // 5m: mwh = mw * (5/60); coal: 0.90, gas: 0.38, oil: 0.75
   const emissionsData = useMemo(() => {
     return data.map((d) => {
-      const coalT = ((d.coal || 0) * (5.0 / 60.0)) * 0.90;
-      const gasT = ((d.gas || 0) * (5.0 / 60.0)) * 0.38;
-      const oilT = ((d.oil || 0) * (5.0 / 60.0)) * 0.75;
+      const coalT = (d.coal || 0) * (5.0 / 60.0) * 0.9;
+      const gasT = (d.gas || 0) * (5.0 / 60.0) * 0.38;
+      const oilT = (d.oil || 0) * (5.0 / 60.0) * 0.75;
       return {
         coal: Math.round(coalT * 10) / 10,
         gas: Math.round(gasT * 10) / 10,
@@ -174,17 +177,39 @@ export function EmissionsChart({ data, height = "180px" }: EmissionsChartProps) 
     };
   }, [timestamps, emissionsData]);
 
+  const onEvents = useMemo(() => {
+    return {
+      updateAxisPointer: (event: any) => {
+        const idx = event.dataIndex != null ? event.dataIndex : event.dataIndexInside;
+        if (idx != null && idx >= 0 && idx < data.length) {
+          onHoverPoint?.(data[idx]);
+        }
+      },
+      globalout: () => {
+        onHoverPoint?.(null);
+      },
+    };
+  }, [data, onHoverPoint]);
+
   return (
-    <div className="bg-white border border-neutral-200 rounded-sm">
+    <div
+      className="bg-white border border-neutral-200 rounded-sm"
+      onMouseLeave={() => onHoverPoint?.(null)}
+    >
       {/* Chart Header Bar */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-neutral-100 bg-neutral-50/50">
         <div className="flex items-center space-x-2 text-xs font-semibold text-neutral-800">
           <Menu className="h-3.5 w-3.5 text-neutral-400" />
           <span>Emissions Volume</span>
-          <span className="text-[11px] font-normal text-neutral-500 font-mono">(tCO₂e / interval)</span>
+          <span className="text-[11px] font-normal text-neutral-500 font-mono">
+            (tCO₂e / interval)
+          </span>
         </div>
         <div className="text-[11px] font-medium text-neutral-500 font-mono">
-          Av. <strong className="text-neutral-900 font-bold">{avgEmissions.toLocaleString()} tCO₂e</strong>
+          Av.{" "}
+          <strong className="text-neutral-900 font-bold">
+            {avgEmissions.toLocaleString()} tCO₂e
+          </strong>
         </div>
       </div>
 
@@ -192,6 +217,7 @@ export function EmissionsChart({ data, height = "180px" }: EmissionsChartProps) 
       <div className="p-2">
         <ReactECharts
           option={option}
+          onEvents={onEvents}
           style={{ height, width: "100%" }}
           notMerge={true}
           lazyUpdate={false}

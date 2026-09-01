@@ -12,6 +12,7 @@ interface GenerationChartProps {
   viewMode: ViewMode;
   unit?: "MW" | "GWh";
   height?: string;
+  onHoverPoint?: (pt: FuelGenerationPoint | null) => void;
 }
 
 const FUEL_ORDER = [
@@ -31,6 +32,7 @@ export function GenerationChart({
   viewMode,
   unit = "MW",
   height = "320px",
+  onHoverPoint,
 }: GenerationChartProps) {
   const timestamps = useMemo(() => {
     return data.map((d) => {
@@ -82,7 +84,6 @@ export function GenerationChart({
       };
     });
 
-    // Overlaid Demand Line in discrete mode
     if (!isCumulative) {
       series.push({
         name: "Total Demand",
@@ -219,8 +220,25 @@ export function GenerationChart({
     };
   }, [data, timestamps, viewMode, unit]);
 
+  const onEvents = useMemo(() => {
+    return {
+      updateAxisPointer: (event: any) => {
+        const idx = event.dataIndex != null ? event.dataIndex : event.dataIndexInside;
+        if (idx != null && idx >= 0 && idx < data.length) {
+          onHoverPoint?.(data[idx]);
+        }
+      },
+      globalout: () => {
+        onHoverPoint?.(null);
+      },
+    };
+  }, [data, onHoverPoint]);
+
   return (
-    <div className="bg-white border border-neutral-200 rounded-sm">
+    <div
+      className="bg-white border border-neutral-200 rounded-sm"
+      onMouseLeave={() => onHoverPoint?.(null)}
+    >
       {/* Chart Header Bar */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-neutral-100 bg-neutral-50/50">
         <div className="flex items-center space-x-2 text-xs font-semibold text-neutral-800">
@@ -237,6 +255,7 @@ export function GenerationChart({
       <div className="p-2">
         <ReactECharts
           option={option}
+          onEvents={onEvents}
           style={{ height, width: "100%" }}
           notMerge={true}
           lazyUpdate={false}

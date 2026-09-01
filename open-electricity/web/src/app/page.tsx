@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   CountryCode,
   Region,
@@ -20,7 +20,6 @@ import { EmissionsChart } from "@/components/EmissionsChart";
 import { PriceChart } from "@/components/PriceChart";
 import { DataSidebar } from "@/components/DataSidebar";
 import { generateMockEnergyData } from "@/lib/mockData";
-import { Database, Activity, ExternalLink } from "lucide-react";
 
 export default function DashboardPage() {
   const [country, setCountry] = useState<CountryCode>("PH");
@@ -36,8 +35,19 @@ export default function DashboardPage() {
   const [interconnectors, setInterconnectors] = useState<InterconnectorFlow[]>([]);
   const [dataSource, setDataSource] = useState<string>("live");
 
+  // Real-time hover cursor interaction state
+  const [hoveredPoint, setHoveredPoint] = useState<FuelGenerationPoint | null>(null);
+
   const countryInfo = COUNTRIES_METADATA[country] || COUNTRIES_METADATA["PH"];
   const unit = RANGE_CONFIG[range]?.unit || "MW";
+
+  const timeSpan = useMemo(() => {
+    if (!points || points.length === 0) return undefined;
+    return {
+      start: points[0].timestamp,
+      end: points[points.length - 1].timestamp,
+    };
+  }, [points]);
 
   const handleCountryChange = (newCountry: CountryCode) => {
     setCountry(newCountry);
@@ -45,6 +55,7 @@ export default function DashboardPage() {
     if (info) {
       setRegion(info.defaultRegion);
     }
+    setHoveredPoint(null);
   };
 
   const handleRangeChange = (newRange: TimeRange) => {
@@ -53,6 +64,7 @@ export default function DashboardPage() {
     if (cfg) {
       setInterval(cfg.defaultInterval);
     }
+    setHoveredPoint(null);
   };
 
   const fetchData = useCallback(async () => {
@@ -117,12 +129,14 @@ export default function DashboardPage() {
               viewMode={viewMode}
               unit={unit}
               height="310px"
+              onHoverPoint={setHoveredPoint}
             />
 
             {/* Chart 2: Emissions Volume (tCO2e/interval) */}
             <EmissionsChart
               data={points}
               height="170px"
+              onHoverPoint={setHoveredPoint}
             />
 
             {/* Chart 3: Spot Market Price */}
@@ -131,6 +145,7 @@ export default function DashboardPage() {
               currencySymbol={countryInfo.currencySymbol}
               currencyCode={countryInfo.currencyCode}
               height="150px"
+              onHoverPoint={setHoveredPoint}
             />
           </div>
 
@@ -140,6 +155,8 @@ export default function DashboardPage() {
               breakdown={breakdown}
               summary={summary}
               interconnectors={interconnectors}
+              hoveredPoint={hoveredPoint}
+              timeSpan={timeSpan}
               currencySymbol={countryInfo.currencySymbol}
               currencyCode={countryInfo.currencyCode}
               unit={unit}

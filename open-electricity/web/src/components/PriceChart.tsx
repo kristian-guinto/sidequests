@@ -11,6 +11,7 @@ interface PriceChartProps {
   currencySymbol?: string;
   currencyCode?: string;
   height?: string;
+  onHoverPoint?: (pt: FuelGenerationPoint | null) => void;
 }
 
 export function PriceChart({
@@ -18,6 +19,7 @@ export function PriceChart({
   currencySymbol = "₱",
   currencyCode = "PHP",
   height = "160px",
+  onHoverPoint,
 }: PriceChartProps) {
   const timestamps = useMemo(() => {
     return data.map((d) => {
@@ -67,7 +69,9 @@ export function PriceChart({
             <div class="text-neutral-500 text-[10px] mb-1">${p.axisValue}</div>
             <div class="flex items-center justify-between space-x-3 text-xs">
               <span class="font-semibold text-rose-600">Spot Price:</span>
-              <span class="font-mono font-bold text-neutral-900">${currencySymbol}${Math.round(val).toLocaleString()} /MWh</span>
+              <span class="font-mono font-bold text-neutral-900">${currencySymbol}${Math.round(
+            val
+          ).toLocaleString()} /MWh</span>
             </div>
           </div>`;
         },
@@ -105,7 +109,8 @@ export function PriceChart({
         axisLabel: {
           color: "#64748B",
           fontSize: 10,
-          formatter: (v: number) => `${v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`}`,
+          formatter: (v: number) =>
+            `${v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`}`,
         },
         splitLine: {
           lineStyle: { color: "#F1F5F9", type: "dashed" },
@@ -140,8 +145,25 @@ export function PriceChart({
     };
   }, [timestamps, prices, currencySymbol, currencyCode]);
 
+  const onEvents = useMemo(() => {
+    return {
+      updateAxisPointer: (event: any) => {
+        const idx = event.dataIndex != null ? event.dataIndex : event.dataIndexInside;
+        if (idx != null && idx >= 0 && idx < data.length) {
+          onHoverPoint?.(data[idx]);
+        }
+      },
+      globalout: () => {
+        onHoverPoint?.(null);
+      },
+    };
+  }, [data, onHoverPoint]);
+
   return (
-    <div className="bg-white border border-neutral-200 rounded-sm">
+    <div
+      className="bg-white border border-neutral-200 rounded-sm"
+      onMouseLeave={() => onHoverPoint?.(null)}
+    >
       {/* Chart Header Bar */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-neutral-100 bg-neutral-50/50">
         <div className="flex items-center space-x-2 text-xs font-semibold text-neutral-800">
@@ -152,7 +174,11 @@ export function PriceChart({
           </span>
         </div>
         <div className="text-[11px] font-medium text-neutral-500 font-mono">
-          Av. <strong className="text-neutral-900 font-bold">{currencySymbol}{avgPrice.toLocaleString()} /MWh</strong>
+          Av.{" "}
+          <strong className="text-neutral-900 font-bold">
+            {currencySymbol}
+            {avgPrice.toLocaleString()} /MWh
+          </strong>
         </div>
       </div>
 
@@ -160,6 +186,7 @@ export function PriceChart({
       <div className="p-2">
         <ReactECharts
           option={option}
+          onEvents={onEvents}
           style={{ height, width: "100%" }}
           notMerge={true}
           lazyUpdate={false}

@@ -1,91 +1,228 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   FuelBreakdownRow,
+  FuelGenerationPoint,
   SummaryMetrics,
   InterconnectorFlow,
-  TimeRange,
-  TimeInterval,
 } from "@/lib/types";
-import { ChevronDown, PieChart as PieIcon, List, Zap, Globe } from "lucide-react";
+import { ChevronDown, PieChart as PieIcon, List, Globe } from "lucide-react";
 import ReactECharts from "echarts-for-react";
+import { format, parseISO } from "date-fns";
 
 interface DataSidebarProps {
   breakdown: FuelBreakdownRow[];
   summary: SummaryMetrics | null;
   interconnectors: InterconnectorFlow[];
+  hoveredPoint: FuelGenerationPoint | null;
+  timeSpan?: { start: string; end: string };
   currencySymbol?: string;
   currencyCode?: string;
   unit?: "MW" | "GWh";
 }
 
+const FUEL_KEYS = [
+  { key: "solar", label: "Solar", color: "#FACC15", isRen: true },
+  { key: "wind", label: "Wind", color: "#22C55E", isRen: true },
+  { key: "hydro", label: "Hydro", color: "#38BDF8", isRen: true },
+  { key: "geothermal", label: "Geothermal", color: "#06B6D4", isRen: true },
+  { key: "biomass", label: "Biomass", color: "#16A34A", isRen: true },
+  { key: "gas", label: "Gas", color: "#FB923C", isRen: false },
+  { key: "coal", label: "Coal", color: "#1E293B", isRen: false },
+  { key: "oil", label: "Oil", color: "#E11D48", isRen: false },
+  { key: "battery", label: "Battery", color: "#6366F1", isRen: true },
+] as const;
+
 export function DataSidebar({
   breakdown,
   summary,
   interconnectors,
+  hoveredPoint,
+  timeSpan,
   currencySymbol = "₱",
   currencyCode = "PHP",
   unit = "MW",
 }: DataSidebarProps) {
   const [activeView, setActiveView] = useState<"table" | "donut">("table");
 
-  const totalGWh = summary?.totalGenerationGWh || 0;
-  const renewablesPct = summary?.renewablesPct || 0;
-  const avgPrice = summary?.avgPricePHPMWh || 0;
+  const isHovered = hoveredPoint !== null;
+
+  // Format header time text
+  const formattedTimeHeader = useMemo(() => {
+    if (isHovered && hoveredPoint?.timestamp) {
+      try {
+        const d = parseISO(hoveredPoint.timestamp);
+        return format(d, "d MMM yyyy, h:mm a");
+      } catch {
+        return hoveredPoint.timestamp;
+      }
+    }
+    if (timeSpan?.start && timeSpan?.end) {
+      try {
+        const s = parseISO(timeSpan.start);
+        const e = parseISO(timeSpan.end);
+        return `${format(s, "d MMM yyyy")} – ${format(e, "d MMM yyyy")}`;
+      } catch {
+        return "Live Selected Range";
+      }
+    }
+    return "Summary (Total Range)";
+  }, [isHovered, hoveredPoint, timeSpan]);
+
+  // Compute table rows based on hover or aggregate
+  const tableData = useMemo(() => {
+    if (isHovered && hoveredPoint) {
+      const pt = hoveredPoint;
+      const totalGen = pt.totalGeneration || 1;
+      const ptPrice = pt.price || summary?.avgPricePHPMWh || 0;
+
+      const rows = FUEL_KEYS.map((f) => {
+        const val = Number((pt as any)[f.key]) || 0;
+        const pct = totalGen > 0 ? (val / totalGen) * 100 : 0;
+        return {
+          fuelTech: f.key,
+          label: f.label,
+          color: f.color,
+          valueDisplay: `${val.toLocaleString()} MW`,
+          rawVal: val,
+          pct: pct,
+          priceDisplay: `${currencySymbol}${Math.round(ptPrice).toLocaleString()}`,
+          isRenewable: f.isRen,
+        };
+      }).sort((a, b) => b.rawVal - a.rawVal);
+
+      let renVal = 0;
+      rows.forEach((r) => {
+        if (r.isRenewable) renVal += r.rawVal;
+      });
+      const renPct = totalGen > 0 ? (renVal / totalGen) * 100 : 0;
+
+      return {
+        rows,
+        totalDisplay: `${Math.round(totalGen).toLocaleString()} MW`,
+        renValDisplay: `${Math.round(renVal).toLocaleString()} MW`,
+        renPctDisplay: `${renPct.toFixed(1)}%`,
+        priceDisplay: `${currencySymbol}${Math.round(ptPrice).toLocaleString()}`,
+        columnUnit: "Power",
+        unitSub: "MW",
+        isInstant: true,
+      };
+    }
+
+    // Default range summary
+    const totalGWh = summary?.totalGenerationGWh || 0;
+    const renPct = summary?.renewablesPct || 0;
+    const avgPrice = summary?.avgPricePHPMWh || 0;
+
+    const rows = breakdown.map((b) => {
+      const estimatedPrice = Math.round(
+        b.fuelTech === "solar"
+          ? avgPrice * 0.75
+          : b.fuelTech === "wind"
+          ? avgPrice * 0.85
+          : b.fuelTech === "hydro"
+          ? avgPrice * 1.05
+          : b.fuelTech === "coal"
+          ? avgPrice * 0.95
+          : b.fuelTech === "gas"
+          ? avgPrice * 1.15
+          : avgPrice * 1.3
+      );
+
+      return {
+        fuelTech: b.fuelTech,
+        label: b.label,
+        color: b.color,
+        valueDisplay: b.energyGWh.toLocaleString(),
+        rawVal: b.energyGWh,
+        pct: b.percentage,
+        priceDisplay: `${currencySymbol}${estimatedPrice.toLocaleString()}`,
+        isRenewable: b.isRenewable,
+      };
+    });
+
+    return {
+      rows,
+      totalDisplay: `${totalGWh.toLocaleString()} GWh`,
+      renValDisplay: `${Math.round((totalGWh * renPct) / 100).toLocaleString()} GWh`,
+      renPctDisplay: `${renPct}%`,
+      priceDisplay: `${currencySymbol}${avgPrice.toLocaleString()}`,
+      columnUnit: "Energy",
+      unitSub: "GWh",
+      isInstant: false,
+    };
+  }, [isHovered, hoveredPoint, summary, breakdown, currencySymbol]);
 
   // Donut chart option
-  const donutOption = {
-    backgroundColor: "#FFFFFF",
-    tooltip: {
-      trigger: "item",
-      formatter: "{b}: {c} GWh ({d}%)",
-    },
-    series: [
-      {
-        name: "Fuel Mix",
-        type: "pie",
-        radius: ["45%", "72%"],
-        center: ["50%", "50%"],
-        avoidLabelOverlap: false,
-        itemStyle: {
-          borderRadius: 2,
-          borderColor: "#fff",
-          borderWidth: 1,
-        },
-        label: { show: false },
-        emphasis: {
-          label: {
-            show: true,
-            fontSize: 11,
-            fontWeight: "bold",
-          },
-        },
-        data: breakdown.map((b) => ({
-          name: b.label,
-          value: b.energyGWh,
-          itemStyle: { color: b.color },
-        })),
+  const donutOption = useMemo(() => {
+    const dataItems = tableData.rows.map((r) => ({
+      name: r.label,
+      value: r.rawVal,
+      itemStyle: { color: r.color },
+    }));
+
+    return {
+      backgroundColor: "#FFFFFF",
+      tooltip: {
+        trigger: "item",
+        formatter: `{b}: {c} ${tableData.unitSub} ({d}%)`,
       },
-    ],
-  };
+      series: [
+        {
+          name: "Fuel Mix",
+          type: "pie",
+          radius: ["45%", "72%"],
+          center: ["50%", "50%"],
+          avoidLabelOverlap: false,
+          itemStyle: {
+            borderRadius: 2,
+            borderColor: "#fff",
+            borderWidth: 1,
+          },
+          label: { show: false },
+          emphasis: {
+            label: {
+              show: true,
+              fontSize: 11,
+              fontWeight: "bold",
+            },
+          },
+          data: dataItems,
+        },
+      ],
+    };
+  }, [tableData]);
 
   return (
-    <aside className="bg-white border border-neutral-200 rounded-sm flex flex-col h-full text-neutral-800 text-xs">
-      {/* Sidebar Header: Date range display */}
-      <div className="p-3 border-b border-neutral-100 flex items-center justify-between">
-        <div className="flex items-center space-x-1.5 font-medium text-neutral-600">
-          <span className="font-semibold text-neutral-900">Summary</span>
-          <span className="text-neutral-400">&bull;</span>
-          <span className="text-[11px] text-neutral-500">Live Breakdown</span>
+    <aside className="bg-white border border-neutral-200 rounded-sm flex flex-col h-full text-neutral-800 text-xs shadow-sm transition-all">
+      {/* Sidebar Header: Date range / Hovered Time display */}
+      <div className="p-2.5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/60">
+        <div className="flex flex-col">
+          <div className="flex items-center space-x-1.5">
+            {isHovered ? (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                POINT IN TIME
+              </span>
+            ) : (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-neutral-200 text-neutral-800">
+                AGGREGATE
+              </span>
+            )}
+            <span className="font-semibold text-neutral-900 text-xs truncate max-w-[200px]">
+              {formattedTimeHeader}
+            </span>
+          </div>
         </div>
 
         {/* Toggle between Table & Donut */}
-        <div className="flex items-center border border-neutral-200 rounded p-0.5">
+        <div className="flex items-center border border-neutral-200 rounded p-0.5 bg-white">
           <button
             onClick={() => setActiveView("table")}
             className={`p-1 rounded transition ${
-              activeView === "table" ? "bg-neutral-100 text-neutral-900 font-bold" : "text-neutral-400 hover:text-neutral-700"
+              activeView === "table"
+                ? "bg-neutral-100 text-neutral-900 font-bold"
+                : "text-neutral-400 hover:text-neutral-700"
             }`}
             title="Table View"
           >
@@ -94,7 +231,9 @@ export function DataSidebar({
           <button
             onClick={() => setActiveView("donut")}
             className={`p-1 rounded transition ${
-              activeView === "donut" ? "bg-neutral-100 text-neutral-900 font-bold" : "text-neutral-400 hover:text-neutral-700"
+              activeView === "donut"
+                ? "bg-neutral-100 text-neutral-900 font-bold"
+                : "text-neutral-400 hover:text-neutral-700"
             }`}
             title="Donut Chart View"
           >
@@ -115,16 +254,23 @@ export function DataSidebar({
                   </div>
                 </th>
                 <th className="py-2 px-2 text-right font-mono">
-                  Energy<br />
-                  <span className="font-normal text-[10px] text-neutral-400">GWh</span>
+                  {tableData.columnUnit}
+                  <br />
+                  <span className="font-normal text-[10px] text-neutral-400">
+                    {tableData.unitSub}
+                  </span>
                 </th>
                 <th className="py-2 px-2 text-right font-mono">
-                  Contrib.<br />
+                  Contrib.
+                  <br />
                   <span className="font-normal text-[10px] text-neutral-400">%</span>
                 </th>
                 <th className="py-2 px-3 text-right font-mono">
-                  Av. Value<br />
-                  <span className="font-normal text-[10px] text-neutral-400">{currencySymbol}/MWh</span>
+                  {isHovered ? "Spot Price" : "Av. Value"}
+                  <br />
+                  <span className="font-normal text-[10px] text-neutral-400">
+                    {currencySymbol}/MWh
+                  </span>
                 </th>
               </tr>
             </thead>
@@ -137,60 +283,46 @@ export function DataSidebar({
                 </td>
               </tr>
 
-              {breakdown.map((row) => {
-                const estimatedPrice = Math.round(
-                  row.fuelTech === "solar"
-                    ? avgPrice * 0.75
-                    : row.fuelTech === "wind"
-                    ? avgPrice * 0.85
-                    : row.fuelTech === "hydro"
-                    ? avgPrice * 1.05
-                    : row.fuelTech === "coal"
-                    ? avgPrice * 0.95
-                    : row.fuelTech === "gas"
-                    ? avgPrice * 1.15
-                    : avgPrice * 1.30
-                );
-
-                return (
-                  <tr
-                    key={row.fuelTech}
-                    className="hover:bg-neutral-50/80 transition-colors group cursor-default"
-                  >
-                    <td className="py-1.5 px-3 flex items-center space-x-2">
-                      <span
-                        className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
-                        style={{ backgroundColor: row.color }}
-                      />
-                      <span className="font-medium text-neutral-800 text-[11px] group-hover:text-neutral-950">
-                        {row.label}
-                      </span>
-                    </td>
-                    <td className="py-1.5 px-2 text-right font-mono font-medium text-[11px] text-neutral-900">
-                      {row.energyGWh.toLocaleString()}
-                    </td>
-                    <td className="py-1.5 px-2 text-right font-mono text-[11px] text-neutral-600">
-                      {row.percentage.toFixed(1)}%
-                    </td>
-                    <td className="py-1.5 px-3 text-right font-mono text-[11px] text-neutral-500">
-                      {currencySymbol}{estimatedPrice.toLocaleString()}
-                    </td>
-                  </tr>
-                );
-              })}
+              {tableData.rows.map((row) => (
+                <tr
+                  key={row.fuelTech}
+                  className={`hover:bg-neutral-50/90 transition-colors group cursor-default ${
+                    row.rawVal === 0 ? "opacity-40" : ""
+                  }`}
+                >
+                  <td className="py-1.5 px-3 flex items-center space-x-2">
+                    <span
+                      className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
+                      style={{ backgroundColor: row.color }}
+                    />
+                    <span className="font-medium text-neutral-800 text-[11px] group-hover:text-neutral-950">
+                      {row.label}
+                    </span>
+                  </td>
+                  <td className="py-1.5 px-2 text-right font-mono font-medium text-[11px] text-neutral-900">
+                    {row.valueDisplay}
+                  </td>
+                  <td className="py-1.5 px-2 text-right font-mono text-[11px] text-neutral-600">
+                    {row.pct.toFixed(1)}%
+                  </td>
+                  <td className="py-1.5 px-3 text-right font-mono text-[11px] text-neutral-500">
+                    {row.priceDisplay}
+                  </td>
+                </tr>
+              ))}
 
               {/* Summary Totals */}
               <tr className="border-t-2 border-neutral-200 bg-neutral-50/40 font-bold text-neutral-900">
                 <td className="py-2 px-3 text-[11px] flex items-center space-x-1.5">
                   <span className="text-neutral-400 font-normal">—</span>
-                  <span>Net Generation</span>
+                  <span>Net {isHovered ? "Power" : "Generation"}</span>
                 </td>
                 <td className="py-2 px-2 text-right font-mono text-[11px]">
-                  {totalGWh.toLocaleString()}
+                  {tableData.totalDisplay}
                 </td>
                 <td className="py-2 px-2 text-right font-mono text-[11px]">100%</td>
                 <td className="py-2 px-3 text-right font-mono text-[11px]">
-                  {currencySymbol}{avgPrice.toLocaleString()}
+                  {tableData.priceDisplay}
                 </td>
               </tr>
 
@@ -200,13 +332,13 @@ export function DataSidebar({
                   <span>Renewables</span>
                 </td>
                 <td className="py-2 px-2 text-right font-mono text-[11px] text-emerald-700">
-                  {Math.round((totalGWh * renewablesPct) / 100).toLocaleString()}
+                  {tableData.renValDisplay}
                 </td>
                 <td className="py-2 px-2 text-right font-mono text-[11px] text-emerald-700">
-                  {renewablesPct}%
+                  {tableData.renPctDisplay}
                 </td>
                 <td className="py-2 px-3 text-right font-mono text-[11px] text-emerald-700">
-                  {currencySymbol}{Math.round(avgPrice * 0.9).toLocaleString()}
+                  {tableData.priceDisplay}
                 </td>
               </tr>
             </tbody>
@@ -214,10 +346,10 @@ export function DataSidebar({
         </div>
       ) : (
         <div className="p-4 flex-1 flex flex-col justify-center items-center">
-          <ReactECharts option={donutOption} style={{ height: "260px", width: "100%" }} />
+          <ReactECharts option={donutOption} style={{ height: "250px", width: "100%" }} />
           <div className="text-center text-[11px] text-neutral-500 mt-2 font-mono">
-            Total Output: <strong className="text-neutral-900">{totalGWh.toLocaleString()} GWh</strong> &bull; Renewables:{" "}
-            <strong className="text-emerald-600">{renewablesPct}%</strong>
+            Total: <strong className="text-neutral-900">{tableData.totalDisplay}</strong> &bull;
+            Renewables: <strong className="text-emerald-600">{tableData.renPctDisplay}</strong>
           </div>
         </div>
       )}
@@ -234,7 +366,8 @@ export function DataSidebar({
               <div key={i} className="flex items-center justify-between text-neutral-600">
                 <span className="truncate max-w-[180px]">{flow.name}</span>
                 <span className="font-mono font-medium text-neutral-900">
-                  {flow.flowMW} MW <span className="text-[10px] text-neutral-400">/ {flow.capacityMW}</span>
+                  {flow.flowMW} MW{" "}
+                  <span className="text-[10px] text-neutral-400">/ {flow.capacityMW}</span>
                 </span>
               </div>
             ))}
