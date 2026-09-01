@@ -12,12 +12,12 @@ from pollmph.util import (
     get_mock_adapter,
 )
 
-Adapter = Literal["mock", "grok", "gemini", "local"]
+Adapter = Literal["gemini", "grok", "mock", "local"]
 adapter_map = {
+    "gemini": lambda: get_gemini_adapter(),
+    "grok": lambda: get_xai_adapter(),
     "mock": lambda: get_mock_adapter(),
-    "grok": lambda: get_xai_adapter(model="grok-4-1-fast-reasoning"),
-    "gemini": lambda: get_gemini_adapter(model="gemini-2.5-flash"),
-    "local": lambda: get_ollama_adapter(model="gemma3n"),
+    "local": lambda: get_ollama_adapter(),
 }
 
 app = typer.Typer(name="pollmph", help="Philippine political sentiment tracker.")
@@ -30,7 +30,9 @@ def run_today(
     limit: Annotated[
         int, typer.Option("--limit", "-l", help="Max propositions to process.")
     ] = 5,
-    llm: Annotated[Adapter, typer.Option("--llm", help="LLM adapter to use.")] = "mock",
+    llm: Annotated[
+        Adapter, typer.Option("--llm", help="LLM adapter to use.")
+    ] = "gemini",
     no_db: Annotated[bool, _no_db] = False,
     verbose: Annotated[bool, _verbose] = False,
 ):
@@ -51,7 +53,9 @@ def backfill(
     days_back: Annotated[
         int, typer.Option("--days-back", help="Number of past days to backfill.")
     ] = 7,
-    llm: Annotated[Adapter, typer.Option("--llm", help="LLM adapter to use.")] = "mock",
+    llm: Annotated[
+        Adapter, typer.Option("--llm", help="LLM adapter to use.")
+    ] = "gemini",
     no_db: Annotated[bool, _no_db] = False,
     verbose: Annotated[bool, _verbose] = False,
 ):
@@ -77,7 +81,9 @@ def weekly_summary(
     ] = None,
     no_db: Annotated[bool, _no_db] = False,
     verbose: Annotated[bool, _verbose] = False,
-    llm: Annotated[Adapter, typer.Option("--llm", help="LLM adapter to use.")] = "mock",
+    llm: Annotated[
+        Adapter, typer.Option("--llm", help="LLM adapter to use.")
+    ] = "gemini",
 ):
     """Generate weekly narrative summaries for propositions."""
     from pollmph.workflow import run_weekly_summary
@@ -107,7 +113,7 @@ def add(
     ] = None,
     llm: Annotated[
         Adapter, typer.Option("--llm", help="LLM adapter to use for backfill.")
-    ] = "mock",
+    ] = "gemini",
 ):
     """Add a new proposition to the database."""
     from pollmph.db import create_proposition
@@ -169,7 +175,7 @@ def evaluate(
     ] = False,
     llm: Annotated[
         Adapter, typer.Option("--llm", help="LLM adapter to use for backfill.")
-    ] = "mock",
+    ] = "gemini",
 ):
     """Evaluate whether a proposition has enough public attention to track."""
     from pollmph.task import EvaluatePropositionTask

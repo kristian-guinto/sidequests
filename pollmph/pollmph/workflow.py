@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 from pollmph.llm import LLMAdapter
 from pollmph.task import SentimentTask, ContextSummaryTask
-from pollmph.util import get_supabase_client, get_xai_adapter
+from pollmph.util import get_supabase_client, get_gemini_adapter, get_xai_adapter
 from pollmph.db import (
     has_sentiment_on_date,
     read_propositions,
@@ -59,7 +59,7 @@ def run_sentiment_on_date(
     write_to_db: bool = True,
     adapter: LLMAdapter | None = None,
 ):
-    llm_adapter = adapter or get_xai_adapter(model="grok-4.3")
+    llm_adapter = adapter or get_gemini_adapter()
     sb_client = get_supabase_client()
     task = SentimentTask(adapter=llm_adapter, sb_client=sb_client, verbose=verbose)
 
@@ -240,7 +240,7 @@ def run_weekly_summary(
     write_to_db: bool = True,
     adapter: LLMAdapter | None = None,
 ):
-    llm_adapter = adapter or get_xai_adapter(model="grok-4.3")
+    llm_adapter = adapter or get_gemini_adapter()
     sb_client = get_supabase_client()
     task = ContextSummaryTask(adapter=llm_adapter, sb_client=sb_client, verbose=verbose)
 

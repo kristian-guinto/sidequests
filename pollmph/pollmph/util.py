@@ -24,6 +24,11 @@ def get_supabase_client():
     return sb.create_client(SB_URL, SB_KEY)
 
 
+DEFAULT_GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+DEFAULT_XAI_MODEL = os.getenv("XAI_MODEL", "grok-4-1-fast-reasoning")
+DEFAULT_OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma3n")
+
+
 def get_xai_client():
     from xai_sdk import Client as XAIClient
 
@@ -34,10 +39,10 @@ def get_xai_client():
     return XAIClient(api_key=xai_api_key)
 
 
-def get_xai_adapter(model: str):
+def get_xai_adapter(model: str | None = None):
     from pollmph.adapters.xai import XAIAdapter
 
-    return XAIAdapter(client=get_xai_client(), model=model)
+    return XAIAdapter(client=get_xai_client(), model=model or DEFAULT_XAI_MODEL)
 
 
 def get_gemini_client():
@@ -50,10 +55,12 @@ def get_gemini_client():
     return genai.Client(api_key=api_key)
 
 
-def get_gemini_adapter(model: str):
+def get_gemini_adapter(model: str | None = None):
     from pollmph.adapters.gemini import GeminiAdapter
 
-    return GeminiAdapter(client=get_gemini_client(), model=model)
+    return GeminiAdapter(
+        client=get_gemini_client(), model=model or DEFAULT_GEMINI_MODEL
+    )
 
 
 def get_ollama_client(host: str = "http://localhost:11434"):
@@ -62,10 +69,12 @@ def get_ollama_client(host: str = "http://localhost:11434"):
     return OllamaClient(host=host)
 
 
-def get_ollama_adapter(model: str, host: str = "http://localhost:11434"):
+def get_ollama_adapter(model: str | None = None, host: str = "http://localhost:11434"):
     from pollmph.adapters.ollama import OllamaAdapter
 
-    return OllamaAdapter(client=get_ollama_client(host=host), model=model)
+    return OllamaAdapter(
+        client=get_ollama_client(host=host), model=model or DEFAULT_OLLAMA_MODEL
+    )
 
 
 def get_mock_adapter(
