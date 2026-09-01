@@ -1,0 +1,7 @@
+# Ducklembic Configuration File
+[database]
+local_path = "/home/ian/open-electricity/open_nem_ph.duckdb"
+motherduck_database = "open_electricity_db"
+
+[migrations]
+directory = "/home/ian/open-electricity/pipeline/migrations"

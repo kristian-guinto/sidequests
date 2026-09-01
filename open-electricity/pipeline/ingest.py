@@ -268,9 +268,27 @@ def app():
     country = (args.country or "PH").upper()
 
     if mode in ("migrate", "sync-cloud"):
-        from pipeline.sync_motherduck import sync_local_to_motherduck
+        from ducklembic import DuckDB, Sync
+        from pipeline.config import DUCKDB_PATH, MOTHERDUCK_TOKEN, MOTHERDUCK_DATABASE
 
-        sync_local_to_motherduck()
+        if not MOTHERDUCK_TOKEN:
+            print("❌ MOTHERDUCK_TOKEN environment variable is not set in .env.")
+            return
+
+        local_db = DuckDB(local_path=DUCKDB_PATH, mode="local")
+        remote_db = DuckDB(
+            motherduck_token=MOTHERDUCK_TOKEN,
+            motherduck_database=MOTHERDUCK_DATABASE,
+            mode="motherduck",
+        )
+        sync_engine = Sync(local=local_db, remote=remote_db)
+        print("🚀 Pushing local DuckDB tables to MotherDuck Cloud...")
+        report = sync_engine.push(confirm=True)
+        for tbl in report.tables:
+            print(
+                f"  ✓ {tbl.table}: {tbl.source_rows} rows -> MotherDuck ({tbl.target_rows} total)"
+            )
+        print("\n🎉 MotherDuck Cloud sync complete!")
         return
 
     if mode == "inspect":
