@@ -24,7 +24,7 @@ def get_supabase_client():
     return sb.create_client(SB_URL, SB_KEY)
 
 
-DEFAULT_GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+DEFAULT_GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-flash-lite-latest")
 DEFAULT_XAI_MODEL = os.getenv("XAI_MODEL", "grok-4-1-fast-reasoning")
 DEFAULT_OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma3n")
 
