@@ -17,7 +17,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Load environment variables
 load_dotenv(BASE_DIR / ".env")
-load_dotenv(BASE_DIR / "web" / ".env.local")
 
 MOTHERDUCK_TOKEN = os.getenv("MOTHERDUCK_TOKEN", "")
 MOTHERDUCK_DATABASE = os.getenv("MOTHERDUCK_DATABASE", "open_electricity_db")

@@ -39,13 +39,13 @@ open-electricity/
 │   ├── ingest.py                   # CLI tool for daily sync & backfills
 │   └── data/
 │       └── generators_master.json  # Comprehensive Philippine power plant catalog
-├── web/                            # Next.js 14 + Tailwind + ECharts frontend (Vercel)
-│   ├── src/
-│   │   ├── app/                    # Next.js App Router (Dashboard)
-│   │   ├── components/             # Charts, KPI cards, Fuel table, Interconnectors
-│   │   └── lib/                    # Types, color palette, mock generator
-│   ├── package.json
-│   └── tailwind.config.ts
+├── src/                            # Next.js 14 Frontend
+│   ├── app/                        # Next.js App Router (Dashboard)
+│   ├── components/                 # Charts, KPI cards, Fuel table, Interconnectors
+│   └── lib/                        # Types, color palette, mock generator
+├── package.json                    # Frontend dependencies & scripts
+├── next.config.mjs                 # Next.js rewrites configuration
+├── tailwind.config.ts              # Tailwind CSS configuration
 ├── open_nem_ph.duckdb              # Embedded OLAP DuckDB database (local)
 ├── vercel.json                     # Vercel deployment routing configuration
 ├── pyproject.toml                  # Python package configuration
@@ -96,13 +96,11 @@ Interactive API documentation will be available at [`http://localhost:8000/api/d
 
 **Terminal 2: Next.js Frontend**
 ```bash
-cd web
-
 # Install frontend dependencies
-pnpm install
+npm install
 
 # Start Next.js dev server on port 3000 (proxies /api requests to FastAPI)
-pnpm dev
+npm run dev
 ```
 
 Visit [`http://localhost:3000`](http://localhost:3000) to view the live dashboard!
@@ -136,13 +134,14 @@ The repository includes a GitHub Action in [`.github/workflows/daily_pipeline.ym
 ## 🌐 Deploy to Vercel
 
 1. Import this repository into [Vercel](https://vercel.com).
-2. Ensure the following environment variables are set in your Vercel Project Settings:
+2. **Settings**:
+   - **Framework Preset**: `Next.js` (detected automatically)
+   - **Root Directory**: `./` (leave default)
+   - **Build Command** & **Output Directory**: Leave default (no custom commands needed)
+3. **Environment Variables** (under **Settings → Environment Variables**):
    - `MOTHERDUCK_TOKEN`: Your MotherDuck Service Token
    - `MOTHERDUCK_DATABASE`: `open_electricity_db`
-3. Vercel automatically deploys:
-   - **Frontend**: Next.js App Router
-   - **Backend Serverless Functions**: FastAPI from `api/index.py`
-4. Deploy!
+4. Deploy! Vercel will automatically build the Next.js React frontend and deploy the FastAPI serverless function at `/api/*`.
 
 ---
 
