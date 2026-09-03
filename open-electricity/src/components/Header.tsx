@@ -7,6 +7,7 @@ import {
   TimeRange,
   TimeInterval,
   ViewMode,
+  PaletteMode,
   RANGE_CONFIG,
   COUNTRIES_METADATA,
 } from "@/lib/types";
@@ -17,6 +18,8 @@ import {
   RotateCw,
   Check,
   Percent,
+  Palette,
+  Leaf,
   Sun,
   Moon,
 } from "lucide-react";
@@ -33,6 +36,8 @@ interface HeaderProps {
   onIntervalChange: (i: TimeInterval) => void;
   viewMode: ViewMode;
   onViewModeChange: (v: ViewMode) => void;
+  paletteMode: PaletteMode;
+  onPaletteModeChange: (p: PaletteMode) => void;
   onRefresh: () => void;
   isLoading: boolean;
 }
@@ -56,6 +61,8 @@ export function Header({
   onIntervalChange,
   viewMode,
   onViewModeChange,
+  paletteMode,
+  onPaletteModeChange,
   onRefresh,
   isLoading,
 }: HeaderProps) {
@@ -206,19 +213,36 @@ export function Header({
 
           <div className="h-4 w-[1px] bg-neutral-200 dark:bg-[#27272A] mx-1 hidden sm:block" />
 
-          {/* Chart Mode Toggle (Value vs Percentage) */}
+          {/* Palette Mode Toggle (Clean / Fossil vs Detailed) */}
           <div className="flex items-center border border-neutral-200 dark:border-[#27272A] rounded p-0.5 bg-neutral-50/50 dark:bg-[#121215]">
             <button
-              onClick={() => onViewModeChange("stacked")}
-              className={`flex items-center space-x-1 px-2.5 py-0.5 rounded text-xs font-medium transition ${viewMode === "stacked" || viewMode === "cumulative"
+              onClick={() => onPaletteModeChange("clean-fossil")}
+              className={`flex items-center space-x-1 px-2.5 py-0.5 rounded text-xs font-medium transition ${paletteMode === "clean-fossil"
                 ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold shadow-sm"
                 : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white"
                 }`}
-              title="Absolute Value (MW / GWh)"
+              title="2-Tone Clean vs. Fossil Mode"
             >
-              <AreaIcon className="h-3.5 w-3.5" />
-              <span>Value</span>
+              <Leaf className="h-3.5 w-3.5 text-emerald-500 dark:text-emerald-400" />
+              <span>Clean / Fossil</span>
             </button>
+            <button
+              onClick={() => onPaletteModeChange("detailed")}
+              className={`flex items-center space-x-1 px-2.5 py-0.5 rounded text-xs font-medium transition ${paletteMode === "detailed"
+                ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold shadow-sm"
+                : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white"
+                }`}
+              title="Full Multi-Color Fuel Mix"
+            >
+              <Palette className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400" />
+              <span>Detailed</span>
+            </button>
+          </div>
+
+          <div className="h-4 w-[1px] bg-neutral-200 dark:bg-[#27272A] mx-1 hidden sm:block" />
+
+          {/* Chart Mode Toggle (Percentage vs Value) */}
+          <div className="flex items-center border border-neutral-200 dark:border-[#27272A] rounded p-0.5 bg-neutral-50/50 dark:bg-[#121215]">
             <button
               onClick={() => onViewModeChange("percentage")}
               className={`flex items-center space-x-1 px-2.5 py-0.5 rounded text-xs font-medium transition ${viewMode === "percentage"
@@ -227,8 +251,19 @@ export function Header({
                 }`}
               title="Percentage Contribution Share (%)"
             >
-              <Percent className="h-3.5 w-3.5" />
+              <Percent className="h-3.5 w-3.5 text-emerald-500 dark:text-emerald-400" />
               <span>Percentage</span>
+            </button>
+            <button
+              onClick={() => onViewModeChange("stacked")}
+              className={`flex items-center space-x-1 px-2.5 py-0.5 rounded text-xs font-medium transition ${viewMode === "stacked" || viewMode === "cumulative"
+                ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold shadow-sm"
+                : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white"
+                }`}
+              title="Absolute Value (MW / GWh)"
+            >
+              <AreaIcon className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400" />
+              <span>Value</span>
             </button>
           </div>
 

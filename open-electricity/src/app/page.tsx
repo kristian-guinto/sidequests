@@ -7,6 +7,7 @@ import {
   TimeRange,
   TimeInterval,
   ViewMode,
+  PaletteMode,
   FuelGenerationPoint,
   FuelTech,
   SummaryMetrics,
@@ -27,7 +28,8 @@ export default function DashboardPage() {
   const [region, setRegion] = useState<Region>("ALL");
   const [range, setRange] = useState<TimeRange>("7d");
   const [interval, setInterval] = useState<TimeInterval>("30m");
-  const [viewMode, setViewMode] = useState<ViewMode>("stacked");
+  const [viewMode, setViewMode] = useState<ViewMode>("percentage");
+  const [paletteMode, setPaletteMode] = useState<PaletteMode>("clean-fossil");
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const [points, setPoints] = useState<FuelGenerationPoint[]>([]);
@@ -116,6 +118,8 @@ export default function DashboardPage() {
         onIntervalChange={setInterval}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
+        paletteMode={paletteMode}
+        onPaletteModeChange={setPaletteMode}
         onRefresh={fetchData}
         isLoading={isLoading}
       />
@@ -129,6 +133,7 @@ export default function DashboardPage() {
             <GenerationChart
               data={points}
               viewMode={viewMode}
+              paletteMode={paletteMode}
               unit={unit}
               height="310px"
               hoveredFuel={hoveredFuel}
@@ -167,6 +172,7 @@ export default function DashboardPage() {
               currencySymbol={countryInfo.currencySymbol}
               currencyCode={countryInfo.currencyCode}
               unit={unit}
+              paletteMode={paletteMode}
             />
           </div>
         </div>

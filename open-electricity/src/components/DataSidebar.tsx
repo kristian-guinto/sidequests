@@ -7,6 +7,7 @@ import {
   SummaryMetrics,
   InterconnectorFlow,
   FuelTech,
+  PaletteMode,
 } from "@/lib/types";
 import { getFuelMeta } from "@/lib/colors";
 import { ChevronDown, PieChart as PieIcon, List, Globe, Zap, CloudFog, TrendingUp } from "lucide-react";
@@ -25,6 +26,7 @@ interface DataSidebarProps {
   currencySymbol?: string;
   currencyCode?: string;
   unit?: "MW" | "GWh";
+  paletteMode?: PaletteMode;
 }
 
 const FUEL_DISPLAY_ORDER: FuelTech[] = [
@@ -50,6 +52,7 @@ export function DataSidebar({
   currencySymbol = "₱",
   currencyCode = "PHP",
   unit = "MW",
+  paletteMode = "detailed",
 }: DataSidebarProps) {
   const { isDark } = useTheme();
   const [activeView, setActiveView] = useState<"table" | "donut">("table");
@@ -93,7 +96,7 @@ export function DataSidebar({
       const totalEmissionsT = coalT + gasT + oilT;
 
       const rows = FUEL_DISPLAY_ORDER.map((fKey) => {
-        const meta = getFuelMeta(fKey, isDark);
+        const meta = getFuelMeta(fKey, isDark, paletteMode);
         const val = Number((pt as any)[fKey]) || 0;
         const pct = totalGen > 0 ? (val / totalGen) * 100 : 0;
         return {
@@ -133,7 +136,7 @@ export function DataSidebar({
       const peakDemand = summary?.peakDemandMW || 0;
 
       const rows = FUEL_DISPLAY_ORDER.map((fKey) => {
-        const meta = getFuelMeta(fKey, isDark);
+        const meta = getFuelMeta(fKey, isDark, paletteMode);
         const b = breakdown.find((item) => item.fuelTech === fKey);
         const gwh = b?.energyGWh || 0;
         const mw = b?.generationMW || 0;
@@ -165,8 +168,8 @@ export function DataSidebar({
         totalDisplay: isEnergy
           ? `${totalGWh.toFixed(1)} GWh`
           : `${Math.round(
-              rows.reduce((acc, r) => acc + (isEnergy ? 0 : r.rawVal), 0)
-            ).toLocaleString()} MW`,
+            rows.reduce((acc, r) => acc + (isEnergy ? 0 : r.rawVal), 0)
+          ).toLocaleString()} MW`,
         renValDisplay: isEnergy
           ? `${renVal.toFixed(1)} GWh`
           : `${Math.round(renVal).toLocaleString()} MW`,
@@ -178,7 +181,7 @@ export function DataSidebar({
         unitSub: isEnergy ? "GWh" : "MW",
       };
     }
-  }, [isHovered, hoveredPoint, breakdown, summary, currencySymbol, unit, isDark]);
+  }, [isHovered, hoveredPoint, breakdown, summary, currencySymbol, unit, isDark, paletteMode]);
 
   // Donut chart option
   const donutOption = useMemo(() => {
@@ -234,22 +237,20 @@ export function DataSidebar({
         <div className="flex items-center border border-neutral-200 dark:border-[#27272A] rounded p-0.5 bg-white dark:bg-[#121215]">
           <button
             onClick={() => setActiveView("table")}
-            className={`p-1 rounded transition ${
-              activeView === "table"
+            className={`p-1 rounded transition ${activeView === "table"
                 ? "bg-neutral-100 dark:bg-[#27272A] text-neutral-900 dark:text-white font-bold"
                 : "text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
-            }`}
+              }`}
             title="Table View"
           >
             <List className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={() => setActiveView("donut")}
-            className={`p-1 rounded transition ${
-              activeView === "donut"
+            className={`p-1 rounded transition ${activeView === "donut"
                 ? "bg-neutral-100 dark:bg-[#27272A] text-neutral-900 dark:text-white font-bold"
                 : "text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
-            }`}
+              }`}
             title="Donut Chart View"
           >
             <PieIcon className="h-3.5 w-3.5" />
@@ -306,29 +307,26 @@ export function DataSidebar({
                     key={row.fuelTech}
                     onMouseEnter={() => onHoverFuel?.(row.fuelTech)}
                     onMouseLeave={() => onHoverFuel?.(null)}
-                    className={`transition-all duration-150 cursor-pointer ${
-                      isThisRowHovered
+                    className={`transition-all duration-150 cursor-pointer ${isThisRowHovered
                         ? "bg-neutral-100 dark:bg-[#27272A] font-bold shadow-xs scale-[1.005]"
                         : isAnyRowHovered
-                        ? "opacity-40 hover:opacity-100 hover:bg-neutral-50/90 dark:hover:bg-[#18181B]/70"
-                        : row.rawVal === 0
-                        ? "opacity-40 hover:bg-neutral-50/90 dark:hover:bg-[#18181B]/70"
-                        : "hover:bg-neutral-50/90 dark:hover:bg-[#18181B]/70"
-                    }`}
+                          ? "opacity-40 hover:opacity-100 hover:bg-neutral-50/90 dark:hover:bg-[#18181B]/70"
+                          : row.rawVal === 0
+                            ? "opacity-40 hover:bg-neutral-50/90 dark:hover:bg-[#18181B]/70"
+                            : "hover:bg-neutral-50/90 dark:hover:bg-[#18181B]/70"
+                      }`}
                   >
                     <td className="py-1.5 px-3 flex items-center space-x-2">
                       <span
-                        className={`w-2.5 h-2.5 rounded-sm flex-shrink-0 transition-transform ${
-                          isThisRowHovered ? "scale-125 ring-1 ring-neutral-400" : ""
-                        }`}
+                        className={`w-2.5 h-2.5 rounded-sm flex-shrink-0 transition-transform ${isThisRowHovered ? "scale-125 ring-1 ring-neutral-400" : ""
+                          }`}
                         style={{ backgroundColor: row.color }}
                       />
                       <span
-                        className={`text-[11px] ${
-                          isThisRowHovered
+                        className={`text-[11px] ${isThisRowHovered
                             ? "text-neutral-950 dark:text-white font-bold"
                             : "font-medium text-neutral-800 dark:text-neutral-200"
-                        }`}
+                          }`}
                       >
                         {row.label}
                       </span>

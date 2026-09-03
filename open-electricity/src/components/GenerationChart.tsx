@@ -3,7 +3,7 @@
 import React, { useMemo, useCallback } from "react";
 import ReactECharts from "echarts-for-react";
 import * as echarts from "echarts";
-import { FuelGenerationPoint, ViewMode, FuelTech } from "@/lib/types";
+import { FuelGenerationPoint, ViewMode, FuelTech, PaletteMode } from "@/lib/types";
 import { getFuelMeta } from "@/lib/colors";
 import { computeXAxisConfig, getShadcnTooltipConfig } from "@/lib/chartUtils";
 import {
@@ -14,12 +14,13 @@ import {
   ChartCardContent,
 } from "@/components/ui/ChartCard";
 import { format, parseISO } from "date-fns";
-import { Zap, Percent } from "lucide-react";
+import { Zap, Percent, Leaf } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 
 interface GenerationChartProps {
   data: FuelGenerationPoint[];
   viewMode: ViewMode;
+  paletteMode?: PaletteMode;
   unit?: "MW" | "GWh";
   height?: string;
   hoveredFuel?: FuelTech | null;
@@ -42,6 +43,7 @@ const FUEL_ORDER = [
 export function GenerationChart({
   data,
   viewMode,
+  paletteMode = "clean-fossil",
   unit = "MW",
   height = "330px",
   hoveredFuel,
@@ -83,7 +85,7 @@ export function GenerationChart({
     const isAnyFuelFocused = Boolean(hoveredFuel);
 
     const series = FUEL_ORDER.map((fuel) => {
-      const meta = getFuelMeta(fuel, isDark);
+      const meta = getFuelMeta(fuel, isDark, paletteMode);
       const isFocused = hoveredFuel === fuel;
 
       const seriesData = data.map((d) => {
@@ -100,6 +102,18 @@ export function GenerationChart({
       let lineWidth = 0.5;
       let lineColor = isDark ? "#3F3F46" : "#ffffff33";
       let zLevel = 2;
+
+      if (paletteMode === "clean-fossil") {
+        if (fuel === "gas") {
+          // Prominent line marking the boundary between fossil base and clean canopy
+          lineWidth = 1.8;
+          lineColor = isDark ? "#10B981" : "#059669";
+          zLevel = 6;
+        } else {
+          lineWidth = 0.5;
+          lineColor = isDark ? "rgba(0, 0, 0, 0.35)" : "rgba(255, 255, 255, 0.45)";
+        }
+      }
 
       if (isAnyFuelFocused) {
         if (isFocused) {
@@ -202,10 +216,20 @@ export function GenerationChart({
                 : `${isEnergy ? r.val.toFixed(2) : Math.round(r.val).toLocaleString()} ${unitStr}`;
               const subPct = !isPercentage ? `<span class="${textSubPct} text-[10px] ml-1">(${r.pct.toFixed(1)}%)</span>` : "";
 
+              const isClean = ["solar", "wind", "hydro", "geothermal", "biomass", "battery", "bioenergy"].some(
+                (f) => r.name.toLowerCase().includes(f)
+              );
+              const cleanBadge = paletteMode === "clean-fossil"
+                ? isClean
+                  ? `<span class="text-[9px] px-1 py-0.2 rounded bg-emerald-500/15 text-emerald-400 font-mono ml-1.5 font-semibold">Clean</span>`
+                  : `<span class="text-[9px] px-1 py-0.2 rounded bg-neutral-700/30 text-neutral-400 font-mono ml-1.5 font-semibold">Fossil</span>`
+                : "";
+
               html += `<div class="flex justify-between items-center py-0.5 text-xs">
                 <span class="flex items-center ${textSecondary}">
-                  <span class="w-2.5 h-2.5 rounded-[3px] mr-2" style="background-color:${r.color}"></span>
+                  <span class="w-2.5 h-2.5 rounded-[3px] mr-2 shrink-0" style="background-color:${r.color}"></span>
                   ${r.name}
+                  ${cleanBadge}
                 </span>
                 <span class="font-mono ${textPrimary} font-medium">${displayVal} ${subPct}</span>
               </div>`;
@@ -248,7 +272,7 @@ export function GenerationChart({
       },
       series,
     };
-  }, [data, isPercentage, isEnergy, xAxisConfig, tooltipConfig, isDark, hoveredFuel]);
+  }, [data, isPercentage, isEnergy, xAxisConfig, tooltipConfig, isDark, hoveredFuel, paletteMode]);
 
   const onEvents = useMemo(() => {
     return {
@@ -282,6 +306,12 @@ export function GenerationChart({
             <span>
               Generation ({isPercentage ? "%" : unit})
             </span>
+            {paletteMode === "clean-fossil" && (
+              <span className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-sans">
+                <Leaf className="h-3 w-3" />
+                Clean vs Fossil
+              </span>
+            )}
           </div>
           <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-100 dark:bg-[#18181B] text-neutral-800 dark:text-neutral-200 border border-neutral-200/60 dark:border-neutral-800 font-mono shadow-xs">
             {isPercentage ? (

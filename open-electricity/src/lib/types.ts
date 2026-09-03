@@ -143,6 +143,8 @@ export const RANGE_CONFIG: Record<
 
 export type ViewMode = "stacked" | "percentage" | "cumulative" | "discrete";
 
+export type PaletteMode = "detailed" | "clean-fossil";
+
 export type FuelTech =
   | "solar"
   | "wind"

@@ -1,4 +1,4 @@
-import { FuelTech } from "./types";
+import { FuelTech, PaletteMode } from "./types";
 
 export interface FuelMeta {
   label: string;
@@ -121,7 +121,132 @@ export const DARK_FUEL_META: Record<FuelTech, FuelMeta> = {
   },
 };
 
-export function getFuelMeta(fuel: FuelTech, isDark: boolean = true): FuelMeta {
+export const CLEAN_FOSSIL_DARK_META: Record<FuelTech, FuelMeta> = {
+  // Clean Energy - Coordinated Luminous Green Shades (Top Canopy)
+  solar: {
+    label: "Solar",
+    color: "#86EFAC", // Light Lime / Sunlit Mint
+    isRenewable: true,
+    order: 1,
+  },
+  wind: {
+    label: "Wind",
+    color: "#4ADE80", // Crisp Emerald Mint
+    isRenewable: true,
+    order: 2,
+  },
+  hydro: {
+    label: "Hydro",
+    color: "#22C55E", // Vivid Emerald Green
+    isRenewable: true,
+    order: 3,
+  },
+  battery: {
+    label: "Battery (Discharging)",
+    color: "#16A34A", // Pure Grass Green
+    isRenewable: true,
+    order: 4,
+  },
+  geothermal: {
+    label: "Geothermal",
+    color: "#15803D", // Deep Forest Green
+    isRenewable: true,
+    order: 5,
+  },
+  biomass: {
+    label: "Bioenergy",
+    color: "#14532D", // Earthy Moss Green
+    isRenewable: true,
+    order: 6,
+  },
+  // Fossil Energy - Coordinated Dark Charcoal / Slate Shades (Base Foundation)
+  gas: {
+    label: "Gas",
+    color: "#52525B", // Slate Gray (Zinc 600)
+    isRenewable: false,
+    order: 7,
+  },
+  oil: {
+    label: "Distillate",
+    color: "#3F3F46", // Dark Slate (Zinc 700)
+    isRenewable: false,
+    order: 8,
+  },
+  coal: {
+    label: "Coal",
+    color: "#18181B", // Deep Carbon Charcoal (Zinc 900)
+    isRenewable: false,
+    order: 9,
+  },
+};
+
+export const CLEAN_FOSSIL_LIGHT_META: Record<FuelTech, FuelMeta> = {
+  // Clean Energy - Richer Greens for Light Background
+  solar: {
+    label: "Solar",
+    color: "#34D399",
+    isRenewable: true,
+    order: 1,
+  },
+  wind: {
+    label: "Wind",
+    color: "#10B981",
+    isRenewable: true,
+    order: 2,
+  },
+  hydro: {
+    label: "Hydro",
+    color: "#059669",
+    isRenewable: true,
+    order: 3,
+  },
+  battery: {
+    label: "Battery (Discharging)",
+    color: "#047857",
+    isRenewable: true,
+    order: 4,
+  },
+  geothermal: {
+    label: "Geothermal",
+    color: "#065F46",
+    isRenewable: true,
+    order: 5,
+  },
+  biomass: {
+    label: "Bioenergy",
+    color: "#064E3B",
+    isRenewable: true,
+    order: 6,
+  },
+  // Fossil Energy - Charcoal / Slate on Light
+  gas: {
+    label: "Gas",
+    color: "#64748B",
+    isRenewable: false,
+    order: 7,
+  },
+  oil: {
+    label: "Distillate",
+    color: "#475569",
+    isRenewable: false,
+    order: 8,
+  },
+  coal: {
+    label: "Coal",
+    color: "#1E293B",
+    isRenewable: false,
+    order: 9,
+  },
+};
+
+export function getFuelMeta(
+  fuel: FuelTech,
+  isDark: boolean = true,
+  paletteMode: PaletteMode = "detailed"
+): FuelMeta {
+  if (paletteMode === "clean-fossil") {
+    return isDark ? CLEAN_FOSSIL_DARK_META[fuel] : CLEAN_FOSSIL_LIGHT_META[fuel];
+  }
   return isDark ? DARK_FUEL_META[fuel] : LIGHT_FUEL_META[fuel];
 }
 
