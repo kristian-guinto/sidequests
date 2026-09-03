@@ -91,6 +91,16 @@ uv run ingest inspect --table daily --limit 10
 
 ### 2. Running Locally (FastAPI + Next.js)
 
+**Single Command (Recommended)**:
+```bash
+./dev.sh
+# or
+npm run dev:all
+```
+This starts both the FastAPI backend (`:8000`) and Next.js frontend (`:3000`) concurrently and handles graceful shutdown when pressing `Ctrl+C`.
+
+Alternatively, run them in separate terminals:
+
 **Terminal 1: FastAPI Backend**
 ```bash
 # Start the Python FastAPI server on port 8000

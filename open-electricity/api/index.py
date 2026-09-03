@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 
 import duckdb
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -563,8 +563,9 @@ def get_root():
 
 
 @app.get("/api/health")
-def get_health():
+def get_health(response: Response):
     """Health check endpoint and active database connection inspector."""
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     conn, source = get_duckdb_connection()
     tables_count = {}
 
@@ -581,9 +582,13 @@ def get_health():
                     tables_count[tbl] = c
                 except Exception:
                     tables_count[tbl] = 0
-            conn.close()
         except Exception as e:
             tables_count["error"] = str(e)
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
     return {
         "status": "healthy",
@@ -597,11 +602,16 @@ def get_health():
 
 @app.get("/api/energy", response_model=EnergyResponse)
 def get_energy(
+    response: Response,
     country: str = Query(default="PH"),
     region: str = Query(default="ALL"),
     range: str = Query(default="7d"),
     interval: Optional[str] = Query(default=None),
 ):
+    response.headers["Cache-Control"] = (
+        "public, s-maxage=60, stale-while-revalidate=300"
+    )
+
     country = country.upper()
     range_val = range.lower()
     c_meta = COUNTRIES_METADATA.get(country, COUNTRIES_METADATA["PH"])
@@ -845,7 +855,6 @@ def get_energy(
                             ),
                         ]
 
-                    conn.close()
                     return EnergyResponse(
                         country=country,
                         region=region,
@@ -860,6 +869,7 @@ def get_energy(
                     )
         except Exception as e:
             print(f"[API] DuckDB execution error: {e}")
+        finally:
             try:
                 conn.close()
             except Exception:
@@ -880,9 +890,14 @@ def get_energy(
 
 @app.get("/api/facilities", response_model=FacilitiesResponse)
 def get_facilities(
+    response: Response,
     country: str = Query(default="PH"),
     region: Optional[str] = Query(default=None),
 ):
+    response.headers["Cache-Control"] = (
+        "public, s-maxage=3600, stale-while-revalidate=86400"
+    )
+
     country = country.upper()
     conn, source = get_duckdb_connection()
 
@@ -895,7 +910,6 @@ def get_facilities(
                 params.append(region.upper())
 
             rows = conn.execute(sql, params).fetchall()
-            conn.close()
 
             if rows:
                 facilities = [
@@ -920,6 +934,11 @@ def get_facilities(
                 )
         except Exception as e:
             print(f"[API] Facilities DuckDB error: {e}")
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
     # Fallback to static JSON catalog
     if country == "PH" and GENERATORS_JSON.exists():
