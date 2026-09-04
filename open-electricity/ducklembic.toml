@@ -4,4 +4,4 @@ local_path = "open_nem_ph.duckdb"
 motherduck_database = "open_electricity_db"
 
 [migrations]
-directory = "packages/pipeline/pipeline/migrations"
+directory = "migrations"

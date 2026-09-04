@@ -39,9 +39,7 @@ def load_config() -> dict:
     config = {
         "local_path": os.getenv("DUCKLEMBIC_LOCAL_PATH", "open_nem_ph.duckdb"),
         "motherduck_database": os.getenv("MOTHERDUCK_DATABASE", "open_electricity_db"),
-        "migrations_dir": os.getenv(
-            "DUCKLEMBIC_MIGRATIONS_DIR", "packages/pipeline/pipeline/migrations"
-        ),
+        "migrations_dir": os.getenv("DUCKLEMBIC_MIGRATIONS_DIR", "migrations"),
     }
 
     cfg_file = find_config_path()

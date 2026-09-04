@@ -29,6 +29,9 @@ open-electricity/
 ├── api/
 │   ├── index.py                    # FastAPI Backend (Vercel Serverless Function)
 │   └── requirements.txt            # FastAPI Python dependencies
+├── migrations/                     # Versioned SQL migrations (managed by ducklembic)
+│   ├── 001_initial_schema.up.sql
+│   └── 001_initial_schema.down.sql
 ├── packages/
 │   ├── ducklembic/                 # Reusable DuckDB + MotherDuck migration & sync library
 │   └── pipeline/                   # Python data ingestion & ETL engine package (uv)
@@ -39,7 +42,6 @@ open-electricity/
 │           ├── generator_registry.py # Generator fuel tech mapper & heuristic resolver
 │           ├── data_processor.py   # 5-minute dispatch & regional aggregator
 │           ├── db.py               # DuckDB & MotherDuck storage layer (uses ducklembic)
-│           ├── migrations/         # Versioned SQL migration files
 │           ├── ingest.py           # CLI tool for daily sync & backfills
 │           └── data/
 │               └── generators_master.json # Philippine power plant catalog

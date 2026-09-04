@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from ducklembic import DuckDB, Migrator
@@ -7,9 +8,13 @@ from pipeline.config import (
     MOTHERDUCK_DATABASE,
     DB_MODE,
     COUNTRIES_CONFIG,
+    BASE_DIR,
 )
 
-MIGRATIONS_DIR = Path(__file__).resolve().parent / "migrations"
+MIGRATIONS_DIR_STR = os.getenv("DUCKLEMBIC_MIGRATIONS_DIR")
+MIGRATIONS_DIR = (
+    Path(MIGRATIONS_DIR_STR) if MIGRATIONS_DIR_STR else BASE_DIR / "migrations"
+)
 
 
 class Database:
