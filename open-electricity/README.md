@@ -30,19 +30,19 @@ open-electricity/
 │   ├── index.py                    # FastAPI Backend (Vercel Serverless Function)
 │   └── requirements.txt            # FastAPI Python dependencies
 ├── packages/
-│   └── ducklembic/                 # Reusable DuckDB + MotherDuck migration & sync library
-├── pipeline/                       # Python data ingestion & ETL engine (uv)
-│   ├── config.py                   # Configuration & constants
-│   ├── iemop_client.py             # IEMOP AJAX downloader & ZIP/CSV unpacker
-│   ├── generator_registry.py       # Generator fuel tech mapper & heuristic resolver
-│   ├── data_processor.py           # 5-minute dispatch & regional aggregator
-│   ├── db.py                       # DuckDB & MotherDuck storage layer (uses ducklembic)
-│   ├── migrations/                 # Versioned SQL migration files
-│   │   ├── 001_initial_schema.up.sql
-│   │   └── 001_initial_schema.down.sql
-│   ├── ingest.py                   # CLI tool for daily sync & backfills
-│   └── data/
-│       └── generators_master.json  # Comprehensive Philippine power plant catalog
+│   ├── ducklembic/                 # Reusable DuckDB + MotherDuck migration & sync library
+│   └── pipeline/                   # Python data ingestion & ETL engine package (uv)
+│       ├── pyproject.toml          # Pipeline package definition & CLI entry points
+│       └── pipeline/
+│           ├── config.py           # Configuration & constants
+│           ├── iemop_client.py     # IEMOP AJAX downloader & ZIP/CSV unpacker
+│           ├── generator_registry.py # Generator fuel tech mapper & heuristic resolver
+│           ├── data_processor.py   # 5-minute dispatch & regional aggregator
+│           ├── db.py               # DuckDB & MotherDuck storage layer (uses ducklembic)
+│           ├── migrations/         # Versioned SQL migration files
+│           ├── ingest.py           # CLI tool for daily sync & backfills
+│           └── data/
+│               └── generators_master.json # Philippine power plant catalog
 ├── src/                            # Next.js 14 Frontend
 │   ├── app/                        # Next.js App Router (Dashboard)
 │   ├── components/                 # Charts, KPI cards, Fuel table, Interconnectors

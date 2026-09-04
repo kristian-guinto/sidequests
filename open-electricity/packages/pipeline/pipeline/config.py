@@ -1,20 +1,27 @@
 import os
 from pathlib import Path
 
-# Load environment variables from .env if present
-BASE_DIR = Path(__file__).resolve().parent.parent
+# Base directory points to the monorepo/workspace root
+# (packages/pipeline/pipeline/config.py -> 3 levels up to packages, 4 to root)
+REPO_ROOT = Path(__file__).resolve().parents[3]
+BASE_DIR = REPO_ROOT
 
 try:
-    from dotenv import load_dotenv
+    from dotenv import load_dotenv, find_dotenv
 
-    load_dotenv(BASE_DIR / ".env")
+    env_path = find_dotenv(usecwd=True) or (REPO_ROOT / ".env")
+    if env_path:
+        load_dotenv(env_path)
 except ImportError:
     pass
 
 MOTHERDUCK_TOKEN = os.getenv("MOTHERDUCK_TOKEN", "")
 MOTHERDUCK_DATABASE = os.getenv("MOTHERDUCK_DATABASE", "open_electricity_db")
 DB_MODE = os.getenv("DB_MODE", "auto")  # "motherduck", "duckdb", or "auto"
-DUCKDB_PATH = BASE_DIR / "open_nem_ph.duckdb"
+DUCKDB_PATH_STR = os.getenv("DUCKDB_PATH") or os.getenv("DUCKLEMBIC_LOCAL_PATH")
+DUCKDB_PATH = (
+    Path(DUCKDB_PATH_STR) if DUCKDB_PATH_STR else BASE_DIR / "open_nem_ph.duckdb"
+)
 
 # Southeast Asia Countries Configuration
 COUNTRIES_CONFIG = {

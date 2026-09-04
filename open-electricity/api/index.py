@@ -31,7 +31,11 @@ load_dotenv(BASE_DIR / ".env")
 MOTHERDUCK_TOKEN = os.getenv("MOTHERDUCK_TOKEN", "")
 MOTHERDUCK_DATABASE = os.getenv("MOTHERDUCK_DATABASE", "open_electricity_db")
 DUCKDB_PATH = BASE_DIR / "open_nem_ph.duckdb"
-GENERATORS_JSON = BASE_DIR / "pipeline" / "data" / "generators_master.json"
+GENERATORS_JSON = (
+    BASE_DIR / "packages" / "pipeline" / "pipeline" / "data" / "generators_master.json"
+)
+if not GENERATORS_JSON.exists():
+    GENERATORS_JSON = BASE_DIR / "pipeline" / "data" / "generators_master.json"
 
 app = FastAPI(
     title="OpenElectricity API",

@@ -21,7 +21,11 @@ class DuckDB:
         self.local_path = (
             Path(local_path) if str(local_path) != ":memory:" else ":memory:"
         )
-        self.motherduck_token = motherduck_token or os.getenv("MOTHERDUCK_TOKEN")
+        self.motherduck_token = (
+            motherduck_token
+            if motherduck_token is not None
+            else os.getenv("MOTHERDUCK_TOKEN")
+        )
         self.motherduck_database = (
             motherduck_database or os.getenv("MOTHERDUCK_DATABASE") or "my_db"
         )
