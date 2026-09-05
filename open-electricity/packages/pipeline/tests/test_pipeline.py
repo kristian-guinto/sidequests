@@ -120,3 +120,23 @@ def test_api_get_energy_ranges_and_filters():
     assert res_sg.interval == "30m"
     assert len(res_sg.points) > 0
 
+
+def test_api_health():
+    from api.index import get_health
+
+    health = get_health(response=Response())
+    assert health["status"] == "healthy"
+    assert "energy_interval" in health["tables"]
+    assert "energy_daily" in health["tables"]
+    assert "exchange_rates" in health["tables"]
+    assert health["tables"]["energy_interval"] > 0
+
+
+def test_api_get_energy_not_found():
+    import pytest
+    from fastapi import HTTPException
+
+    with pytest.raises(HTTPException) as excinfo:
+        get_energy(response=Response(), country="VN", range="7d")
+    assert excinfo.value.status_code == 404
+

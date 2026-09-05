@@ -203,18 +203,14 @@ class Database:
                 float(r.get("vwap_price_dollar"))
                 if r.get("vwap_price_dollar") is not None
                 else (
-                    round(p_local / fx, 2)
-                    if p_local is not None and fx > 0
-                    else None
+                    round(p_local / fx, 2) if p_local is not None and fx > 0 else None
                 )
             )
             t_dollar = (
                 float(r.get("twap_price_dollar"))
                 if r.get("twap_price_dollar") is not None
                 else (
-                    round(t_local / fx, 2)
-                    if t_local is not None and fx > 0
-                    else None
+                    round(t_local / fx, 2) if t_local is not None and fx > 0 else None
                 )
             )
 
@@ -232,10 +228,7 @@ class Database:
                         )
                     ),
                     float(
-                        r.get(
-                            "peak_generation_mw", r.get("peak_demand_mw", 0.0)
-                        )
-                        or 0.0
+                        r.get("peak_generation_mw", r.get("peak_demand_mw", 0.0)) or 0.0
                     ),
                     p_local,
                     t_local,
@@ -369,7 +362,7 @@ class Database:
             try:
                 cnt = self.conn.execute(
                     f"SELECT COUNT(*) FROM {tbl}{country_filter if tbl != 'exchange_rates' else ''}",
-                    c_params if tbl != 'exchange_rates' else [],
+                    c_params if tbl != "exchange_rates" else [],
                 ).fetchone()[0]
                 time_span = "—"
                 if tbl == "energy_interval" and cnt > 0:
@@ -382,7 +375,7 @@ class Database:
                 elif tbl in ("energy_daily", "exchange_rates") and cnt > 0:
                     min_d, max_d = self.conn.execute(
                         f"SELECT MIN(date), MAX(date) FROM {tbl}{country_filter if tbl != 'exchange_rates' else ''}",
-                        c_params if tbl != 'exchange_rates' else [],
+                        c_params if tbl != "exchange_rates" else [],
                     ).fetchone()
                     if min_d and max_d:
                         time_span = f"{min_d} -> {max_d}"
