@@ -28,7 +28,7 @@ open-electricity/
 │       └── daily_pipeline.yml      # Automated daily GitHub Actions cron (uv run ingest)
 ├── api/
 │   ├── index.py                    # FastAPI Backend (Vercel Serverless Function)
-│   └── requirements.txt            # FastAPI Python dependencies
+│   └── pyproject.toml              # FastAPI Python dependencies
 ├── migrations/                     # Versioned SQL migrations (managed by ducklembic)
 │   ├── 001_initial_schema.up.sql
 │   └── 001_initial_schema.down.sql
