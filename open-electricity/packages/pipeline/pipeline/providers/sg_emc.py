@@ -212,6 +212,7 @@ class SingaporeEMCProvider(BaseProvider):
                     {
                         "country_code": "SG",
                         "timestamp": ts_str,
+                        "interval_duration_mins": 30,
                         "region": "SINGAPORE",
                         "fuel_tech": fuel,
                         "generation_mw": round(gen, 2),
@@ -285,6 +286,7 @@ class SingaporeEMCProvider(BaseProvider):
                 {
                     "country_code": "SG",
                     "timestamp": ts_str,
+                    "interval_duration_mins": 30,
                     "region": "SINGAPORE",
                     "demand_mw": round(demand_mw, 1),
                     "generation_mw": round(gen_mw, 1),

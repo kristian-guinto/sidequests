@@ -17,7 +17,7 @@ except ImportError:
 
 MOTHERDUCK_TOKEN = os.getenv("MOTHERDUCK_TOKEN", "")
 MOTHERDUCK_DATABASE = os.getenv("MOTHERDUCK_DATABASE", "open_electricity_db")
-DB_MODE = os.getenv("DB_MODE", "auto")  # "motherduck", "duckdb", or "auto"
+DB_MODE = os.getenv("DB_MODE", "local")  # "local", "duckdb", or "motherduck"
 DUCKDB_PATH_STR = os.getenv("DUCKDB_PATH") or os.getenv("DUCKLEMBIC_LOCAL_PATH")
 DUCKDB_PATH = (
     Path(DUCKDB_PATH_STR) if DUCKDB_PATH_STR else BASE_DIR / "open_nem_ph.duckdb"

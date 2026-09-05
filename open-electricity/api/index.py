@@ -234,11 +234,21 @@ class FacilitiesResponse(BaseModel):
 
 
 def get_duckdb_connection():
-    """Returns a DuckDB connection to MotherDuck (if token set) or local file."""
+    """Returns a DuckDB connection to local file (or MotherDuck only if DB_MODE=motherduck)."""
+    mode = os.getenv("DB_MODE", "local").lower()
+
+    if mode != "motherduck":
+        if DUCKDB_PATH.exists():
+            try:
+                conn = duckdb.connect(str(DUCKDB_PATH), read_only=True)
+                return conn, "duckdb_local"
+            except Exception as e:
+                print(f"[DuckDB] Local DuckDB connection failed: {e}")
+
     token = os.getenv("MOTHERDUCK_TOKEN", MOTHERDUCK_TOKEN)
     database = os.getenv("MOTHERDUCK_DATABASE", MOTHERDUCK_DATABASE)
 
-    if token:
+    if token and mode == "motherduck":
         try:
             config = {
                 "motherduck_token": token,
@@ -616,261 +626,309 @@ def get_energy(
         "public, s-maxage=60, stale-while-revalidate=300"
     )
 
-    country = country.upper()
-    range_val = range.lower()
+    country = (country if isinstance(country, str) else "PH").upper()
+    region = region if isinstance(region, str) else "ALL"
+    range_val = (range if isinstance(range, str) else "7d").lower()
     c_meta = COUNTRIES_METADATA.get(country, COUNTRIES_METADATA["PH"])
     cfg = RANGE_CONFIG.get(range_val, RANGE_CONFIG["7d"])
-    active_interval = interval.lower() if interval else cfg["defaultInterval"]
+    active_interval = (
+        interval.lower()
+        if isinstance(interval, str) and interval
+        else cfg["defaultInterval"]
+    )
     unit = cfg["unit"]
 
     # 1. Try DuckDB / MotherDuck
     conn, source = get_duckdb_connection()
     if conn:
         try:
-            # Check maximum timestamp in table
-            max_row = conn.execute(
-                "SELECT MAX(timestamp) FROM energy_dispatch_5m WHERE country_code = ?",
-                [country],
-            ).fetchone()
+            use_daily = cfg["days"] >= 30 or active_interval in ("1d", "1w", "1M")
 
-            if max_row and max_row[0]:
-                max_str = str(max_row[0])
-                try:
-                    max_dt = datetime.fromisoformat(max_str.replace("Z", "+00:00"))
-                except Exception:
-                    max_dt = datetime.now(timezone.utc)
+            reg_clause = ""
+            reg_params: List[Any] = []
+            if region != "ALL" and region != c_meta["defaultRegion"]:
+                reg_clause = " AND region = ?"
+                reg_params.append(region)
+            elif region == "ALL" and country == "PH":
+                reg_clause = " AND region = 'ALL'"
 
-                cutoff_dt = max_dt - timedelta(days=cfg["days"])
-                cutoff_iso = cutoff_dt.isoformat()
+            dispatch_rows = []
+            net_map: Dict[str, Any] = {}
 
-                # Query 5m dispatch
-                dispatch_sql = """
-                    SELECT timestamp, region, fuel_tech, generation_mw, price_local, currency
-                    FROM energy_dispatch_5m
-                    WHERE country_code = ? AND timestamp >= ?
-                """
-                params = [country, cutoff_iso]
+            if use_daily:
+                # Query daily stats
+                max_row = conn.execute(
+                    "SELECT MAX(date) FROM energy_daily WHERE country_code = ?",
+                    [country],
+                ).fetchone()
+                if max_row and max_row[0]:
+                    max_d = max_row[0]
+                    cutoff_d = max_d - timedelta(days=cfg["days"])
+                    is_weekly = active_interval in ("1w", "1M") or cfg["days"] > 30
 
-                if region != "ALL" and region != c_meta["defaultRegion"]:
-                    dispatch_sql += " AND region = ?"
-                    params.append(region)
-                elif region == "ALL" and country == "PH":
-                    dispatch_sql += " AND region = 'ALL'"
+                    if is_weekly:
+                        time_expr = "strftime(time_bucket(INTERVAL '1 week', date), '%Y-%m-%d')"
+                        group_time = "time_bucket(INTERVAL '1 week', date)"
+                    else:
+                        time_expr = "date::VARCHAR"
+                        group_time = "date"
 
-                dispatch_sql += " ORDER BY timestamp ASC"
-                dispatch_rows = conn.execute(dispatch_sql, params).fetchall()
-
-                if dispatch_rows:
-                    # Query regional summary
-                    reg_sql = """
-                        SELECT timestamp, region, demand_mw, generation_mw, losses_mw, import_mw, export_mw, net_interconnector_mw, price_local, currency, renewables_pct
-                        FROM regional_summary_5m
-                        WHERE country_code = ? AND timestamp >= ?
+                    dispatch_sql = f"""
+                        SELECT
+                            {time_expr} AS b_time,
+                            fuel_tech,
+                            round(avg(avg_generation_mw), 1) AS mw,
+                            round(sum(energy_mwh), 2) AS mwh,
+                            round(avg(vwap_price_local), 2) AS price
+                        FROM energy_daily
+                        WHERE country_code = ? AND date >= ? {reg_clause}
+                        GROUP BY {group_time}, fuel_tech
+                        ORDER BY {group_time} ASC
                     """
-                    reg_params = [country, cutoff_iso]
-                    if region != "ALL" and region != c_meta["defaultRegion"]:
-                        reg_sql += " AND region = ?"
-                        reg_params.append(region)
-                    elif region == "ALL" and country == "PH":
-                        reg_sql += " AND region = 'ALL'"
+                    dispatch_rows = conn.execute(
+                        dispatch_sql, [country, cutoff_d] + reg_params
+                    ).fetchall()
 
-                    reg_sql += " ORDER BY timestamp ASC"
-                    reg_rows = conn.execute(reg_sql, reg_params).fetchall()
-                    reg_map = {r[0]: r for r in reg_rows}
+                    network_sql = f"""
+                        SELECT
+                            {time_expr} AS b_time,
+                            round(avg(avg_demand_mw), 1) AS demand,
+                            round(avg(vwap_price_local), 2) AS price,
+                            round(avg(renewables_pct), 1) AS ren_pct
+                        FROM network_daily
+                        WHERE country_code = ? AND date >= ? {reg_clause}
+                        GROUP BY {group_time}
+                        ORDER BY {group_time} ASC
+                    """
+                    network_rows = conn.execute(
+                        network_sql, [country, cutoff_d] + reg_params
+                    ).fetchall()
+                    net_map = {str(r[0]): r for r in network_rows}
+            else:
+                # Query interval dispatches
+                max_row = conn.execute(
+                    "SELECT MAX(interval_start) FROM energy_interval WHERE country_code = ?",
+                    [country],
+                ).fetchone()
+                if max_row and max_row[0]:
+                    max_dt = max_row[0]
+                    cutoff_dt = max_dt - timedelta(days=cfg["days"])
 
-                    # Bucket downsampling
-                    buckets: Dict[str, Dict[str, Any]] = {}
-                    fuel_totals_overall_mwh = {f: 0.0 for f in FUEL_META.keys()}
-                    grand_price_sum = 0.0
-                    grand_price_cnt = 0
+                    if active_interval == "5m":
+                        time_expr = "strftime(interval_start, '%Y-%m-%dT%H:%M:00+08:00')"
+                        group_time = "interval_start"
+                    elif active_interval in ("30m", "1h"):
+                        dur = "30 minutes" if active_interval == "30m" else "1 hour"
+                        time_expr = f"strftime(time_bucket(INTERVAL '{dur}', interval_start), '%Y-%m-%dT%H:%M:00+08:00')"
+                        group_time = f"time_bucket(INTERVAL '{dur}', interval_start)"
+                    else:
+                        time_expr = "strftime(time_bucket(INTERVAL '1 day', interval_start), '%Y-%m-%d')"
+                        group_time = "time_bucket(INTERVAL '1 day', interval_start)"
 
-                    duration_hrs = (5.0 / 60.0) if country == "PH" else (30.0 / 60.0)
+                    dispatch_sql = f"""
+                        SELECT
+                            {time_expr} AS b_time,
+                            fuel_tech,
+                            round(avg(generation_mw), 1) AS mw,
+                            round(sum(energy_mwh), 2) AS mwh,
+                            round(avg(price_local), 2) AS price
+                        FROM energy_interval
+                        WHERE country_code = ? AND interval_start >= ? {reg_clause}
+                        GROUP BY {group_time}, fuel_tech
+                        ORDER BY {group_time} ASC
+                    """
+                    dispatch_rows = conn.execute(
+                        dispatch_sql, [country, cutoff_dt] + reg_params
+                    ).fetchall()
 
-                    for row in dispatch_rows:
-                        ts, reg_val, fuel_raw, mw_val, p_val, curr_val = row
-                        fuel = str(fuel_raw or "").lower()
-                        mw = float(mw_val or 0.0)
-                        mwh = mw * duration_hrs
+                    network_sql = f"""
+                        SELECT
+                            {time_expr} AS b_time,
+                            round(avg(demand_mw), 1) AS demand,
+                            round(avg(price_local), 2) AS price,
+                            round(avg(renewables_pct), 1) AS ren_pct
+                        FROM network_interval
+                        WHERE country_code = ? AND interval_start >= ? {reg_clause}
+                        GROUP BY {group_time}
+                        ORDER BY {group_time} ASC
+                    """
+                    network_rows = conn.execute(
+                        network_sql, [country, cutoff_dt] + reg_params
+                    ).fetchall()
+                    net_map = {str(r[0]): r for r in network_rows}
 
-                        b_key = format_bucket_timestamp(ts, active_interval)
-                        if b_key not in buckets:
-                            buckets[b_key] = {
-                                "fuelMWh": {f: 0.0 for f in FUEL_META.keys()},
-                                "fuelMWSum": {f: 0.0 for f in FUEL_META.keys()},
-                                "fuelCount": {f: 0 for f in FUEL_META.keys()},
-                                "priceSum": 0.0,
-                                "priceCount": 0,
-                                "demandSum": 0.0,
-                                "demandCount": 0,
-                            }
+            if dispatch_rows:
+                time_buckets: Dict[str, Dict[str, Any]] = {}
+                fuel_totals_overall_mwh = {f: 0.0 for f in FUEL_META.keys()}
+                grand_price_sum = 0.0
+                grand_price_cnt = 0
+                is_energy_unit = unit == "GWh"
 
-                        b = buckets[b_key]
-                        if fuel in b["fuelMWh"]:
-                            b["fuelMWh"][fuel] += mwh
-                            b["fuelMWSum"][fuel] += mw
-                            b["fuelCount"][fuel] += 1
-
-                        if fuel in fuel_totals_overall_mwh:
-                            fuel_totals_overall_mwh[fuel] += mwh
-
-                        if p_val is not None:
-                            b["priceSum"] += float(p_val)
-                            b["priceCount"] += 1
-                            grand_price_sum += float(p_val)
-                            grand_price_cnt += 1
-
-                        if ts in reg_map:
-                            reg_r = reg_map[ts]
-                            if reg_r[2] is not None:
-                                b["demandSum"] += float(reg_r[2])
-                                b["demandCount"] += 1
-
-                    points: List[FuelGenerationPoint] = []
-                    peak_demand = 0.0
-                    min_demand = float("inf")
-                    is_energy_unit = unit == "GWh"
-
-                    for key, b in buckets.items():
-                        avg_price = (
-                            round(b["priceSum"] / b["priceCount"])
-                            if b["priceCount"] > 0
-                            else None
+                for b_time, fuel_raw, mw_val, mwh_val, p_val in dispatch_rows:
+                    b_str = str(b_time)
+                    if b_str not in time_buckets:
+                        time_buckets[b_str] = {
+                            "fuels_val": {f: 0.0 for f in FUEL_META.keys()},
+                            "price": p_val,
+                        }
+                    fuel = str(fuel_raw or "").lower()
+                    val = (mwh_val / 1000.0) if is_energy_unit else mw_val
+                    if fuel in time_buckets[b_str]["fuels_val"]:
+                        time_buckets[b_str]["fuels_val"][fuel] = round(
+                            val, 2 if is_energy_unit else 1
                         )
-                        avg_demand = (
-                            (b["demandSum"] / b["demandCount"])
-                            if b["demandCount"] > 0
+
+                    if fuel in fuel_totals_overall_mwh:
+                        fuel_totals_overall_mwh[fuel] += mwh_val
+
+                    if p_val is not None:
+                        grand_price_sum += float(p_val)
+                        grand_price_cnt += 1
+
+                points: List[FuelGenerationPoint] = []
+                peak_demand = 0.0
+                min_demand = float("inf")
+
+                for b_time, b in time_buckets.items():
+                    net_info = net_map.get(b_time)
+                    dem = (
+                        net_info[1]
+                        if net_info and net_info[1] is not None and net_info[1] > 0
+                        else None
+                    )
+                    if dem:
+                        peak_demand = max(peak_demand, dem)
+                        min_demand = min(min_demand, dem)
+
+                    price = (
+                        net_info[2]
+                        if net_info and net_info[2] is not None
+                        else b["price"]
+                    )
+                    ren_pct = (
+                        net_info[3]
+                        if net_info and net_info[3] is not None
+                        else None
+                    )
+
+                    b_tot_gen = sum(b["fuels_val"].values())
+                    b_ren_gen = sum(
+                        b["fuels_val"][f]
+                        for f in b["fuels_val"]
+                        if FUEL_META[f]["isRenewable"]
+                    )
+                    if ren_pct is None:
+                        ren_pct = (
+                            (b_ren_gen / b_tot_gen * 100.0)
+                            if b_tot_gen > 0
                             else 0.0
                         )
 
-                        pt_fuel = {}
-                        b_tot_gen = 0.0
-                        b_ren_gen = 0.0
-
-                        for f in FUEL_META.keys():
-                            if is_energy_unit:
-                                gwh = b["fuelMWh"][f] / 1000.0
-                                pt_fuel[f] = round(gwh, 2)
-                                b_tot_gen += gwh
-                                if FUEL_META[f]["isRenewable"]:
-                                    b_ren_gen += gwh
-                            else:
-                                cnt = b["fuelCount"][f] or 1
-                                avg_mw = b["fuelMWSum"][f] / cnt
-                                pt_fuel[f] = round(avg_mw, 1)
-                                b_tot_gen += avg_mw
-                                if FUEL_META[f]["isRenewable"]:
-                                    b_ren_gen += avg_mw
-
-                        ren_pct = (
-                            (b_ren_gen / b_tot_gen * 100.0) if b_tot_gen > 0 else 0.0
-                        )
-                        if avg_demand > 0:
-                            peak_demand = max(peak_demand, avg_demand)
-                            min_demand = min(min_demand, avg_demand)
-
-                        points.append(
-                            FuelGenerationPoint(
-                                timestamp=key,
-                                solar=pt_fuel.get("solar", 0.0),
-                                wind=pt_fuel.get("wind", 0.0),
-                                hydro=pt_fuel.get("hydro", 0.0),
-                                geothermal=pt_fuel.get("geothermal", 0.0),
-                                biomass=pt_fuel.get("biomass", 0.0),
-                                gas=pt_fuel.get("gas", 0.0),
-                                coal=pt_fuel.get("coal", 0.0),
-                                oil=pt_fuel.get("oil", 0.0),
-                                battery=pt_fuel.get("battery", 0.0),
-                                demand=round(avg_demand) if avg_demand > 0 else None,
-                                price=avg_price,
-                                totalGeneration=round(b_tot_gen, 1),
-                                renewablesPct=round(ren_pct, 1),
-                            )
-                        )
-
-                    tot_mwh = sum(fuel_totals_overall_mwh.values())
-                    tot_ren_mwh = sum(
-                        fuel_totals_overall_mwh[f]
-                        for f in fuel_totals_overall_mwh
-                        if FUEL_META[f]["isRenewable"]
-                    )
-                    tot_emissions = sum(
-                        fuel_totals_overall_mwh[f] * FUEL_META[f]["emissionsFactor"]
-                        for f in fuel_totals_overall_mwh
-                    )
-
-                    summary = SummaryMetrics(
-                        renewablesPct=round((tot_ren_mwh / tot_mwh * 100.0), 1)
-                        if tot_mwh > 0
-                        else 0.0,
-                        totalGenerationGWh=round(tot_mwh / 1000.0, 1),
-                        peakDemandMW=round(peak_demand),
-                        minDemandMW=round(min_demand)
-                        if min_demand != float("inf")
-                        else 0,
-                        avgPricePHPMWh=round(grand_price_sum / grand_price_cnt)
-                        if grand_price_cnt > 0
-                        else 0,
-                        currencySymbol=c_meta["currencySymbol"],
-                        currencyCode=c_meta["currencyCode"],
-                        emissionsIntensityGPerKWh=round(
-                            tot_emissions / tot_mwh * 1000.0
-                        )
-                        if tot_mwh > 0
-                        else 0,
-                        totalEmissionsTonnes=round(tot_emissions),
-                    )
-
-                    latest_pt = points[-1] if points else None
-                    breakdown = []
-                    for f, mwh in fuel_totals_overall_mwh.items():
-                        meta = FUEL_META[f]
-                        pct = round((mwh / tot_mwh * 100.0), 1) if tot_mwh > 0 else 0.0
-                        cur_val = getattr(latest_pt, f, 0.0) if latest_pt else 0.0
-                        breakdown.append(
-                            FuelBreakdownRow(
-                                fuelTech=f,
-                                label=meta["label"],
-                                color=meta["color"],
-                                generationMW=cur_val,
-                                energyGWh=round(mwh / 1000.0, 2),
-                                percentage=pct,
-                                isRenewable=meta["isRenewable"],
-                                emissionsTonnes=round(mwh * meta["emissionsFactor"]),
-                            )
-                        )
-                    breakdown.sort(key=lambda x: x.energyGWh, reverse=True)
-
-                    interconnectors = []
-                    if country == "PH":
-                        interconnectors = [
-                            InterconnectorFlow(
-                                name="Luzon - Visayas HVDC",
-                                fromRegion="LUZON",
-                                toRegion="VISAYAS",
-                                flowMW=180,
-                                capacityMW=440,
+                    points.append(
+                        FuelGenerationPoint(
+                            timestamp=b_time,
+                            solar=b["fuels_val"].get("solar", 0.0),
+                            wind=b["fuels_val"].get("wind", 0.0),
+                            hydro=b["fuels_val"].get("hydro", 0.0),
+                            geothermal=b["fuels_val"].get("geothermal", 0.0),
+                            biomass=b["fuels_val"].get("biomass", 0.0),
+                            gas=b["fuels_val"].get("gas", 0.0),
+                            coal=b["fuels_val"].get("coal", 0.0),
+                            oil=b["fuels_val"].get("oil", 0.0),
+                            battery=b["fuels_val"].get("battery", 0.0),
+                            demand=round(dem) if dem else None,
+                            price=round(price, 2) if price is not None else None,
+                            totalGeneration=round(
+                                b_tot_gen, 1 if not is_energy_unit else 2
                             ),
-                            InterconnectorFlow(
-                                name="Mindanao - Visayas (MVIP)",
-                                fromRegion="MINDANAO",
-                                toRegion="VISAYAS",
-                                flowMW=220,
-                                capacityMW=450,
-                            ),
-                        ]
-
-                    return EnergyResponse(
-                        country=country,
-                        region=region,
-                        range=range_val,
-                        interval=active_interval,
-                        source=source,
-                        unit=unit,
-                        points=points,
-                        summary=summary,
-                        breakdown=breakdown,
-                        interconnectors=interconnectors,
+                            renewablesPct=round(ren_pct, 1),
+                        )
                     )
+
+                tot_mwh = sum(fuel_totals_overall_mwh.values())
+                tot_ren_mwh = sum(
+                    fuel_totals_overall_mwh[f]
+                    for f in fuel_totals_overall_mwh
+                    if FUEL_META[f]["isRenewable"]
+                )
+                tot_emissions = sum(
+                    fuel_totals_overall_mwh[f] * FUEL_META[f]["emissionsFactor"]
+                    for f in fuel_totals_overall_mwh
+                )
+
+                summary = SummaryMetrics(
+                    renewablesPct=round((tot_ren_mwh / tot_mwh * 100.0), 1)
+                    if tot_mwh > 0
+                    else 0.0,
+                    totalGenerationGWh=round(tot_mwh / 1000.0, 1),
+                    peakDemandMW=round(peak_demand),
+                    minDemandMW=round(min_demand)
+                    if min_demand != float("inf")
+                    else 0,
+                    avgPricePHPMWh=round(grand_price_sum / grand_price_cnt)
+                    if grand_price_cnt > 0
+                    else 0,
+                    currencySymbol=c_meta["currencySymbol"],
+                    currencyCode=c_meta["currencyCode"],
+                    emissionsIntensityGPerKWh=round(
+                        tot_emissions / tot_mwh * 1000.0
+                    )
+                    if tot_mwh > 0
+                    else 0,
+                    totalEmissionsTonnes=round(tot_emissions),
+                )
+
+                latest_pt = points[-1] if points else None
+                breakdown = []
+                for f, mwh in fuel_totals_overall_mwh.items():
+                    meta = FUEL_META[f]
+                    pct = round((mwh / tot_mwh * 100.0), 1) if tot_mwh > 0 else 0.0
+                    cur_val = getattr(latest_pt, f, 0.0) if latest_pt else 0.0
+                    breakdown.append(
+                        FuelBreakdownRow(
+                            fuelTech=f,
+                            label=meta["label"],
+                            color=meta["color"],
+                            generationMW=cur_val,
+                            energyGWh=round(mwh / 1000.0, 2),
+                            percentage=pct,
+                            isRenewable=meta["isRenewable"],
+                            emissionsTonnes=round(mwh * meta["emissionsFactor"]),
+                        )
+                    )
+                breakdown.sort(key=lambda x: x.energyGWh, reverse=True)
+
+                interconnectors = []
+                if country == "PH":
+                    interconnectors = [
+                        InterconnectorFlow(
+                            name="Luzon - Visayas HVDC",
+                            fromRegion="LUZON",
+                            toRegion="VISAYAS",
+                            flowMW=180,
+                            capacityMW=440,
+                        ),
+                        InterconnectorFlow(
+                            name="Mindanao - Visayas (MVIP)",
+                            fromRegion="MINDANAO",
+                            toRegion="VISAYAS",
+                            flowMW=220,
+                            capacityMW=450,
+                        ),
+                    ]
+
+                return EnergyResponse(
+                    country=country,
+                    region=region,
+                    range=range_val,
+                    interval=active_interval,
+                    source=source,
+                    unit=unit,
+                    points=points,
+                    summary=summary,
+                    breakdown=breakdown,
+                    interconnectors=interconnectors,
+                )
         except Exception as e:
             print(f"[API] DuckDB execution error: {e}")
         finally:
@@ -887,7 +945,6 @@ def get_energy(
         range=range_val,
         interval=active_interval,
         source="simulation_dataset",
-        unit=unit,
         **sim,
     )
 

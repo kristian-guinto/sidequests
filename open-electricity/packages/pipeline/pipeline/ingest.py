@@ -107,13 +107,8 @@ def run_ph_sync(
 
     # 4. Daily Rollups
     print("\n[4/4] Computing Daily Rollups & Emissions...")
-    total_daily_synced = 0
-    if all_dispatch_records:
-        daily_stats = processor.compute_daily_rollups(all_dispatch_records, [])
-        for d in daily_stats:
-            d["country_code"] = "PH"
-        total_daily_synced = db.upsert_daily_stats(daily_stats, country_code="PH")
-    print(f"  ✓ Synced {total_daily_synced} daily rollup records.")
+    db.compute_daily_rollups("PH", start_date=start_date, end_date=end_date)
+    print("  ✓ Computed and synchronized daily rollup records.")
 
 
 def run_provider_sync(
@@ -148,61 +143,9 @@ def run_provider_sync(
     print(f"  ✓ Synced {synced_disp} interval dispatch records.")
 
     # 4. Compute Daily Stats
-    if dispatch:
-        fuel_daily = {}
-        for row in dispatch:
-            dt_key = row["timestamp"][:10]
-            region = row["region"]
-            fuel = row["fuel_tech"]
-            key = (dt_key, region, fuel)
-            if key not in fuel_daily:
-                fuel_daily[key] = {
-                    "mwh": 0.0,
-                    "price_sum": 0.0,
-                    "price_cnt": 0,
-                    "max_mw": 0.0,
-                    "min_mw": float("inf"),
-                }
-            b = fuel_daily[key]
-            # 30-min interval: mwh = mw * 0.5
-            mw = row["generation_mw"]
-            b["mwh"] += mw * 0.5
-            b["max_mw"] = max(b["max_mw"], mw)
-            b["min_mw"] = min(b["min_mw"], mw)
-            if row.get("price_local") is not None:
-                b["price_sum"] += row["price_local"]
-                b["price_cnt"] += 1
-
-        daily_records = []
-        em_factors = {
-            "coal": 0.90,
-            "gas": 0.38,
-            "oil": 0.75,
-            "biomass": 0.02,
-            "geothermal": 0.05,
-        }
-
-        for (d_str, reg, fuel), v in fuel_daily.items():
-            avg_p = (v["price_sum"] / v["price_cnt"]) if v["price_cnt"] > 0 else None
-            em_t = v["mwh"] * em_factors.get(fuel, 0.0)
-            daily_records.append(
-                {
-                    "country_code": country,
-                    "date": d_str,
-                    "region": reg,
-                    "fuel_tech": fuel,
-                    "energy_mwh": round(v["mwh"], 2),
-                    "avg_price_local": round(avg_p, 2) if avg_p is not None else None,
-                    "peak_demand_mw": round(v["max_mw"], 1),
-                    "min_demand_mw": round(v["min_mw"], 1)
-                    if v["min_mw"] != float("inf")
-                    else 0.0,
-                    "emissions_tco2": round(em_t, 2),
-                }
-            )
-
-        synced_daily = db.upsert_daily_stats(daily_records, country_code=country)
-        print(f"  ✓ Computed and synced {synced_daily} daily rollup records.")
+    print(f"\n[4/4] Computing Daily Rollups & Emissions ({country})...")
+    db.compute_daily_rollups(country, start_date=start_date, end_date=end_date)
+    print("  ✓ Computed and synchronized daily rollup records.")
 
 
 def app():
