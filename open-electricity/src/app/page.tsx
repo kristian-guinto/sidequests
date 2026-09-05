@@ -12,7 +12,6 @@ import {
   FuelTech,
   SummaryMetrics,
   FuelBreakdownRow,
-  InterconnectorFlow,
   RANGE_CONFIG,
   COUNTRIES_METADATA,
 } from "@/lib/types";
@@ -35,7 +34,6 @@ export default function DashboardPage() {
   const [points, setPoints] = useState<FuelGenerationPoint[]>([]);
   const [summary, setSummary] = useState<SummaryMetrics | null>(null);
   const [breakdown, setBreakdown] = useState<FuelBreakdownRow[]>([]);
-  const [interconnectors, setInterconnectors] = useState<InterconnectorFlow[]>([]);
   const [dataSource, setDataSource] = useState<string>("live");
 
   // Real-time hover cursor interaction state
@@ -82,7 +80,6 @@ export default function DashboardPage() {
         setPoints(json.points || []);
         setSummary(json.summary || null);
         setBreakdown(json.breakdown || []);
-        setInterconnectors(json.interconnectors || []);
         setDataSource(json.source || "api");
       } else {
         throw new Error("Failed to fetch API data");
@@ -93,7 +90,6 @@ export default function DashboardPage() {
       setPoints(fallback.points);
       setSummary(fallback.summary);
       setBreakdown(fallback.breakdown);
-      setInterconnectors(fallback.interconnectors);
       setDataSource("simulation_dataset");
     } finally {
       setIsLoading(false);
@@ -164,7 +160,6 @@ export default function DashboardPage() {
             <DataSidebar
               breakdown={breakdown}
               summary={summary}
-              interconnectors={interconnectors}
               hoveredPoint={hoveredPoint}
               hoveredFuel={hoveredFuel}
               onHoverFuel={setHoveredFuel}

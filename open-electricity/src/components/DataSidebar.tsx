@@ -5,12 +5,11 @@ import {
   FuelBreakdownRow,
   FuelGenerationPoint,
   SummaryMetrics,
-  InterconnectorFlow,
   FuelTech,
   PaletteMode,
 } from "@/lib/types";
 import { getFuelMeta } from "@/lib/colors";
-import { ChevronDown, PieChart as PieIcon, List, Globe, Zap, CloudFog, TrendingUp } from "lucide-react";
+import { ChevronDown, PieChart as PieIcon, List, Zap, CloudFog, TrendingUp } from "lucide-react";
 import ReactECharts from "echarts-for-react";
 import { format, parseISO } from "date-fns";
 import { useTheme } from "@/components/ThemeProvider";
@@ -18,7 +17,6 @@ import { useTheme } from "@/components/ThemeProvider";
 interface DataSidebarProps {
   breakdown: FuelBreakdownRow[];
   summary: SummaryMetrics | null;
-  interconnectors: InterconnectorFlow[];
   hoveredPoint: FuelGenerationPoint | null;
   hoveredFuel?: FuelTech | null;
   onHoverFuel?: (fuel: FuelTech | null) => void;
@@ -44,7 +42,6 @@ const FUEL_DISPLAY_ORDER: FuelTech[] = [
 export function DataSidebar({
   breakdown,
   summary,
-  interconnectors,
   hoveredPoint,
   hoveredFuel,
   onHoverFuel,
@@ -86,8 +83,7 @@ export function DataSidebar({
     if (isHovered && hoveredPoint) {
       const pt = hoveredPoint;
       const totalGen = pt.totalGeneration || 1;
-      const ptPrice = pt.price || summary?.avgPricePHPMWh || 0;
-      const demandVal = pt.demand || 0;
+      const ptPrice = pt.price || summary?.avgPriceLocal || 0;
 
       // Calculate emissions for point in time (5-minute interval)
       const coalT = (pt.coal || 0) * (5.0 / 60.0) * 0.9;
@@ -124,16 +120,16 @@ export function DataSidebar({
         renPctDisplay: `${renPct.toFixed(1)}%`,
         priceDisplay: `${currencySymbol}${Math.round(ptPrice).toLocaleString()}`,
         emissionsDisplay: `${totalEmissionsT.toFixed(1)} tCO₂e`,
-        demandDisplay: demandVal > 0 ? `${Math.round(demandVal).toLocaleString()} MW` : null,
+        peakDisplay: null,
         columnUnit: "Power",
         unitSub: "MW",
       };
     } else {
       const isEnergy = unit === "GWh";
       const totalGWh = summary?.totalGenerationGWh || 0;
-      const avgPrice = summary?.avgPricePHPMWh || 0;
+      const avgPrice = summary?.avgPriceLocal || 0;
       const totalEmissions = summary?.totalEmissionsTonnes || 0;
-      const peakDemand = summary?.peakDemandMW || 0;
+      const peakGen = summary?.peakGenerationMW || 0;
 
       const rows = FUEL_DISPLAY_ORDER.map((fKey) => {
         const meta = getFuelMeta(fKey, isDark, paletteMode);
@@ -176,7 +172,7 @@ export function DataSidebar({
         renPctDisplay: `${renPct.toFixed(1)}%`,
         priceDisplay: `${currencySymbol}${Math.round(avgPrice).toLocaleString()}`,
         emissionsDisplay: totalEmissions > 0 ? `${Math.round(totalEmissions).toLocaleString()} tCO₂e` : null,
-        demandDisplay: peakDemand > 0 ? `Peak ${Math.round(peakDemand).toLocaleString()} MW` : null,
+        peakDisplay: peakGen > 0 ? `Peak ${Math.round(peakGen).toLocaleString()} MW` : null,
         columnUnit: isEnergy ? "Energy" : "Power",
         unitSub: isEnergy ? "GWh" : "MW",
       };
@@ -392,15 +388,15 @@ export function DataSidebar({
                 </tr>
               )}
 
-              {/* Demand Row */}
-              {tableData.demandDisplay && (
+              {/* Peak Generation Row */}
+              {tableData.peakDisplay && (
                 <tr className="bg-neutral-50/20 dark:bg-[#121215]/30 text-neutral-700 dark:text-neutral-300 font-medium">
                   <td className="py-1.5 px-3 text-[11px] flex items-center space-x-1.5">
                     <TrendingUp className="h-3 w-3 text-neutral-400" />
-                    <span>Demand</span>
+                    <span>Peak Generation</span>
                   </td>
                   <td colSpan={3} className="py-1.5 px-3 text-right font-mono text-[11px] text-neutral-800 dark:text-neutral-200">
-                    {tableData.demandDisplay}
+                    {tableData.peakDisplay}
                   </td>
                 </tr>
               )}
@@ -413,27 +409,6 @@ export function DataSidebar({
           <div className="text-center text-[11px] text-neutral-500 dark:text-neutral-400 mt-2 font-mono">
             Total: <strong className="text-neutral-900 dark:text-white">{tableData.totalDisplay}</strong> &bull;
             Renewables: <strong className="text-emerald-600 dark:text-emerald-400">{tableData.renPctDisplay}</strong>
-          </div>
-        </div>
-      )}
-
-      {/* Bottom Sub-panel: Interconnectors & Grid Flow */}
-      {interconnectors.length > 0 && (
-        <div className="p-3 border-t border-neutral-100 dark:border-[#27272A] bg-neutral-50/30 dark:bg-[#121215]/40 text-[11px]">
-          <div className="font-semibold text-neutral-700 dark:text-neutral-300 mb-2 flex items-center space-x-1.5">
-            <Globe className="h-3 w-3 text-neutral-500 dark:text-neutral-400" />
-            <span>Interconnectors &amp; Grid Flows</span>
-          </div>
-          <div className="space-y-1.5">
-            {interconnectors.map((flow, i) => (
-              <div key={i} className="flex items-center justify-between text-neutral-600 dark:text-neutral-400">
-                <span className="truncate max-w-[180px]">{flow.name}</span>
-                <span className="font-mono font-medium text-neutral-900 dark:text-white">
-                  {flow.flowMW} MW{" "}
-                  <span className="text-[10px] text-neutral-400 dark:text-neutral-500">/ {flow.capacityMW}</span>
-                </span>
-              </div>
-            ))}
           </div>
         </div>
       )}

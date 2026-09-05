@@ -120,6 +120,13 @@ def test_api_get_energy_ranges_and_filters():
     assert res_sg.interval == "30m"
     assert len(res_sg.points) > 0
 
+    # Verify lean response model: no demand, no interconnectors, updated summary fields
+    assert not hasattr(res_1d, "interconnectors")
+    assert not hasattr(res_1d.points[0], "demand")
+    assert res_1d.summary.avgPriceLocal > 0
+    assert res_1d.summary.peakGenerationMW > 0
+    assert not hasattr(res_1d.summary, "minDemandMW")
+
 
 def test_api_health():
     from api.index import get_health

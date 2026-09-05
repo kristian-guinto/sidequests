@@ -6,7 +6,6 @@ import {
   TimeInterval,
   SummaryMetrics,
   FuelBreakdownRow,
-  InterconnectorFlow,
   RANGE_CONFIG,
   COUNTRIES_METADATA,
 } from "./types";
@@ -21,7 +20,6 @@ export function generateMockEnergyData(
   points: FuelGenerationPoint[];
   summary: SummaryMetrics;
   breakdown: FuelBreakdownRow[];
-  interconnectors: InterconnectorFlow[];
   unit: "MW" | "GWh";
 } {
   const activeInterval = interval || RANGE_CONFIG[range]?.defaultInterval || "30m";
@@ -204,7 +202,6 @@ export function generateMockEnergyData(
       coal: Math.round(coalMW * pointMultiplier * 10) / 10,
       oil: Math.round(oilMW * pointMultiplier * 10) / 10,
       battery: Math.round(batteryMW * pointMultiplier * 10) / 10,
-      demand: Math.round(totalSystemDemandMW * pointMultiplier * 10) / 10,
       price: Math.round(price * 10) / 10,
       totalGeneration: Math.round(totalGenMW * pointMultiplier * 10) / 10,
       renewablesPct: Math.round(renPct * 10) / 10,
@@ -219,9 +216,8 @@ export function generateMockEnergyData(
   const summary: SummaryMetrics = {
     renewablesPct: overallRenewablesPct,
     totalGenerationGWh: totalGenGWh,
-    peakDemandMW: Math.round(peakDemand),
-    minDemandMW: Math.round(minDemand),
-    avgPricePHPMWh: avgPrice,
+    peakGenerationMW: Math.round(peakDemand),
+    avgPriceLocal: avgPrice,
     currencySymbol: countryInfo.currencySymbol,
     currencyCode: countryInfo.currencyCode,
     emissionsIntensityGPerKWh: emissionsIntensity,
@@ -251,23 +247,5 @@ export function generateMockEnergyData(
     })
     .sort((a, b) => b.energyGWh - a.energyGWh);
 
-  let interconnectors: InterconnectorFlow[] = [];
-  if (country === "PH") {
-    interconnectors = [
-      { name: "Luzon - Visayas HVDC", fromRegion: "LUZON", toRegion: "VISAYAS", flowMW: 180, capacityMW: 440 },
-      { name: "Mindanao - Visayas (MVIP)", fromRegion: "MINDANAO", toRegion: "VISAYAS", flowMW: 220, capacityMW: 450 },
-    ];
-  } else if (country === "SG") {
-    interconnectors = [
-      { name: "LTMS-PIP (Lao PDR Clean Hydro)", fromRegion: "LAOS/MY", toRegion: "SINGAPORE", flowMW: 85, capacityMW: 100 },
-      { name: "Plentong - Woodlands Intertie", fromRegion: "MALAYSIA", toRegion: "SINGAPORE", flowMW: 0, capacityMW: 200 },
-    ];
-  } else if (country === "MY") {
-    interconnectors = [
-      { name: "Malaysia - Singapore Intertie", fromRegion: "PENINSULAR", toRegion: "SINGAPORE", flowMW: 85, capacityMW: 200 },
-      { name: "EGAT - TNB HVDC (Thailand)", fromRegion: "THAILAND", toRegion: "PENINSULAR", flowMW: 120, capacityMW: 300 },
-    ];
-  }
-
-  return { points, summary, breakdown, interconnectors, unit };
+  return { points, summary, breakdown, unit };
 }

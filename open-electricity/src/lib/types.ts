@@ -167,8 +167,8 @@ export interface FuelGenerationPoint {
   coal: number;
   oil: number;
   battery: number;
-  demand?: number;
   price?: number;
+  priceDollar?: number;
   totalGeneration?: number;
   renewablesPct?: number;
 }
@@ -176,9 +176,9 @@ export interface FuelGenerationPoint {
 export interface SummaryMetrics {
   renewablesPct: number;
   totalGenerationGWh: number;
-  peakDemandMW: number;
-  minDemandMW: number;
-  avgPricePHPMWh: number;
+  peakGenerationMW: number;
+  avgPriceLocal: number;
+  avgPriceUSD?: number;
   currencySymbol?: string;
   currencyCode?: string;
   emissionsIntensityGPerKWh: number;
@@ -194,24 +194,4 @@ export interface FuelBreakdownRow {
   percentage: number;
   isRenewable: boolean;
   emissionsTonnes: number;
-}
-
-export interface Facility {
-  country_code?: string;
-  resource_id: string;
-  facility_name: string;
-  region: string;
-  fuel_tech: FuelTech;
-  capacity_mw: number;
-  is_renewable: boolean;
-  emissions_factor: number;
-  status: string;
-}
-
-export interface InterconnectorFlow {
-  name: string;
-  fromRegion: string;
-  toRegion: string;
-  flowMW: number;
-  capacityMW: number;
 }

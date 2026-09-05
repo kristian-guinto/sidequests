@@ -168,7 +168,6 @@ class FuelGenerationPoint(BaseModel):
     coal: float = 0.0
     oil: float = 0.0
     battery: float = 0.0
-    demand: Optional[float] = None
     price: Optional[float] = None
     priceDollar: Optional[float] = None
     totalGeneration: Optional[float] = None
@@ -178,9 +177,8 @@ class FuelGenerationPoint(BaseModel):
 class SummaryMetrics(BaseModel):
     renewablesPct: float
     totalGenerationGWh: float
-    peakDemandMW: float
-    minDemandMW: float
-    avgPricePHPMWh: float
+    peakGenerationMW: float
+    avgPriceLocal: float
     avgPriceUSD: Optional[float] = None
     currencySymbol: Optional[str] = "₱"
     currencyCode: Optional[str] = "PHP"
@@ -199,14 +197,6 @@ class FuelBreakdownRow(BaseModel):
     emissionsTonnes: float
 
 
-class InterconnectorFlow(BaseModel):
-    name: str
-    fromRegion: str
-    toRegion: str
-    flowMW: float
-    capacityMW: float
-
-
 class EnergyResponse(BaseModel):
     country: str
     region: str
@@ -217,7 +207,6 @@ class EnergyResponse(BaseModel):
     points: List[FuelGenerationPoint]
     summary: SummaryMetrics
     breakdown: List[FuelBreakdownRow]
-    interconnectors: List[InterconnectorFlow]
 
 
 # ---------------------------------------------------------
@@ -459,8 +448,7 @@ def get_energy(
                 grand_usd_cnt += 1
 
         points: List[FuelGenerationPoint] = []
-        peak_demand = 0.0
-        min_demand = float("inf")
+        peak_gen = 0.0
 
         for b_time, b in time_buckets.items():
             b_tot_gen = sum(b["fuels_val"].values())
@@ -471,8 +459,7 @@ def get_energy(
             )
             ren_pct = (b_ren_gen / b_tot_gen * 100.0) if b_tot_gen > 0 else 0.0
 
-            peak_demand = max(peak_demand, b_tot_gen)
-            min_demand = min(min_demand, b_tot_gen)
+            peak_gen = max(peak_gen, b_tot_gen)
 
             points.append(
                 FuelGenerationPoint(
@@ -486,7 +473,6 @@ def get_energy(
                     coal=b["fuels_val"].get("coal", 0.0),
                     oil=b["fuels_val"].get("oil", 0.0),
                     battery=b["fuels_val"].get("battery", 0.0),
-                    demand=None,
                     price=round(b["price"], 2) if b["price"] is not None else None,
                     priceDollar=round(b["price_dollar"], 2)
                     if b["price_dollar"] is not None
@@ -512,9 +498,8 @@ def get_energy(
             if tot_mwh > 0
             else 0.0,
             totalGenerationGWh=round(tot_mwh / 1000.0, 1),
-            peakDemandMW=round(peak_demand),
-            minDemandMW=round(min_demand) if min_demand != float("inf") else 0,
-            avgPricePHPMWh=round(grand_price_sum / grand_price_cnt)
+            peakGenerationMW=round(peak_gen),
+            avgPriceLocal=round(grand_price_sum / grand_price_cnt)
             if grand_price_cnt > 0
             else 0,
             avgPriceUSD=round(grand_usd_sum / grand_usd_cnt, 2)
@@ -548,25 +533,6 @@ def get_energy(
             )
         breakdown.sort(key=lambda x: x.energyGWh, reverse=True)
 
-        interconnectors = []
-        if country == "PH":
-            interconnectors = [
-                InterconnectorFlow(
-                    name="Luzon - Visayas HVDC",
-                    fromRegion="LUZON",
-                    toRegion="VISAYAS",
-                    flowMW=180,
-                    capacityMW=440,
-                ),
-                InterconnectorFlow(
-                    name="Mindanao - Visayas (MVIP)",
-                    fromRegion="MINDANAO",
-                    toRegion="VISAYAS",
-                    flowMW=220,
-                    capacityMW=450,
-                ),
-            ]
-
         return EnergyResponse(
             country=country,
             region=region,
@@ -577,7 +543,6 @@ def get_energy(
             points=points,
             summary=summary,
             breakdown=breakdown,
-            interconnectors=interconnectors,
         )
     finally:
         try:
