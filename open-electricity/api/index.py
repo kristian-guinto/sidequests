@@ -63,30 +63,35 @@ COUNTRIES_METADATA = {
         "currencyCode": "PHP",
         "currencySymbol": "₱",
         "defaultRegion": "ALL",
+        "minInterval": "5m",
     },
     "SG": {
         "name": "Singapore",
         "currencyCode": "SGD",
         "currencySymbol": "S$",
         "defaultRegion": "SINGAPORE",
+        "minInterval": "30m",
     },
     "MY": {
         "name": "Malaysia",
         "currencyCode": "MYR",
         "currencySymbol": "RM",
         "defaultRegion": "PENINSULAR",
+        "minInterval": "30m",
     },
     "TH": {
         "name": "Thailand",
         "currencyCode": "THB",
         "currencySymbol": "฿",
         "defaultRegion": "THAILAND",
+        "minInterval": "30m",
     },
     "VN": {
         "name": "Vietnam",
         "currencyCode": "VND",
         "currencySymbol": "₫",
         "defaultRegion": "VIETNAM",
+        "minInterval": "30m",
     },
 }
 
@@ -173,6 +178,7 @@ class FuelGenerationPoint(BaseModel):
     battery: float = 0.0
     demand: Optional[float] = None
     price: Optional[float] = None
+    priceDollar: Optional[float] = None
     totalGeneration: Optional[float] = None
     renewablesPct: Optional[float] = None
 
@@ -183,6 +189,7 @@ class SummaryMetrics(BaseModel):
     peakDemandMW: float
     minDemandMW: float
     avgPricePHPMWh: float
+    avgPriceUSD: Optional[float] = None
     currencySymbol: Optional[str] = "₱"
     currencyCode: Optional[str] = "PHP"
     emissionsIntensityGPerKWh: float
@@ -636,6 +643,8 @@ def get_energy(
         if isinstance(interval, str) and interval
         else cfg["defaultInterval"]
     )
+    if c_meta.get("minInterval") == "30m" and active_interval == "5m":
+        active_interval = "30m"
     unit = cfg["unit"]
 
     # 1. Try DuckDB / MotherDuck
@@ -653,7 +662,6 @@ def get_energy(
                 reg_clause = " AND region = 'ALL'"
 
             dispatch_rows = []
-            net_map: Dict[str, Any] = {}
 
             if use_daily:
                 # Query daily stats
@@ -667,7 +675,9 @@ def get_energy(
                     is_weekly = active_interval in ("1w", "1M") or cfg["days"] > 30
 
                     if is_weekly:
-                        time_expr = "strftime(time_bucket(INTERVAL '1 week', date), '%Y-%m-%d')"
+                        time_expr = (
+                            "strftime(time_bucket(INTERVAL '1 week', date), '%Y-%m-%d')"
+                        )
                         group_time = "time_bucket(INTERVAL '1 week', date)"
                     else:
                         time_expr = "date::VARCHAR"
@@ -679,7 +689,8 @@ def get_energy(
                             fuel_tech,
                             round(avg(avg_generation_mw), 1) AS mw,
                             round(sum(energy_mwh), 2) AS mwh,
-                            round(avg(vwap_price_local), 2) AS price
+                            round(avg(vwap_price_local), 2) AS price,
+                            round(avg(vwap_price_dollar), 2) AS price_dollar
                         FROM energy_daily
                         WHERE country_code = ? AND date >= ? {reg_clause}
                         GROUP BY {group_time}, fuel_tech
@@ -688,22 +699,6 @@ def get_energy(
                     dispatch_rows = conn.execute(
                         dispatch_sql, [country, cutoff_d] + reg_params
                     ).fetchall()
-
-                    network_sql = f"""
-                        SELECT
-                            {time_expr} AS b_time,
-                            round(avg(avg_demand_mw), 1) AS demand,
-                            round(avg(vwap_price_local), 2) AS price,
-                            round(avg(renewables_pct), 1) AS ren_pct
-                        FROM network_daily
-                        WHERE country_code = ? AND date >= ? {reg_clause}
-                        GROUP BY {group_time}
-                        ORDER BY {group_time} ASC
-                    """
-                    network_rows = conn.execute(
-                        network_sql, [country, cutoff_d] + reg_params
-                    ).fetchall()
-                    net_map = {str(r[0]): r for r in network_rows}
             else:
                 # Query interval dispatches
                 max_row = conn.execute(
@@ -715,7 +710,9 @@ def get_energy(
                     cutoff_dt = max_dt - timedelta(days=cfg["days"])
 
                     if active_interval == "5m":
-                        time_expr = "strftime(interval_start, '%Y-%m-%dT%H:%M:00+08:00')"
+                        time_expr = (
+                            "strftime(interval_start, '%Y-%m-%dT%H:%M:00+08:00')"
+                        )
                         group_time = "interval_start"
                     elif active_interval in ("30m", "1h"):
                         dur = "30 minutes" if active_interval == "30m" else "1 hour"
@@ -731,7 +728,8 @@ def get_energy(
                             fuel_tech,
                             round(avg(generation_mw), 1) AS mw,
                             round(sum(energy_mwh), 2) AS mwh,
-                            round(avg(price_local), 2) AS price
+                            round(avg(price_local), 2) AS price,
+                            round(avg(price_dollar), 2) AS price_dollar
                         FROM energy_interval
                         WHERE country_code = ? AND interval_start >= ? {reg_clause}
                         GROUP BY {group_time}, fuel_tech
@@ -741,35 +739,22 @@ def get_energy(
                         dispatch_sql, [country, cutoff_dt] + reg_params
                     ).fetchall()
 
-                    network_sql = f"""
-                        SELECT
-                            {time_expr} AS b_time,
-                            round(avg(demand_mw), 1) AS demand,
-                            round(avg(price_local), 2) AS price,
-                            round(avg(renewables_pct), 1) AS ren_pct
-                        FROM network_interval
-                        WHERE country_code = ? AND interval_start >= ? {reg_clause}
-                        GROUP BY {group_time}
-                        ORDER BY {group_time} ASC
-                    """
-                    network_rows = conn.execute(
-                        network_sql, [country, cutoff_dt] + reg_params
-                    ).fetchall()
-                    net_map = {str(r[0]): r for r in network_rows}
-
             if dispatch_rows:
                 time_buckets: Dict[str, Dict[str, Any]] = {}
                 fuel_totals_overall_mwh = {f: 0.0 for f in FUEL_META.keys()}
                 grand_price_sum = 0.0
                 grand_price_cnt = 0
+                grand_usd_sum = 0.0
+                grand_usd_cnt = 0
                 is_energy_unit = unit == "GWh"
 
-                for b_time, fuel_raw, mw_val, mwh_val, p_val in dispatch_rows:
+                for b_time, fuel_raw, mw_val, mwh_val, p_val, p_usd in dispatch_rows:
                     b_str = str(b_time)
                     if b_str not in time_buckets:
                         time_buckets[b_str] = {
                             "fuels_val": {f: 0.0 for f in FUEL_META.keys()},
                             "price": p_val,
+                            "price_dollar": p_usd,
                         }
                     fuel = str(fuel_raw or "").lower()
                     val = (mwh_val / 1000.0) if is_energy_unit else mw_val
@@ -784,45 +769,27 @@ def get_energy(
                     if p_val is not None:
                         grand_price_sum += float(p_val)
                         grand_price_cnt += 1
+                    if p_usd is not None:
+                        grand_usd_sum += float(p_usd)
+                        grand_usd_cnt += 1
 
                 points: List[FuelGenerationPoint] = []
                 peak_demand = 0.0
                 min_demand = float("inf")
 
                 for b_time, b in time_buckets.items():
-                    net_info = net_map.get(b_time)
-                    dem = (
-                        net_info[1]
-                        if net_info and net_info[1] is not None and net_info[1] > 0
-                        else None
-                    )
-                    if dem:
-                        peak_demand = max(peak_demand, dem)
-                        min_demand = min(min_demand, dem)
-
-                    price = (
-                        net_info[2]
-                        if net_info and net_info[2] is not None
-                        else b["price"]
-                    )
-                    ren_pct = (
-                        net_info[3]
-                        if net_info and net_info[3] is not None
-                        else None
-                    )
-
                     b_tot_gen = sum(b["fuels_val"].values())
                     b_ren_gen = sum(
                         b["fuels_val"][f]
                         for f in b["fuels_val"]
                         if FUEL_META[f]["isRenewable"]
                     )
-                    if ren_pct is None:
-                        ren_pct = (
-                            (b_ren_gen / b_tot_gen * 100.0)
-                            if b_tot_gen > 0
-                            else 0.0
-                        )
+                    ren_pct = (
+                        (b_ren_gen / b_tot_gen * 100.0) if b_tot_gen > 0 else 0.0
+                    )
+
+                    peak_demand = max(peak_demand, b_tot_gen)
+                    min_demand = min(min_demand, b_tot_gen)
 
                     points.append(
                         FuelGenerationPoint(
@@ -836,8 +803,9 @@ def get_energy(
                             coal=b["fuels_val"].get("coal", 0.0),
                             oil=b["fuels_val"].get("oil", 0.0),
                             battery=b["fuels_val"].get("battery", 0.0),
-                            demand=round(dem) if dem else None,
-                            price=round(price, 2) if price is not None else None,
+                            demand=None,
+                            price=round(b["price"], 2) if b["price"] is not None else None,
+                            priceDollar=round(b["price_dollar"], 2) if b["price_dollar"] is not None else None,
                             totalGeneration=round(
                                 b_tot_gen, 1 if not is_energy_unit else 2
                             ),
@@ -862,17 +830,16 @@ def get_energy(
                     else 0.0,
                     totalGenerationGWh=round(tot_mwh / 1000.0, 1),
                     peakDemandMW=round(peak_demand),
-                    minDemandMW=round(min_demand)
-                    if min_demand != float("inf")
-                    else 0,
+                    minDemandMW=round(min_demand) if min_demand != float("inf") else 0,
                     avgPricePHPMWh=round(grand_price_sum / grand_price_cnt)
                     if grand_price_cnt > 0
                     else 0,
+                    avgPriceUSD=round(grand_usd_sum / grand_usd_cnt, 2)
+                    if grand_usd_cnt > 0
+                    else 0.0,
                     currencySymbol=c_meta["currencySymbol"],
                     currencyCode=c_meta["currencyCode"],
-                    emissionsIntensityGPerKWh=round(
-                        tot_emissions / tot_mwh * 1000.0
-                    )
+                    emissionsIntensityGPerKWh=round(tot_emissions / tot_mwh * 1000.0)
                     if tot_mwh > 0
                     else 0,
                     totalEmissionsTonnes=round(tot_emissions),

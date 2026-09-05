@@ -11,6 +11,7 @@ from pipeline.config import (
     BASE_DIR,
     DEFAULT_EMISSIONS_FACTOR,
 )
+from pipeline.fx import get_fx_rate, COUNTRY_TO_CURRENCY
 
 MIGRATIONS_DIR_STR = os.getenv("DUCKLEMBIC_MIGRATIONS_DIR")
 MIGRATIONS_DIR = (
@@ -91,8 +92,8 @@ class Database:
         if not records:
             return 0
 
-        currency = COUNTRIES_CONFIG.get(country_code, {}).get("currency", "PHP")
         default_dur = 5 if country_code.upper() == "PH" else 30
+        curr = COUNTRY_TO_CURRENCY.get(country_code.upper(), "PHP")
 
         data = []
         for r in records:
@@ -104,12 +105,7 @@ class Database:
                 else round(mw * (dur / 60.0), 4)
             )
             fuel = str(r.get("fuel_tech") or "").lower()
-            em = float(
-                r.get("emissions_tco2")
-                if r.get("emissions_tco2") is not None
-                else round(mwh * DEFAULT_EMISSIONS_FACTOR.get(fuel, 0.0), 4)
-            )
-            price = (
+            price_local = (
                 float(r.get("price_local", r.get("price_php_mwh")))
                 if (
                     r.get("price_local") is not None
@@ -117,36 +113,38 @@ class Database:
                 )
                 else None
             )
+            price_dollar = None
+            if price_local is not None:
+                fx = get_fx_rate(
+                    r["timestamp"], r.get("currency", curr), conn=self.conn
+                )
+                price_dollar = round(price_local / fx, 2) if fx > 0 else None
 
             data.append(
                 (
                     r.get("country_code", country_code).upper(),
                     r["timestamp"],
-                    dur,
                     r["region"],
                     fuel,
                     mw,
                     mwh,
-                    em,
-                    price,
-                    r.get("currency", currency),
+                    price_local,
+                    price_dollar,
                 )
             )
 
         self.conn.executemany(
             """
             INSERT INTO energy_interval (
-                country_code, interval_start, interval_duration_mins, region, fuel_tech,
-                generation_mw, energy_mwh, emissions_tco2, price_local, currency
+                country_code, interval_start, region, fuel_tech,
+                generation_mw, energy_mwh, price_local, price_dollar
             )
-            VALUES (?, ?::TIMESTAMPTZ, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?::TIMESTAMPTZ, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (country_code, interval_start, region, fuel_tech) DO UPDATE SET
-                interval_duration_mins = EXCLUDED.interval_duration_mins,
                 generation_mw = EXCLUDED.generation_mw,
                 energy_mwh = EXCLUDED.energy_mwh,
-                emissions_tco2 = EXCLUDED.emissions_tco2,
                 price_local = EXCLUDED.price_local,
-                currency = EXCLUDED.currency;
+                price_dollar = EXCLUDED.price_dollar;
         """,
             data,
         )
@@ -157,60 +155,7 @@ class Database:
     def upsert_network_interval(
         self, records: List[Dict[str, Any]], country_code: str = "PH"
     ) -> int:
-        if not records:
-            return 0
-
-        currency = COUNTRIES_CONFIG.get(country_code, {}).get("currency", "PHP")
-        default_dur = 5 if country_code.upper() == "PH" else 30
-
-        data = [
-            (
-                r.get("country_code", country_code).upper(),
-                r["timestamp"],
-                int(r.get("interval_duration_mins") or default_dur),
-                r["region"],
-                float(r.get("demand_mw", 0.0) or 0.0),
-                float(r.get("generation_mw", 0.0) or 0.0),
-                float(r.get("losses_mw", 0.0) or 0.0),
-                float(r.get("import_mw", 0.0) or 0.0),
-                float(r.get("export_mw", 0.0) or 0.0),
-                float(r.get("net_interconnector_mw", 0.0) or 0.0),
-                float(r.get("price_local", r.get("price_php_mwh")))
-                if (
-                    r.get("price_local") is not None
-                    or r.get("price_php_mwh") is not None
-                )
-                else None,
-                r.get("currency", currency),
-                float(r["renewables_pct"])
-                if r.get("renewables_pct") is not None
-                else None,
-            )
-            for r in records
-        ]
-
-        self.conn.executemany(
-            """
-            INSERT INTO network_interval (
-                country_code, interval_start, interval_duration_mins, region,
-                demand_mw, generation_mw, losses_mw, import_mw, export_mw,
-                net_interconnector_mw, price_local, currency, renewables_pct
-            )
-            VALUES (?, ?::TIMESTAMPTZ, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT (country_code, interval_start, region) DO UPDATE SET
-                interval_duration_mins = EXCLUDED.interval_duration_mins,
-                demand_mw = EXCLUDED.demand_mw,
-                generation_mw = EXCLUDED.generation_mw,
-                losses_mw = EXCLUDED.losses_mw,
-                import_mw = EXCLUDED.import_mw,
-                export_mw = EXCLUDED.export_mw,
-                net_interconnector_mw = EXCLUDED.net_interconnector_mw,
-                price_local = EXCLUDED.price_local,
-                currency = EXCLUDED.currency,
-                renewables_pct = EXCLUDED.renewables_pct;
-        """,
-            data,
-        )
+        """Backward compatibility no-op."""
         return len(records)
 
     upsert_regional_summary_5m = upsert_network_interval
@@ -221,26 +166,11 @@ class Database:
         if not records:
             return 0
 
-        currency = COUNTRIES_CONFIG.get(country_code, {}).get("currency", "PHP")
+        curr = COUNTRY_TO_CURRENCY.get(country_code.upper(), "PHP")
 
-        data = [
-            (
-                r.get("country_code", country_code).upper(),
-                r["date"],
-                r["region"],
-                r["fuel_tech"],
-                float(r.get("energy_mwh", 0.0) or 0.0),
-                float(
-                    r.get(
-                        "avg_generation_mw",
-                        (r.get("energy_mwh", 0.0) or 0.0) / 24.0,
-                    )
-                ),
-                float(
-                    r.get("peak_generation_mw", r.get("peak_demand_mw", 0.0))
-                    or 0.0
-                ),
-                float(r.get("emissions_tco2", 0.0) or 0.0),
+        data = []
+        for r in records:
+            p_local = (
                 float(
                     r.get(
                         "vwap_price_local",
@@ -252,7 +182,9 @@ class Database:
                     or r.get("avg_price_local") is not None
                     or r.get("avg_price_php_mwh") is not None
                 )
-                else None,
+                else None
+            )
+            t_local = (
                 float(
                     r.get(
                         "twap_price_local",
@@ -264,28 +196,70 @@ class Database:
                     or r.get("avg_price_local") is not None
                     or r.get("avg_price_php_mwh") is not None
                 )
-                else None,
-                r.get("currency", currency),
+                else None
             )
-            for r in records
-        ]
+            fx = get_fx_rate(r["date"], r.get("currency", curr), conn=self.conn)
+            p_dollar = (
+                float(r.get("vwap_price_dollar"))
+                if r.get("vwap_price_dollar") is not None
+                else (
+                    round(p_local / fx, 2)
+                    if p_local is not None and fx > 0
+                    else None
+                )
+            )
+            t_dollar = (
+                float(r.get("twap_price_dollar"))
+                if r.get("twap_price_dollar") is not None
+                else (
+                    round(t_local / fx, 2)
+                    if t_local is not None and fx > 0
+                    else None
+                )
+            )
+
+            data.append(
+                (
+                    r.get("country_code", country_code).upper(),
+                    r["date"],
+                    r["region"],
+                    r["fuel_tech"],
+                    float(r.get("energy_mwh", 0.0) or 0.0),
+                    float(
+                        r.get(
+                            "avg_generation_mw",
+                            (r.get("energy_mwh", 0.0) or 0.0) / 24.0,
+                        )
+                    ),
+                    float(
+                        r.get(
+                            "peak_generation_mw", r.get("peak_demand_mw", 0.0)
+                        )
+                        or 0.0
+                    ),
+                    p_local,
+                    t_local,
+                    p_dollar,
+                    t_dollar,
+                )
+            )
 
         self.conn.executemany(
             """
             INSERT INTO energy_daily (
                 country_code, date, region, fuel_tech, energy_mwh,
-                avg_generation_mw, peak_generation_mw, emissions_tco2,
-                vwap_price_local, twap_price_local, currency
+                avg_generation_mw, peak_generation_mw,
+                vwap_price_local, twap_price_local, vwap_price_dollar, twap_price_dollar
             )
             VALUES (?, ?::DATE, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (country_code, date, region, fuel_tech) DO UPDATE SET
                 energy_mwh = EXCLUDED.energy_mwh,
                 avg_generation_mw = EXCLUDED.avg_generation_mw,
                 peak_generation_mw = EXCLUDED.peak_generation_mw,
-                emissions_tco2 = EXCLUDED.emissions_tco2,
                 vwap_price_local = EXCLUDED.vwap_price_local,
                 twap_price_local = EXCLUDED.twap_price_local,
-                currency = EXCLUDED.currency;
+                vwap_price_dollar = EXCLUDED.vwap_price_dollar,
+                twap_price_dollar = EXCLUDED.twap_price_dollar;
         """,
             data,
         )
@@ -299,7 +273,7 @@ class Database:
         start_date: Optional[Any] = None,
         end_date: Optional[Any] = None,
     ) -> Dict[str, Any]:
-        """Aggregates energy_interval and network_interval into energy_daily and network_daily tables."""
+        """Aggregates energy_interval into energy_daily table with VWAP, TWAP, and USD conversions."""
         country = country_code.upper()
         date_cond = ""
         params: List[Any] = [country]
@@ -314,12 +288,12 @@ class Database:
             date_cond = " AND interval_start >= (SELECT COALESCE(MAX(interval_start) - INTERVAL '3 days', '2000-01-01'::TIMESTAMPTZ) FROM energy_interval WHERE country_code = ?)"
             params.append(country)
 
-        # 1. Rollup energy_daily
         energy_sql = f"""
             INSERT INTO energy_daily (
                 country_code, date, region, fuel_tech, energy_mwh,
-                avg_generation_mw, peak_generation_mw, emissions_tco2,
-                vwap_price_local, twap_price_local, currency
+                avg_generation_mw, peak_generation_mw,
+                vwap_price_local, twap_price_local,
+                vwap_price_dollar, twap_price_dollar
             )
             SELECT
                 country_code,
@@ -329,14 +303,18 @@ class Database:
                 round(sum(energy_mwh), 2) AS energy_mwh,
                 round(avg(generation_mw), 2) AS avg_generation_mw,
                 round(max(generation_mw), 2) AS peak_generation_mw,
-                round(sum(emissions_tco2), 2) AS emissions_tco2,
                 CASE
                     WHEN sum(energy_mwh) > 0 AND count(price_local) > 0
                     THEN round(sum(COALESCE(price_local, 0.0) * energy_mwh) / sum(energy_mwh), 2)
                     ELSE round(avg(price_local), 2)
                 END AS vwap_price_local,
                 round(avg(price_local), 2) AS twap_price_local,
-                max(currency) AS currency
+                CASE
+                    WHEN sum(energy_mwh) > 0 AND count(price_dollar) > 0
+                    THEN round(sum(COALESCE(price_dollar, 0.0) * energy_mwh) / sum(energy_mwh), 2)
+                    ELSE round(avg(price_dollar), 2)
+                END AS vwap_price_dollar,
+                round(avg(price_dollar), 2) AS twap_price_dollar
             FROM energy_interval
             WHERE country_code = ? {date_cond}
             GROUP BY country_code, interval_start::DATE, region, fuel_tech
@@ -344,50 +322,12 @@ class Database:
                 energy_mwh = EXCLUDED.energy_mwh,
                 avg_generation_mw = EXCLUDED.avg_generation_mw,
                 peak_generation_mw = EXCLUDED.peak_generation_mw,
-                emissions_tco2 = EXCLUDED.emissions_tco2,
                 vwap_price_local = EXCLUDED.vwap_price_local,
                 twap_price_local = EXCLUDED.twap_price_local,
-                currency = EXCLUDED.currency;
+                vwap_price_dollar = EXCLUDED.vwap_price_dollar,
+                twap_price_dollar = EXCLUDED.twap_price_dollar;
         """
         self.conn.execute(energy_sql, params)
-
-        # 2. Rollup network_daily
-        net_params = [country] + params[1:]
-        network_sql = f"""
-            INSERT INTO network_daily (
-                country_code, date, region, demand_mwh, avg_demand_mw, peak_demand_mw,
-                min_demand_mw, generation_mwh, renewables_pct, net_interconnector_mwh,
-                vwap_price_local, currency
-            )
-            SELECT
-                country_code,
-                interval_start::DATE AS date,
-                region,
-                round(sum(demand_mw * (interval_duration_mins / 60.0)), 2) AS demand_mwh,
-                round(avg(demand_mw), 2) AS avg_demand_mw,
-                round(max(demand_mw), 2) AS peak_demand_mw,
-                round(min(demand_mw), 2) AS min_demand_mw,
-                round(sum(generation_mw * (interval_duration_mins / 60.0)), 2) AS generation_mwh,
-                round(avg(renewables_pct), 2) AS renewables_pct,
-                round(sum(net_interconnector_mw * (interval_duration_mins / 60.0)), 2) AS net_interconnector_mwh,
-                round(avg(price_local), 2) AS vwap_price_local,
-                max(currency) AS currency
-            FROM network_interval
-            WHERE country_code = ? {date_cond}
-            GROUP BY country_code, interval_start::DATE, region
-            ON CONFLICT (country_code, date, region) DO UPDATE SET
-                demand_mwh = EXCLUDED.demand_mwh,
-                avg_demand_mw = EXCLUDED.avg_demand_mw,
-                peak_demand_mw = EXCLUDED.peak_demand_mw,
-                min_demand_mw = EXCLUDED.min_demand_mw,
-                generation_mwh = EXCLUDED.generation_mwh,
-                renewables_pct = EXCLUDED.renewables_pct,
-                net_interconnector_mwh = EXCLUDED.net_interconnector_mwh,
-                vwap_price_local = EXCLUDED.vwap_price_local,
-                currency = EXCLUDED.currency;
-        """
-        self.conn.execute(network_sql, net_params)
-
         return {"status": "success"}
 
     def inspect_database(
@@ -413,9 +353,9 @@ class Database:
 
         tables_info = [
             ("facilities", "Generator & Power Plant Catalog"),
-            ("energy_dispatch_5m", "5-Min / 30-Min Fuel Mix Generation & Spot Prices"),
-            ("regional_summary_5m", "Regional Demand, Losses & Interconnectors"),
-            ("energy_daily_stats", "Daily Rollups & Emissions"),
+            ("energy_interval", "Interval Fuel Mix Generation & Prices (Local & USD)"),
+            ("energy_daily", "Daily Fuel Mix Rollups, VWAP & TWAP"),
+            ("exchange_rates", "Daily Reference FX Rates to USD"),
         ]
 
         print(f"\n📊 TABLE OVERVIEW ({country}):")
@@ -428,20 +368,21 @@ class Database:
         for tbl, desc in tables_info:
             try:
                 cnt = self.conn.execute(
-                    f"SELECT COUNT(*) FROM {tbl}{country_filter}", c_params
+                    f"SELECT COUNT(*) FROM {tbl}{country_filter if tbl != 'exchange_rates' else ''}",
+                    c_params if tbl != 'exchange_rates' else [],
                 ).fetchone()[0]
                 time_span = "—"
-                if tbl in ("energy_dispatch_5m", "regional_summary_5m") and cnt > 0:
+                if tbl == "energy_interval" and cnt > 0:
                     min_t, max_t = self.conn.execute(
-                        f"SELECT MIN(timestamp), MAX(timestamp) FROM {tbl}{country_filter}",
+                        f"SELECT MIN(interval_start), MAX(interval_start) FROM {tbl}{country_filter}",
                         c_params,
                     ).fetchone()
                     if min_t and max_t:
-                        time_span = f"{min_t[:10]} -> {max_t[:10]}"
-                elif tbl == "energy_daily_stats" and cnt > 0:
+                        time_span = f"{str(min_t)[:10]} -> {str(max_t)[:10]}"
+                elif tbl in ("energy_daily", "exchange_rates") and cnt > 0:
                     min_d, max_d = self.conn.execute(
-                        f"SELECT MIN(date), MAX(date) FROM {tbl}{country_filter}",
-                        c_params,
+                        f"SELECT MIN(date), MAX(date) FROM {tbl}{country_filter if tbl != 'exchange_rates' else ''}",
+                        c_params if tbl != 'exchange_rates' else [],
                     ).fetchone()
                     if min_d and max_d:
                         time_span = f"{min_d} -> {max_d}"

@@ -5,6 +5,7 @@ from pipeline.generator_registry import GeneratorRegistry
 from pipeline.iemop_client import IEMOPClient
 from pipeline.data_processor import DataProcessor
 from pipeline.db import Database
+from pipeline.fx import sync_exchange_rates
 from pipeline.providers.sg_emc import SingaporeEMCProvider
 from pipeline.providers.my_singlebuyer import MalaysiaSingleBuyerProvider
 
@@ -32,39 +33,10 @@ def run_ph_sync(
     synced_fac = db.upsert_facilities(facilities, country_code="PH")
     print(f"  ✓ Synced {synced_fac} facilities to database.")
 
-    # 2. Regional Summaries
-    print("\n[2/4] Fetching RTD Regional Summaries (Macro Grid)...")
-    reg_files = client.get_rtd_regional_summary_files(start_date, end_date)
-    total_reg = len(reg_files)
-    if max_files:
-        reg_files = reg_files[:max_files]
-    print(f"  Found {total_reg} regional summary files (Processing {len(reg_files)}).")
-
-    all_regional_records = []
-    total_reg_synced = 0
-
-    for idx, f_info in enumerate(reg_files, 1):
-        pct = (idx / len(reg_files)) * 100
-        print(
-            f"  -> [{idx}/{len(reg_files)}] ({pct:4.1f}%) Downloading {f_info['filename']}..."
-        )
-        try:
-            csv_lines = client.download_regional_summary_csv(f_info["file_id"])
-            records = processor.process_regional_summary(csv_lines)
-            for r in records:
-                r["country_code"] = "PH"
-            all_regional_records.extend(records)
-
-            if len(all_regional_records) >= 5000 or idx == len(reg_files):
-                synced = db.upsert_regional_summary_5m(
-                    all_regional_records, country_code="PH"
-                )
-                total_reg_synced += synced
-                all_regional_records = []
-        except Exception as e:
-            print(f"    ⚠️ Failed to process {f_info['filename']}: {e}")
-
-    print(f"  ✓ Synced {total_reg_synced} 5-minute regional balance records.")
+    # 2. Exchange Rates
+    print("\n[2/4] Syncing Exchange Rates (USD Reference)...")
+    synced_fx = sync_exchange_rates(db, start_date=start_date, end_date=end_date)
+    print(f"  ✓ Verified and synced {synced_fx} FX rate records.")
 
     # 3. Unit Dispatch & Prices
     print("\n[3/4] Fetching RTD Unit Dispatch Files (Fuel Mix & Prices)...")
@@ -106,7 +78,7 @@ def run_ph_sync(
     print(f"  ✓ Synced total {total_disp_synced} 5-minute fuel generation records.")
 
     # 4. Daily Rollups
-    print("\n[4/4] Computing Daily Rollups & Emissions...")
+    print("\n[4/4] Computing Daily Rollups & Prices...")
     db.compute_daily_rollups("PH", start_date=start_date, end_date=end_date)
     print("  ✓ Computed and synchronized daily rollup records.")
 
@@ -125,25 +97,24 @@ def run_provider_sync(
     db = Database()
 
     # 1. Facilities
-    print(f"\n[1/3] Syncing Generator Catalog ({country})...")
+    print(f"\n[1/4] Syncing Generator Catalog ({country})...")
     facilities = provider.fetch_facilities()
     synced_fac = db.upsert_facilities(facilities, country_code=country)
     print(f"  ✓ Synced {synced_fac} facilities.")
 
-    # 2. Regional Summaries
-    print(f"\n[2/3] Syncing Regional Summaries & Macro Balances ({country})...")
-    summaries = provider.fetch_regional_summaries(start_date, end_date, days=days)
-    synced_sum = db.upsert_regional_summary_5m(summaries, country_code=country)
-    print(f"  ✓ Synced {synced_sum} interval balance records.")
+    # 2. Exchange Rates
+    print(f"\n[2/4] Syncing Exchange Rates (USD Reference)...")
+    synced_fx = sync_exchange_rates(db, start_date=start_date, end_date=end_date)
+    print(f"  ✓ Verified and synced {synced_fx} FX rate records.")
 
     # 3. Fuel Dispatch & Spot Prices
-    print(f"\n[3/3] Syncing Fuel Mix Generation & Spot Prices ({country})...")
+    print(f"\n[3/4] Syncing Fuel Mix Generation & Spot Prices ({country})...")
     dispatch = provider.fetch_dispatch(start_date, end_date, days=days)
     synced_disp = db.upsert_dispatch_5m(dispatch, country_code=country)
     print(f"  ✓ Synced {synced_disp} interval dispatch records.")
 
     # 4. Compute Daily Stats
-    print(f"\n[4/4] Computing Daily Rollups & Emissions ({country})...")
+    print(f"\n[4/4] Computing Daily Rollups & Prices ({country})...")
     db.compute_daily_rollups(country, start_date=start_date, end_date=end_date)
     print("  ✓ Computed and synchronized daily rollup records.")
 
