@@ -453,9 +453,7 @@ def get_energy(
         for b_time, b in time_buckets.items():
             b_tot_gen = sum(b["fuels_val"].values())
             b_ren_gen = sum(
-                b["fuels_val"][f]
-                for f in b["fuels_val"]
-                if FUEL_META[f]["isRenewable"]
+                b["fuels_val"][f] for f in b["fuels_val"] if FUEL_META[f]["isRenewable"]
             )
             ren_pct = (b_ren_gen / b_tot_gen * 100.0) if b_tot_gen > 0 else 0.0
 

@@ -144,9 +144,9 @@ export function generateMockEnergyData(
     const demandShape = isDailyOrLonger
       ? 0.85 + 0.12 * Math.sin((i / 7) * 2 * Math.PI)
       : 0.65 +
-        0.22 * Math.sin(((hour - 4) / 24) * 2 * Math.PI) +
-        0.15 * Math.exp(-Math.pow((hour - 14) / 3, 2)) +
-        0.18 * Math.exp(-Math.pow((hour - 19.5) / 2.5, 2));
+      0.22 * Math.sin(((hour - 4) / 24) * 2 * Math.PI) +
+      0.15 * Math.exp(-Math.pow((hour - 14) / 3, 2)) +
+      0.18 * Math.exp(-Math.pow((hour - 19.5) / 2.5, 2));
 
     const totalSystemDemandMW = baseDemand * demandShape * (0.98 + Math.random() * 0.04);
     peakDemand = Math.max(peakDemand, totalSystemDemandMW);
@@ -168,9 +168,9 @@ export function generateMockEnergyData(
     const price = Math.max(
       basePrice * 0.5,
       basePrice +
-        (demandShape - 0.75) * basePrice * 0.7 +
-        (!isDailyOrLonger && hour >= 18 && hour <= 21 ? basePrice * 0.3 : 0) +
-        (Math.random() * basePrice * 0.1 - basePrice * 0.05)
+      (demandShape - 0.75) * basePrice * 0.7 +
+      (!isDailyOrLonger && hour >= 18 && hour <= 21 ? basePrice * 0.3 : 0) +
+      (Math.random() * basePrice * 0.1 - basePrice * 0.05)
     );
     priceSum += price;
 

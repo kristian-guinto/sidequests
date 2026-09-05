@@ -146,4 +146,3 @@ def test_api_get_energy_not_found():
     with pytest.raises(HTTPException) as excinfo:
         get_energy(response=Response(), country="VN", range="7d")
     assert excinfo.value.status_code == 404
-

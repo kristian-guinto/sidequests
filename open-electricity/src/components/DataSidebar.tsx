@@ -234,8 +234,8 @@ export function DataSidebar({
           <button
             onClick={() => setActiveView("table")}
             className={`p-1 rounded transition ${activeView === "table"
-                ? "bg-neutral-100 dark:bg-[#27272A] text-neutral-900 dark:text-white font-bold"
-                : "text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
+              ? "bg-neutral-100 dark:bg-[#27272A] text-neutral-900 dark:text-white font-bold"
+              : "text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
               }`}
             title="Table View"
           >
@@ -244,8 +244,8 @@ export function DataSidebar({
           <button
             onClick={() => setActiveView("donut")}
             className={`p-1 rounded transition ${activeView === "donut"
-                ? "bg-neutral-100 dark:bg-[#27272A] text-neutral-900 dark:text-white font-bold"
-                : "text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
+              ? "bg-neutral-100 dark:bg-[#27272A] text-neutral-900 dark:text-white font-bold"
+              : "text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
               }`}
             title="Donut Chart View"
           >
@@ -304,12 +304,12 @@ export function DataSidebar({
                     onMouseEnter={() => onHoverFuel?.(row.fuelTech)}
                     onMouseLeave={() => onHoverFuel?.(null)}
                     className={`transition-all duration-150 cursor-pointer ${isThisRowHovered
-                        ? "bg-neutral-100 dark:bg-[#27272A] font-bold shadow-xs scale-[1.005]"
-                        : isAnyRowHovered
-                          ? "opacity-40 hover:opacity-100 hover:bg-neutral-50/90 dark:hover:bg-[#18181B]/70"
-                          : row.rawVal === 0
-                            ? "opacity-40 hover:bg-neutral-50/90 dark:hover:bg-[#18181B]/70"
-                            : "hover:bg-neutral-50/90 dark:hover:bg-[#18181B]/70"
+                      ? "bg-neutral-100 dark:bg-[#27272A] font-bold shadow-xs scale-[1.005]"
+                      : isAnyRowHovered
+                        ? "opacity-40 hover:opacity-100 hover:bg-neutral-50/90 dark:hover:bg-[#18181B]/70"
+                        : row.rawVal === 0
+                          ? "opacity-40 hover:bg-neutral-50/90 dark:hover:bg-[#18181B]/70"
+                          : "hover:bg-neutral-50/90 dark:hover:bg-[#18181B]/70"
                       }`}
                   >
                     <td className="py-1.5 px-3 flex items-center space-x-2">
@@ -320,8 +320,8 @@ export function DataSidebar({
                       />
                       <span
                         className={`text-[11px] ${isThisRowHovered
-                            ? "text-neutral-950 dark:text-white font-bold"
-                            : "font-medium text-neutral-800 dark:text-neutral-200"
+                          ? "text-neutral-950 dark:text-white font-bold"
+                          : "font-medium text-neutral-800 dark:text-neutral-200"
                           }`}
                       >
                         {row.label}
