@@ -1,7 +1,6 @@
-import pytest
 from pathlib import Path
 from ducklembic.connection import DuckDB
-from ducklembic.migrator import Migrator, compute_checksum
+from ducklembic.migrator import Migrator
 
 
 def test_migrator_lifecycle(tmp_path: Path):
@@ -59,8 +58,9 @@ def test_migrator_lifecycle(tmp_path: Path):
 
     # Verify column exists
     db.execute("UPDATE users SET email = 'alice@example.com' WHERE id = 1;")
-    email = db.fetchone("SELECT email FROM users WHERE id = 1")[0]
-    assert email == "alice@example.com"
+    email_row = db.fetchone("SELECT email FROM users WHERE id = 1")
+    assert email_row is not None
+    assert email_row[0] == "alice@example.com"
 
     # 4. Validation (no errors)
     errors = migrator.validate()

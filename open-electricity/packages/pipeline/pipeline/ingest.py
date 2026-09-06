@@ -103,7 +103,7 @@ def run_provider_sync(
     print(f"  ✓ Synced {synced_fac} facilities.")
 
     # 2. Exchange Rates
-    print(f"\n[2/4] Syncing Exchange Rates (USD Reference)...")
+    print("\n[2/4] Syncing Exchange Rates (USD Reference)...")
     synced_fx = sync_exchange_rates(db, start_date=start_date, end_date=end_date)
     print(f"  ✓ Verified and synced {synced_fx} FX rate records.")
 

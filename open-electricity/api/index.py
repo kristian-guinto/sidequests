@@ -1,7 +1,7 @@
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, TypedDict
 
 import duckdb
 from fastapi import FastAPI, HTTPException, Query, Response
@@ -46,48 +46,62 @@ app.add_middleware(
 )
 
 # ---------------------------------------------------------
-# Metadata & Configurations
+# Metadata & Fuel Constants
 # ---------------------------------------------------------
 
 COUNTRIES_METADATA = {
     "PH": {
         "name": "Philippines",
-        "currencyCode": "PHP",
         "currencySymbol": "₱",
+        "currencyCode": "PHP",
         "defaultRegion": "ALL",
         "minInterval": "5m",
     },
     "SG": {
         "name": "Singapore",
-        "currencyCode": "SGD",
         "currencySymbol": "S$",
+        "currencyCode": "SGD",
         "defaultRegion": "SINGAPORE",
         "minInterval": "30m",
     },
     "MY": {
         "name": "Malaysia",
-        "currencyCode": "MYR",
         "currencySymbol": "RM",
+        "currencyCode": "MYR",
         "defaultRegion": "PENINSULAR",
         "minInterval": "30m",
     },
     "TH": {
         "name": "Thailand",
-        "currencyCode": "THB",
         "currencySymbol": "฿",
+        "currencyCode": "THB",
         "defaultRegion": "THAILAND",
         "minInterval": "30m",
     },
     "VN": {
         "name": "Vietnam",
-        "currencyCode": "VND",
         "currencySymbol": "₫",
+        "currencyCode": "VND",
         "defaultRegion": "VIETNAM",
         "minInterval": "30m",
     },
 }
 
-FUEL_META = {
+
+class FuelMetaInfo(TypedDict):
+    label: str
+    color: str
+    isRenewable: bool
+    emissionsFactor: float
+
+
+class RangeConfigInfo(TypedDict):
+    unit: str
+    defaultInterval: str
+    days: int
+
+
+FUEL_META: Dict[str, FuelMetaInfo] = {
     "solar": {
         "label": "Solar",
         "color": "#FDB813",
@@ -144,7 +158,7 @@ FUEL_META = {
     },
 }
 
-RANGE_CONFIG = {
+RANGE_CONFIG: Dict[str, RangeConfigInfo] = {
     "1d": {"unit": "MW", "defaultInterval": "5m", "days": 1},
     "3d": {"unit": "MW", "defaultInterval": "30m", "days": 3},
     "7d": {"unit": "MW", "defaultInterval": "30m", "days": 7},
@@ -231,7 +245,7 @@ def get_duckdb_connection():
 
     if token and mode == "motherduck":
         try:
-            config = {
+            config: dict[str, str | float | list[str]] = {
                 "motherduck_token": token,
                 "extension_directory": "/tmp/.duckdb/extensions",
             }

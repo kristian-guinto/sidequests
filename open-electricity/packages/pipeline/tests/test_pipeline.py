@@ -49,11 +49,14 @@ def test_database_tiered_upsert_and_rollups(tmp_path: Path):
     e_row = db.conn.execute(
         "SELECT price_local, price_dollar FROM energy_interval WHERE interval_start = '2026-03-01 00:00:00+00'"
     ).fetchone()
+    assert e_row is not None
     assert e_row[0] == 57.0
     assert e_row[1] == 1.0
 
     # 2. Check compatibility views
-    disp_rows = db.conn.execute("SELECT count(*) FROM energy_dispatch_5m").fetchone()[0]
+    disp_row = db.conn.execute("SELECT count(*) FROM energy_dispatch_5m").fetchone()
+    assert disp_row is not None
+    disp_rows = disp_row[0]
     assert disp_rows == 2
 
     # 3. Compute daily rollups
@@ -76,9 +79,11 @@ def test_database_tiered_upsert_and_rollups(tmp_path: Path):
     assert e_daily[5] > 0.0  # vwap dollar
 
     # Check compatibility view energy_daily_stats
-    daily_stats_rows = db.conn.execute(
+    daily_stats_row = db.conn.execute(
         "SELECT count(*) FROM energy_daily_stats"
-    ).fetchone()[0]
+    ).fetchone()
+    assert daily_stats_row is not None
+    daily_stats_rows = daily_stats_row[0]
     assert daily_stats_rows == 1
 
     db.close()

@@ -59,7 +59,10 @@ class Sync:
         for tbl in target_tables:
             # Source rows
             try:
-                src_count = self.local.fetchone(f"SELECT COUNT(*) FROM {tbl}")[0]
+                src_row = self.local.fetchone(f"SELECT COUNT(*) FROM {tbl}")
+                if src_row is None:
+                    raise RuntimeError(f"Could not read count for {tbl}")
+                src_count = src_row[0]
             except Exception as e:
                 src_count = -1
                 results.append(
@@ -75,7 +78,8 @@ class Sync:
 
             # Remote rows
             try:
-                rem_count = self.remote.fetchone(f"SELECT COUNT(*) FROM {tbl}")[0]
+                rem_row = self.remote.fetchone(f"SELECT COUNT(*) FROM {tbl}")
+                rem_count = rem_row[0] if rem_row is not None else 0
             except Exception:
                 rem_count = 0  # Table might not exist yet on remote
 
@@ -149,14 +153,16 @@ class Sync:
             for tbl in target_tables:
                 t_start = time.perf_counter()
                 try:
-                    src_cnt = md_conn.execute(
+                    res_src = md_conn.execute(
                         f"SELECT COUNT(*) FROM {alias}.{tbl}"
-                    ).fetchone()[0]
+                    ).fetchone()
+                    src_cnt = res_src[0] if res_src is not None else 0
 
                     # Check if table exists on remote (current database)
-                    exists = md_conn.execute(
+                    res_exists = md_conn.execute(
                         f"SELECT COUNT(*) FROM information_schema.tables WHERE table_catalog = current_database() AND table_name = '{tbl}'"
-                    ).fetchone()[0] > 0
+                    ).fetchone()
+                    exists = (res_exists[0] > 0) if res_exists is not None else False
 
                     if not exists:
                         md_conn.execute(
@@ -180,7 +186,8 @@ class Sync:
                         else:
                             raise ValueError(f"Unknown sync strategy: {strategy}")
 
-                    tgt_cnt = md_conn.execute(f"SELECT COUNT(*) FROM {tbl}").fetchone()[0]
+                    res_tgt = md_conn.execute(f"SELECT COUNT(*) FROM {tbl}").fetchone()
+                    tgt_cnt = res_tgt[0] if res_tgt is not None else 0
                     t_dur = int((time.perf_counter() - t_start) * 1000)
 
                     results.append(
@@ -244,22 +251,20 @@ class Sync:
         try:
             md_conn.execute(f"ATTACH '{local_path}' AS {alias};")
         except Exception as e:
-            raise ConnectionError(
-                f"Failed to attach local DuckDB database: {e}"
-            ) from e
+            raise ConnectionError(f"Failed to attach local DuckDB database: {e}") from e
 
         try:
             for tbl in target_tables:
                 t_start = time.perf_counter()
                 try:
-                    src_cnt = md_conn.execute(
-                        f"SELECT COUNT(*) FROM {tbl}"
-                    ).fetchone()[0]
+                    res_src = md_conn.execute(f"SELECT COUNT(*) FROM {tbl}").fetchone()
+                    src_cnt = res_src[0] if res_src is not None else 0
 
                     # Check if table exists in attached local database
-                    exists = md_conn.execute(
+                    res_exists = md_conn.execute(
                         f"SELECT COUNT(*) FROM information_schema.tables WHERE table_catalog = '{alias}' AND table_name = '{tbl}'"
-                    ).fetchone()[0] > 0
+                    ).fetchone()
+                    exists = (res_exists[0] > 0) if res_exists is not None else False
 
                     if not exists:
                         md_conn.execute(
@@ -283,9 +288,10 @@ class Sync:
                         else:
                             raise ValueError(f"Unknown sync strategy: {strategy}")
 
-                    tgt_cnt = md_conn.execute(
+                    res_tgt = md_conn.execute(
                         f"SELECT COUNT(*) FROM {alias}.{tbl}"
-                    ).fetchone()[0]
+                    ).fetchone()
+                    tgt_cnt = res_tgt[0] if res_tgt is not None else 0
                     t_dur = int((time.perf_counter() - t_start) * 1000)
 
                     results.append(

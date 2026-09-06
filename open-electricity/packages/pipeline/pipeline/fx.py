@@ -1,4 +1,5 @@
 """Foreign Exchange (FX) rate management for USD price normalization."""
+
 from datetime import date, datetime, timedelta
 from typing import Dict, Any, Optional, Union
 import httpx

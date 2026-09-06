@@ -9,7 +9,6 @@ from pipeline.config import (
     DB_MODE,
     COUNTRIES_CONFIG,
     BASE_DIR,
-    DEFAULT_EMISSIONS_FACTOR,
 )
 from pipeline.fx import get_fx_rate, COUNTRY_TO_CURRENCY
 
@@ -99,9 +98,10 @@ class Database:
         for r in records:
             mw = float(r.get("generation_mw", 0.0) or 0.0)
             dur = int(r.get("interval_duration_mins") or default_dur)
-            mwh = float(
-                r.get("energy_mwh")
-                if r.get("energy_mwh") is not None
+            raw_energy = r.get("energy_mwh")
+            mwh = (
+                float(raw_energy)
+                if raw_energy is not None
                 else round(mw * (dur / 60.0), 4)
             )
             fuel = str(r.get("fuel_tech") or "").lower()
@@ -199,16 +199,18 @@ class Database:
                 else None
             )
             fx = get_fx_rate(r["date"], r.get("currency", curr), conn=self.conn)
+            vwap_dollar_val = r.get("vwap_price_dollar")
             p_dollar = (
-                float(r.get("vwap_price_dollar"))
-                if r.get("vwap_price_dollar") is not None
+                float(vwap_dollar_val)
+                if vwap_dollar_val is not None
                 else (
                     round(p_local / fx, 2) if p_local is not None and fx > 0 else None
                 )
             )
+            twap_dollar_val = r.get("twap_price_dollar")
             t_dollar = (
-                float(r.get("twap_price_dollar"))
-                if r.get("twap_price_dollar") is not None
+                float(twap_dollar_val)
+                if twap_dollar_val is not None
                 else (
                     round(t_local / fx, 2) if t_local is not None and fx > 0 else None
                 )
@@ -360,25 +362,28 @@ class Database:
 
         for tbl, desc in tables_info:
             try:
-                cnt = self.conn.execute(
+                cnt_row = self.conn.execute(
                     f"SELECT COUNT(*) FROM {tbl}{country_filter if tbl != 'exchange_rates' else ''}",
                     c_params if tbl != "exchange_rates" else [],
-                ).fetchone()[0]
+                ).fetchone()
+                cnt = cnt_row[0] if cnt_row is not None else 0
                 time_span = "—"
                 if tbl == "energy_interval" and cnt > 0:
-                    min_t, max_t = self.conn.execute(
+                    span_row = self.conn.execute(
                         f"SELECT MIN(interval_start), MAX(interval_start) FROM {tbl}{country_filter}",
                         c_params,
                     ).fetchone()
-                    if min_t and max_t:
-                        time_span = f"{str(min_t)[:10]} -> {str(max_t)[:10]}"
+                    if span_row and span_row[0] and span_row[1]:
+                        time_span = (
+                            f"{str(span_row[0])[:10]} -> {str(span_row[1])[:10]}"
+                        )
                 elif tbl in ("energy_daily", "exchange_rates") and cnt > 0:
-                    min_d, max_d = self.conn.execute(
+                    span_row = self.conn.execute(
                         f"SELECT MIN(date), MAX(date) FROM {tbl}{country_filter if tbl != 'exchange_rates' else ''}",
                         c_params if tbl != "exchange_rates" else [],
                     ).fetchone()
-                    if min_d and max_d:
-                        time_span = f"{min_d} -> {max_d}"
+                    if span_row and span_row[0] and span_row[1]:
+                        time_span = f"{span_row[0]} -> {span_row[1]}"
 
                 print(f"  {tbl:<24} | {cnt:<8} | {time_span:<22} | {desc}")
             except Exception as e:

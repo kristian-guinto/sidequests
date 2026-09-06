@@ -26,8 +26,9 @@ def test_context_manager():
     with DuckDB(":memory:", mode="local") as db:
         db.execute("CREATE TABLE foo (val INT);")
         db.execute("INSERT INTO foo VALUES (42);")
-        val = db.fetchone("SELECT val FROM foo")[0]
-        assert val == 42
+        row = db.fetchone("SELECT val FROM foo")
+        assert row is not None
+        assert row[0] == 42
 
 
 def test_motherduck_mode_without_token_raises():

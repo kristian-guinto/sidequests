@@ -52,7 +52,9 @@ class DuckDB:
             else:
                 self._conn_str = f"md:{self.motherduck_database}"
                 try:
-                    config = {"motherduck_token": self.motherduck_token}
+                    config: dict[str, str | float | list[str]] = {
+                        "motherduck_token": self.motherduck_token
+                    }
                     # Ensure extension dir is writable in serverless environments if /tmp exists
                     if os.path.exists("/tmp") and os.access("/tmp", os.W_OK):
                         config["extension_directory"] = "/tmp/.duckdb/extensions"
@@ -86,6 +88,7 @@ class DuckDB:
     def conn(self) -> duckdb.DuckDBPyConnection:
         if self._conn is None:
             self._connect()
+        assert self._conn is not None
         return self._conn
 
     @property
@@ -102,7 +105,7 @@ class DuckDB:
 
     def execute(
         self, sql: str, params: Optional[Any] = None
-    ) -> duckdb.DuckDBPyRelation:
+    ) -> duckdb.DuckDBPyConnection:
         if params is not None:
             return self.conn.execute(sql, params)
         return self.conn.execute(sql)

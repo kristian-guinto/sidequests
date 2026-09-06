@@ -60,7 +60,9 @@ def test_sync_push_and_pull_execution(tmp_path: Path):
 
     # Check remote directly
     remote_db._connect()
-    assert remote_db.fetchone("SELECT COUNT(*) FROM products")[0] == 2
+    rem_row = remote_db.fetchone("SELECT COUNT(*) FROM products")
+    assert rem_row is not None
+    assert rem_row[0] == 2
     # Add new item on remote
     remote_db.execute("INSERT INTO products VALUES (3, 'Notebook');")
     remote_db.close()
@@ -72,7 +74,9 @@ def test_sync_push_and_pull_execution(tmp_path: Path):
 
     # Check local directly
     local_db._connect()
-    assert local_db.fetchone("SELECT COUNT(*) FROM products")[0] == 3
+    loc_row = local_db.fetchone("SELECT COUNT(*) FROM products")
+    assert loc_row is not None
+    assert loc_row[0] == 3
 
     local_db.close()
     remote_db.close()
