@@ -40,6 +40,7 @@ interface HeaderProps {
   onPaletteModeChange: (p: PaletteMode) => void;
   onRefresh: () => void;
   isLoading: boolean;
+  dataSource?: string;
 }
 
 const RANGES: { id: TimeRange; label: string }[] = [
@@ -65,6 +66,7 @@ export function Header({
   onPaletteModeChange,
   onRefresh,
   isLoading,
+  dataSource = "simulation",
 }: HeaderProps) {
   const { isDark, toggleTheme } = useTheme();
   const [isRegionMenuOpen, setIsRegionMenuOpen] = useState(false);
@@ -135,8 +137,26 @@ export function Header({
 
           {/* Right Status Pill */}
           <div className="flex items-center space-x-2 text-xs text-neutral-600 dark:text-neutral-400">
+            {/* Data Source Indicator */}
+            {dataSource === "motherduck" || dataSource === "motherduck_cloud" ? null : dataSource === "duckdb_local" || dataSource === "local" ? (
+              <div
+                className="flex items-center space-x-1.5 bg-blue-500/10 text-blue-700 dark:text-blue-400 px-2.5 py-1 rounded-md border border-blue-500/20 text-[11px] font-medium"
+                title="Connected to local DuckDB database"
+              >
+                <span className="h-2 w-2 rounded-full bg-blue-500" />
+                <span>local</span>
+              </div>
+            ) : (
+              <div
+                className="flex items-center space-x-1.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2.5 py-1 rounded-md border border-amber-500/20 text-[11px] font-medium"
+                title="Displaying simulated fallback dataset"
+              >
+                <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                <span>simulated</span>
+              </div>
+            )}
+
             <div className="flex items-center space-x-1.5 bg-neutral-50 dark:bg-[#121215] px-2.5 py-1 rounded-md border border-neutral-200 dark:border-[#27272A] text-[11px] font-medium">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
               <span className="text-neutral-800 dark:text-neutral-200">
                 {currentCountry.name} ({currentCountry.currencyCode})
               </span>

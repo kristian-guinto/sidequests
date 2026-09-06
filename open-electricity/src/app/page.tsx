@@ -34,7 +34,7 @@ export default function DashboardPage() {
   const [points, setPoints] = useState<FuelGenerationPoint[]>([]);
   const [summary, setSummary] = useState<SummaryMetrics | null>(null);
   const [breakdown, setBreakdown] = useState<FuelBreakdownRow[]>([]);
-  const [dataSource, setDataSource] = useState<string>("live");
+  const [dataSource, setDataSource] = useState<string>("motherduck_cloud");
 
   // Real-time hover cursor interaction state
   const [hoveredPoint, setHoveredPoint] = useState<FuelGenerationPoint | null>(null);
@@ -80,7 +80,7 @@ export default function DashboardPage() {
         setPoints(json.points || []);
         setSummary(json.summary || null);
         setBreakdown(json.breakdown || []);
-        setDataSource(json.source || "api");
+        setDataSource(json.source || "simulation");
       } else {
         throw new Error("Failed to fetch API data");
       }
@@ -90,7 +90,7 @@ export default function DashboardPage() {
       setPoints(fallback.points);
       setSummary(fallback.summary);
       setBreakdown(fallback.breakdown);
-      setDataSource("simulation_dataset");
+      setDataSource("simulation");
     } finally {
       setIsLoading(false);
     }
@@ -118,7 +118,26 @@ export default function DashboardPage() {
         onPaletteModeChange={setPaletteMode}
         onRefresh={fetchData}
         isLoading={isLoading}
+        dataSource={dataSource}
       />
+
+      {/* API Fallback Warning Banner */}
+      {(dataSource === "simulation" || dataSource === "simulation_dataset") && (
+        <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-1.5 text-xs text-amber-800 dark:text-amber-300 flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+            <span className="font-medium">
+              Database connection unavailable. Displaying simulated fallback dataset.
+            </span>
+          </div>
+          <button
+            onClick={fetchData}
+            className="underline hover:text-amber-950 dark:hover:text-amber-100 cursor-pointer font-medium text-[11px]"
+          >
+            Retry Connection
+          </button>
+        </div>
+      )}
 
       {/* Main Full-Width Two-Column Workspace */}
       <main className="flex-1 w-full px-3 sm:px-4 lg:px-6 py-3">
@@ -179,9 +198,21 @@ export default function DashboardPage() {
           <div className="flex items-center space-x-3 text-neutral-400">
             <span className="text-neutral-200 font-semibold">v4.54.10</span>
             <span>&bull;</span>
-            <span className="flex items-center space-x-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Engine: DuckDB OLAP</span>
+            <span className="flex items-center space-x-1.5">
+              {dataSource === "duckdb_local" || dataSource === "local" ? (
+                <>
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                  <span className="text-blue-400">Engine: DuckDB (local)</span>
+                </>
+              ) : dataSource === "motherduck" || dataSource === "motherduck_cloud" ? (
+                <>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-emerald-400">Engine: MotherDuck Cloud</span>
+                </>
+              ) : (
+                <>
+                </>
+              )}
             </span>
             <span>&bull;</span>
             <span>API: 4.5.11</span>
