@@ -329,10 +329,11 @@ uv run ingest inspect --table energy_interval --region LUZON --limit 15
 ## Automation & CI/CD (GitHub Actions)
 
 The scheduled pipeline is defined in [`.github/workflows/daily_pipeline.yml`](../../.github/workflows/daily_pipeline.yml):
-- **Schedule**: Runs daily at `01:00 UTC` (`09:00 AM PHT`).
-- **Execution**: Runs `uv run ingest latest --target motherduck --days 2`.
-- **Manual Triggers**: Supports manual dispatch with modes: `latest`, `backfill`, `sync-facilities`, or `migrate`.
-- **Cloud Migrations**: Schema migrations are run prior to ingestion via `uv run ducklembic migrate --mode motherduck`.
+- **Schedule**: Runs daily at `01:00 UTC` (`09:00 AM UTC+8` Manila / Singapore / Kuala Lumpur).
+- **Execution**: Runs `uv run ingest latest --target motherduck --country ALL --days 2`.
+- **Manual Triggers**: Supports manual dispatch with modes: `latest`, `backfill`, `sync-facilities`, `migrate`, or `inspect`, with custom country and date filters.
+- **Cloud Migrations**: Schema migrations are automatically run prior to ingestion via `uv run ducklembic migrate --mode motherduck`.
+- **Verification & Summary**: Runs table inspection on completion and generates a GitHub Step Summary.
 
 ---
 

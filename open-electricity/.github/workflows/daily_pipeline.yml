@@ -1,13 +1,13 @@
-name: Daily OpenNEM-PH Ingestion Pipeline
+name: Daily OpenElectricity Ingestion Pipeline
 
 on:
   schedule:
-    # Runs daily at 01:00 UTC (09:00 AM Philippine Standard Time)
+    # Runs daily at 01:00 UTC (09:00 AM Manila / Singapore / Kuala Lumpur time, UTC+8)
     - cron: '0 1 * * *'
   workflow_dispatch:
     inputs:
       mode:
-        description: 'Ingestion Mode (latest, backfill, sync-facilities, migrate)'
+        description: 'Ingestion Mode (latest, backfill, sync-facilities, migrate, inspect)'
         required: true
         default: 'latest'
         type: choice
@@ -16,6 +16,21 @@ on:
           - backfill
           - sync-facilities
           - migrate
+          - inspect
+      country:
+        description: 'Target Country (ALL, PH, SG, MY)'
+        required: true
+        default: 'ALL'
+        type: choice
+        options:
+          - ALL
+          - PH
+          - SG
+          - MY
+      days:
+        description: 'Past days to ingest (for latest mode, default: 2)'
+        required: false
+        default: '2'
       start_date:
         description: 'Start Date for backfill (YYYY-MM-DD)'
         required: false
@@ -25,10 +40,20 @@ on:
         required: false
         default: ''
 
+concurrency:
+  group: motherduck-ingest
+  cancel-in-progress: false
+
 jobs:
   ingest:
-    name: Ingest IEMOP / WESM Data
+    name: Ingest OpenElectricity Data
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    env:
+      MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN }}
+      MOTHERDUCK_DATABASE: ${{ secrets.MOTHERDUCK_DATABASE || 'open_electricity_db' }}
 
     steps:
       - name: Checkout Code
@@ -46,34 +71,71 @@ jobs:
       - name: Install Dependencies
         run: uv sync --frozen || uv sync
 
-      - name: Run Daily Ingestion (Latest)
-        if: "${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'latest') }}"
-        env:
-          MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN }}
-          MOTHERDUCK_DATABASE: ${{ secrets.MOTHERDUCK_DATABASE || 'open_electricity_db' }}
+      - name: Validate MotherDuck Configuration
         run: |
-          uv run ingest latest --target motherduck --days 2
+          if [ -z "$MOTHERDUCK_TOKEN" ]; then
+            echo "::error::MOTHERDUCK_TOKEN secret is not set in this repository. Please configure MOTHERDUCK_TOKEN under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          echo "✓ MotherDuck token is configured."
 
-      - name: Run Manual Backfill
-        if: "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'backfill' }}"
-        env:
-          MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN }}
-          MOTHERDUCK_DATABASE: ${{ secrets.MOTHERDUCK_DATABASE || 'open_electricity_db' }}
-        run: |
-          uv run ingest backfill --target motherduck --start-date ${{ github.event.inputs.start_date }} --end-date ${{ github.event.inputs.end_date }}
-
-      - name: Sync Facilities
-        if: "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'sync-facilities' }}"
-        env:
-          MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN }}
-          MOTHERDUCK_DATABASE: ${{ secrets.MOTHERDUCK_DATABASE || 'open_electricity_db' }}
-        run: |
-          uv run ingest sync-facilities --target motherduck
-
-      - name: Migrate Database Schema (Ducklembic)
-        if: "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'migrate' }}"
-        env:
-          MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN }}
-          MOTHERDUCK_DATABASE: ${{ secrets.MOTHERDUCK_DATABASE || 'open_electricity_db' }}
+      - name: Run Schema Migrations (Ducklembic)
+        if: "${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.mode == 'latest' || github.event.inputs.mode == 'backfill' || github.event.inputs.mode == 'migrate')) }}"
         run: |
           uv run ducklembic migrate --mode motherduck
+
+      - name: Run Daily Ingestion (Latest)
+        if: "${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'latest') }}"
+        run: |
+          COUNTRY="${{ github.event.inputs.country || 'ALL' }}"
+          DAYS="${{ github.event.inputs.days || '2' }}"
+          echo "Running latest sync for country: $COUNTRY across past $DAYS days"
+          uv run ingest latest --target motherduck --country "$COUNTRY" --days "$DAYS"
+
+      - name: Run Historical Backfill
+        if: "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'backfill' }}"
+        run: |
+          COUNTRY="${{ github.event.inputs.country || 'PH' }}"
+          START_DATE="${{ github.event.inputs.start_date }}"
+          END_DATE="${{ github.event.inputs.end_date }}"
+          if [ -z "$START_DATE" ] || [ -z "$END_DATE" ]; then
+            echo "::error::Both start_date and end_date (YYYY-MM-DD) are required for backfill mode."
+            exit 1
+          fi
+          echo "Running backfill for country: $COUNTRY from $START_DATE to $END_DATE"
+          uv run ingest backfill --target motherduck --country "$COUNTRY" --start-date "$START_DATE" --end-date "$END_DATE"
+
+      - name: Sync Facilities Catalog
+        if: "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'sync-facilities' }}"
+        run: |
+          COUNTRY="${{ github.event.inputs.country || 'ALL' }}"
+          echo "Syncing generator facilities catalog for country: $COUNTRY"
+          uv run ingest sync-facilities --target motherduck --country "$COUNTRY"
+
+      - name: Verify & Inspect MotherDuck Database
+        if: success()
+        run: |
+          COUNTRY="${{ github.event.inputs.country || 'ALL' }}"
+          uv run ingest inspect --target motherduck --country "$COUNTRY" --table all --limit 5
+
+      - name: Generate GitHub Step Summary
+        if: always()
+        run: |
+          echo "### ⚡ OpenElectricity Ingestion Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Trigger Event**: \`${{ github.event_name }}\`" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "- **Mode**: \`${{ github.event.inputs.mode }}\`" >> $GITHUB_STEP_SUMMARY
+            echo "- **Country**: \`${{ github.event.inputs.country }}\`" >> $GITHUB_STEP_SUMMARY
+            if [ "${{ github.event.inputs.mode }}" = "latest" ]; then
+              echo "- **Days**: \`${{ github.event.inputs.days }}\`" >> $GITHUB_STEP_SUMMARY
+            elif [ "${{ github.event.inputs.mode }}" = "backfill" ]; then
+              echo "- **Date Range**: \`${{ github.event.inputs.start_date }}\` to \`${{ github.event.inputs.end_date }}\`" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "- **Mode**: \`latest (scheduled daily)\`" >> $GITHUB_STEP_SUMMARY
+            echo "- **Country**: \`ALL (PH, SG, MY)\`" >> $GITHUB_STEP_SUMMARY
+            echo "- **Days**: \`2\`" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "- **Target Database**: \`${{ env.MOTHERDUCK_DATABASE }}\` (MotherDuck Cloud)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Execution Status**: \`${{ job.status }}\`" >> $GITHUB_STEP_SUMMARY

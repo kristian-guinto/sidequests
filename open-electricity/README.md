@@ -133,17 +133,22 @@ Visit [`http://localhost:3000`](http://localhost:3000) to view the live dashboar
      MOTHERDUCK_TOKEN=your-motherduck-token-here
      MOTHERDUCK_DATABASE=open_electricity_db
      ```
-  3. Run `uv run ingest sync-cloud` to sync your local DuckDB data directly to MotherDuck!
+  3. Run `uv run ducklembic sync push --yes` to sync your local DuckDB data directly to MotherDuck Cloud!
 
 ---
 
 ## 🤖 Daily Automated Pipeline (GitHub Actions)
 
-The repository includes a GitHub Action in [`.github/workflows/daily_pipeline.yml`](.github/workflows/daily_pipeline.yml):
-- **Schedule**: Automatically runs daily at `01:00 UTC` (`09:00 AM PHT`), right after IEMOP completes daily data publishing.
-- **MotherDuck Sync**: Automatically writes to MotherDuck Cloud using the `MOTHERDUCK_TOKEN` secret.
-- **Manual Trigger**: Can be triggered anytime with custom date inputs under GitHub's **Actions** tab (`workflow_dispatch`).
-- **Secrets Needed**: Add `MOTHERDUCK_TOKEN` under **Settings > Secrets and variables > Actions**.
+The repository includes a production-ready GitHub Action in [`.github/workflows/daily_pipeline.yml`](.github/workflows/daily_pipeline.yml):
+- **Schedule**: Automatically runs daily at `01:00 UTC` (`09:00 AM UTC+8` Manila / Singapore / Kuala Lumpur), right after regional markets finalize interval data.
+- **Multi-Country Coverage**: Synchronizes generation mix, fuel technology categorization, and spot prices across Philippines (IEMOP), Singapore (EMC), and Malaysia (Single Buyer).
+- **MotherDuck Ingestion**: Automatically writes and rolls up data in MotherDuck Cloud using the `MOTHERDUCK_TOKEN` secret.
+- **Automated Schema Evolution**: Runs Ducklembic migrations prior to ingestion so the cloud database schema is always in sync.
+- **Manual Trigger**: Can be manually triggered on demand (`workflow_dispatch`) with custom parameters:
+  - `mode`: `latest`, `backfill`, `sync-facilities`, `migrate`, or `inspect`.
+  - `country`: `ALL`, `PH`, `SG`, or `MY`.
+  - `days` or custom `start_date` / `end_date` ranges.
+- **Secrets Needed**: Add `MOTHERDUCK_TOKEN` under **Settings > Secrets and variables > Actions** in your GitHub repository.
 
 ---
 
