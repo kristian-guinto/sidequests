@@ -1,260 +1,330 @@
+"""Main CLI and runner for OpenElectricity data ingestion pipeline."""
+
 import argparse
 from datetime import datetime, date, timedelta
-from typing import Optional
-from pipeline.generator_registry import GeneratorRegistry
-from pipeline.iemop_client import IEMOPClient
-from pipeline.data_processor import DataProcessor
+from typing import Optional, List, Dict
+from pipeline.config import DUCKDB_PATH
 from pipeline.db import Database
-from pipeline.fx import sync_exchange_rates
+from pipeline.models import IngestRunReport
+from pipeline.fx import sync_exchange_rates, COUNTRY_TO_CURRENCY
+from pipeline.providers.base import BaseProvider
+from pipeline.providers.ph_iemop import PhilippinesIEMOPProvider
 from pipeline.providers.sg_emc import SingaporeEMCProvider
 from pipeline.providers.my_singlebuyer import MalaysiaSingleBuyerProvider
 
+PROVIDERS: Dict[str, type] = {
+    "PH": PhilippinesIEMOPProvider,
+    "SG": SingaporeEMCProvider,
+    "MY": MalaysiaSingleBuyerProvider,
+}
 
-def run_ph_sync(
+
+def run_country_pipeline(
+    provider: BaseProvider,
+    db: Database,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
+    days: int = 2,
+    sync_facilities_flag: bool = True,
     max_files: Optional[int] = None,
-):
-    print("==================================================")
-    print("  OpenNEM-SEA: 🇵🇭 Philippines Pipeline (IEMOP/WESM)")
-    print(f"  Date Range: {start_date or 'Latest'} -> {end_date or 'Latest'}")
-    print("==================================================")
-
-    registry = GeneratorRegistry()
-    client = IEMOPClient()
-    processor = DataProcessor(registry)
-    db = Database()
-
-    # 1. Facilities
-    print("\n[1/4] Syncing Generator Catalog (PH)...")
-    facilities = registry.get_all_facilities()
-    for f in facilities:
-        f["country_code"] = "PH"
-    synced_fac = db.upsert_facilities(facilities, country_code="PH")
-    print(f"  ✓ Synced {synced_fac} facilities to database.")
-
-    # 2. Exchange Rates
-    print("\n[2/4] Syncing Exchange Rates (USD Reference)...")
-    synced_fx = sync_exchange_rates(db, start_date=start_date, end_date=end_date)
-    print(f"  ✓ Verified and synced {synced_fx} FX rate records.")
-
-    # 3. Unit Dispatch & Prices
-    print("\n[3/4] Fetching RTD Unit Dispatch Files (Fuel Mix & Prices)...")
-    disp_files = client.get_rtd_dispatch_files(start_date, end_date)
-    total_disp = len(disp_files)
-    if max_files:
-        disp_files = disp_files[:max_files]
-    print(
-        f"  Found {total_disp} dispatch archive files (Processing {len(disp_files)})."
-    )
-
-    all_dispatch_records = []
-    batch_records = []
-    total_disp_synced = 0
-
-    for idx, f_info in enumerate(disp_files, 1):
-        pct = (idx / len(disp_files)) * 100
-        print(
-            f"  -> [{idx}/{len(disp_files)}] ({pct:4.1f}%) Unpacking {f_info['filename']}..."
-        )
-        try:
-            csv_lines = client.download_rtd_dispatch_csv(f_info["file_id"])
-            records = processor.process_rtd_dispatch(csv_lines)
-            for r in records:
-                r["country_code"] = "PH"
-            batch_records.extend(records)
-            all_dispatch_records.extend(records)
-
-            if idx % 24 == 0 or idx == len(disp_files):
-                synced = db.upsert_dispatch_5m(batch_records, country_code="PH")
-                total_disp_synced += synced
-                print(
-                    f"     [Saved batch: +{synced} dispatch records (Total: {total_disp_synced})]"
-                )
-                batch_records = []
-        except Exception as e:
-            print(f"    ⚠️ Failed to process {f_info['filename']}: {e}")
-
-    print(f"  ✓ Synced total {total_disp_synced} 5-minute fuel generation records.")
-
-    # 4. Daily Rollups
-    print("\n[4/4] Computing Daily Rollups & Prices...")
-    db.compute_daily_rollups("PH", start_date=start_date, end_date=end_date)
-    print("  ✓ Computed and synchronized daily rollup records.")
-
-
-def run_provider_sync(
-    provider,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
-    days: int = 7,
-):
+) -> IngestRunReport:
+    """Executes the standard 4-step pipeline lifecycle for a single market provider."""
     country = provider.country_code
     print("==================================================")
     print(f"  OpenNEM-SEA: Country [{country}] Pipeline")
+    print(f"  Date Range: {start_date or f'Past {days} days'} -> {end_date or 'Today'}")
     print("==================================================")
 
-    db = Database()
+    fac_count = 0
+    if sync_facilities_flag:
+        print(f"\n[1/4] Syncing Generator Catalog ({country})...")
+        facilities = provider.fetch_facilities(conn=db.conn)
+        fac_count = db.upsert_facilities(facilities, country_code=country)
+        print(f"  ✓ Synced {fac_count} facilities.")
+    else:
+        print(f"\n[1/4] Skipping Generator Catalog Sync ({country}).")
 
-    # 1. Facilities
-    print(f"\n[1/4] Syncing Generator Catalog ({country})...")
-    facilities = provider.fetch_facilities()
-    synced_fac = db.upsert_facilities(facilities, country_code=country)
-    print(f"  ✓ Synced {synced_fac} facilities.")
+    print("\n[2/4] Verifying Exchange Rates (USD Reference)...")
+    curr = COUNTRY_TO_CURRENCY.get(country, "PHP")
+    s_d = start_date or (date.today() - timedelta(days=days))
+    e_d = end_date or date.today()
+    existing_cnt_row = db.conn.execute(
+        "SELECT count(*) FROM exchange_rates WHERE currency = ? AND date >= ?::DATE AND date <= ?::DATE",
+        [curr, s_d, e_d],
+    ).fetchone()
+    existing_cnt = existing_cnt_row[0] if existing_cnt_row else 0
 
-    # 2. Exchange Rates
-    print("\n[2/4] Syncing Exchange Rates (USD Reference)...")
-    synced_fx = sync_exchange_rates(db, start_date=start_date, end_date=end_date)
-    print(f"  ✓ Verified and synced {synced_fx} FX rate records.")
+    if existing_cnt == 0:
+        print(f"  Missing FX rates for {curr} ({s_d} -> {e_d}). Fetching online...")
+        synced_fx = sync_exchange_rates(db, start_date=s_d, end_date=e_d)
+        print(f"  ✓ Synced {synced_fx} FX rate records.")
+    else:
+        print(f"  ✓ Verified {existing_cnt} existing FX rate records for {curr}.")
 
-    # 3. Fuel Dispatch & Spot Prices
-    print(f"\n[3/4] Syncing Fuel Mix Generation & Spot Prices ({country})...")
-    dispatch = provider.fetch_dispatch(start_date, end_date, days=days)
-    synced_disp = db.upsert_dispatch_5m(dispatch, country_code=country)
-    print(f"  ✓ Synced {synced_disp} interval dispatch records.")
+    print(f"\n[3/4] Ingesting Energy Intervals & Spot Prices ({country})...")
+    # For PH provider, pass max_files if provided
+    if country == "PH" and hasattr(provider, "fetch_energy_intervals") and max_files:
+        intervals = provider.fetch_energy_intervals(
+            start_date=start_date,
+            end_date=end_date,
+            days=days,
+            conn=db.conn,
+            max_files=max_files,
+        )
+    else:
+        intervals = provider.fetch_energy_intervals(
+            start_date=start_date, end_date=end_date, days=days, conn=db.conn
+        )
 
-    # 4. Compute Daily Stats
-    print(f"\n[4/4] Computing Daily Rollups & Prices ({country})...")
-    db.compute_daily_rollups(country, start_date=start_date, end_date=end_date)
-    print("  ✓ Computed and synchronized daily rollup records.")
+    synced_intervals = db.upsert_energy_interval(intervals, country_code=country)
+    print(f"  ✓ Synced {synced_intervals} interval records into energy_interval.")
+
+    print(f"\n[4/4] Populating energy_daily Rollups ({country})...")
+    db.populate_energy_daily(country, start_date=start_date, end_date=end_date)
+    print("  ✓ Populated daily rollup records in energy_daily.")
+
+    return IngestRunReport(
+        country_code=country,
+        facilities_synced=fac_count,
+        intervals_synced=synced_intervals,
+        daily_rollups_updated=True,
+    )
+
+
+def resolve_countries(country_arg: str) -> List[str]:
+    """Resolves target country codes from CLI argument."""
+    c = country_arg.upper()
+    if c == "ALL":
+        return ["PH", "SG", "MY"]
+    if c in PROVIDERS:
+        return [c]
+    raise ValueError(
+        f"Unsupported country code: {country_arg}. Choose from: ALL, PH, SG, MY."
+    )
 
 
 def app():
-    """Main CLI entrypoint for uv run ingest."""
-    parser = argparse.ArgumentParser(
-        description="OpenNEM Southeast Asia (OpenNEM-SEA) Data Ingestion CLI"
+    """Main CLI entrypoint for open-electricity / ingest CLI."""
+    parser = argparse.ArgumentParser(description="OpenElectricity Data Ingestion CLI")
+    subparsers = parser.add_subparsers(dest="subcommand", help="Pipeline commands")
+
+    # Command: latest (used by GitHub Actions daily cron)
+    p_latest = subparsers.add_parser(
+        "latest", help="Ingest latest market data across active countries"
     )
-    parser.add_argument(
-        "command",
-        nargs="?",
+    p_latest.add_argument(
+        "--target",
+        choices=["local", "motherduck"],
         default=None,
-        help="Command to run: 'daily', 'backfill', 'inspect', 'migrate', or 'sync-facilities'",
+        help="Target database",
     )
-    parser.add_argument(
-        "--mode",
-        choices=["daily", "backfill", "sync-facilities", "inspect", "migrate"],
+    p_latest.add_argument(
+        "--db-path", type=str, default=None, help="Path to local DuckDB file"
+    )
+    p_latest.add_argument(
+        "--country",
+        type=str,
+        default="ALL",
+        help="Target country (PH, SG, MY, ALL). Default: ALL",
+    )
+    p_latest.add_argument(
+        "--days", type=int, default=2, help="Number of past days to ingest (default: 2)"
+    )
+
+    # Command: backfill (used for local historical backfilling)
+    p_backfill = subparsers.add_parser(
+        "backfill", help="Historical backfill for a custom date range"
+    )
+    p_backfill.add_argument(
+        "--target",
+        choices=["local", "motherduck"],
         default=None,
-        help="Run mode (daily, backfill, sync-facilities, inspect, migrate)",
+        help="Target database",
     )
-    parser.add_argument(
+    p_backfill.add_argument(
+        "--db-path", type=str, default=None, help="Path to local DuckDB file"
+    )
+    p_backfill.add_argument(
         "--country",
         type=str,
         default="PH",
-        help="Target country code (e.g. PH, SG, MY, ALL). Default: PH",
+        help="Target country (PH, SG, MY). Default: PH",
     )
-    parser.add_argument(
-        "--table",
-        choices=["facilities", "dispatch", "regional", "daily", "all"],
-        default=None,
-        help="Table to inspect (facilities, dispatch, regional, daily, all)",
+    p_backfill.add_argument(
+        "--start-date", type=str, required=True, help="Start date (YYYY-MM-DD)"
     )
-    parser.add_argument(
-        "--region",
-        type=str,
-        default=None,
-        help="Filter inspection by region",
+    p_backfill.add_argument(
+        "--end-date", type=str, required=True, help="End date (YYYY-MM-DD)"
     )
-    parser.add_argument(
-        "--limit",
-        type=int,
-        default=15,
-        help="Number of records to display in inspection (default: 15)",
-    )
-    parser.add_argument(
-        "--start-date", type=str, default=None, help="Start date (YYYY-MM-DD)"
-    )
-    parser.add_argument(
-        "--end-date", type=str, default=None, help="End date (YYYY-MM-DD)"
-    )
-    parser.add_argument(
-        "--days", type=int, default=7, help="Number of past days for daily sync"
-    )
-    parser.add_argument(
+    p_backfill.add_argument(
         "--max-files",
         type=int,
         default=None,
         help="Optional max files limit for testing",
     )
+    p_backfill.add_argument(
+        "--skip-facilities", action="store_true", help="Skip catalog sync"
+    )
+
+    # Command: sync-facilities
+    p_fac = subparsers.add_parser(
+        "sync-facilities", help="Synchronize generator facility catalog"
+    )
+    p_fac.add_argument(
+        "--target",
+        choices=["local", "motherduck"],
+        default=None,
+        help="Target database",
+    )
+    p_fac.add_argument(
+        "--db-path", type=str, default=None, help="Path to local DuckDB file"
+    )
+    p_fac.add_argument(
+        "--country",
+        type=str,
+        default="ALL",
+        help="Target country (PH, SG, MY, ALL). Default: ALL",
+    )
+
+    # Command: inspect
+    p_inspect = subparsers.add_parser(
+        "inspect", help="Inspect database tables and sample rows"
+    )
+    p_inspect.add_argument(
+        "--target",
+        choices=["local", "motherduck"],
+        default=None,
+        help="Target database",
+    )
+    p_inspect.add_argument(
+        "--db-path", type=str, default=None, help="Path to local DuckDB file"
+    )
+    p_inspect.add_argument(
+        "--country", type=str, default="ALL", help="Filter by country (default: ALL)"
+    )
+    p_inspect.add_argument(
+        "--table",
+        choices=["facilities", "energy_interval", "energy_daily", "all"],
+        default=None,
+    )
+    p_inspect.add_argument("--region", type=str, default=None, help="Filter by region")
+    p_inspect.add_argument(
+        "--limit",
+        type=int,
+        default=15,
+        help="Number of records to display (default: 15)",
+    )
+
+    # Backward-compatible flags support when invoked as `ingest --mode ...`
+    parser.add_argument(
+        "--mode",
+        choices=["latest", "daily", "backfill", "sync-facilities", "inspect"],
+        default=None,
+    )
+    parser.add_argument("--target", choices=["local", "motherduck"], default=None)
+    parser.add_argument("--db-path", type=str, default=None)
+    parser.add_argument("--country", type=str, default="PH")
+    parser.add_argument("--start-date", type=str, default=None)
+    parser.add_argument("--end-date", type=str, default=None)
+    parser.add_argument("--days", type=int, default=2)
+    parser.add_argument("--max-files", type=int, default=None)
+    parser.add_argument("--table", type=str, default=None)
+    parser.add_argument("--region", type=str, default=None)
+    parser.add_argument("--limit", type=int, default=15)
 
     args = parser.parse_args()
 
-    mode = args.command or args.mode or "daily"
-    country = (args.country or "PH").upper()
+    # Determine execution command
+    cmd = args.subcommand or args.mode or "latest"
+    if cmd == "daily":
+        cmd = "latest"
 
-    if mode in ("migrate", "sync-cloud"):
-        from ducklembic import DuckDB, Sync
-        from pipeline.config import DUCKDB_PATH, MOTHERDUCK_TOKEN, MOTHERDUCK_DATABASE
+    target = args.target or "local"
+    local_path = args.db_path or DUCKDB_PATH
 
-        if not MOTHERDUCK_TOKEN:
-            print("❌ MOTHERDUCK_TOKEN environment variable is not set in .env.")
+    db = Database(target=target, local_path=local_path)
+
+    try:
+        if cmd == "inspect":
+            db.inspect_database(
+                country_code=args.country,
+                table=args.table,
+                region=args.region,
+                limit=args.limit,
+            )
             return
 
-        local_db = DuckDB(local_path=DUCKDB_PATH, mode="local")
-        remote_db = DuckDB(
-            motherduck_token=MOTHERDUCK_TOKEN,
-            motherduck_database=MOTHERDUCK_DATABASE,
-            mode="motherduck",
-        )
-        sync_engine = Sync(local=local_db, remote=remote_db)
-        print("🚀 Pushing local DuckDB tables to MotherDuck Cloud...")
-        report = sync_engine.push(confirm=True)
-        for tbl in report.tables:
-            print(
-                f"  ✓ {tbl.table}: {tbl.source_rows} rows -> MotherDuck ({tbl.target_rows} total)"
-            )
-        print("\n🎉 MotherDuck Cloud sync complete!")
-        return
+        if cmd == "sync-facilities":
+            countries = resolve_countries(args.country)
+            for c in countries:
+                prov_cls = PROVIDERS[c]
+                provider = prov_cls(conn=db.conn) if c == "PH" else prov_cls()
+                facs = provider.fetch_facilities(conn=db.conn)
+                count = db.upsert_facilities(facs, country_code=c)
+                print(f"  ✓ Synced {count} facilities for {c}.")
+            print("\nFacilities catalog sync complete.")
+            return
 
-    if mode == "inspect":
-        db = Database()
-        db.inspect_database(
-            country_code=country, table=args.table, region=args.region, limit=args.limit
-        )
-        return
-
-    if mode == "sync-facilities":
-        if country in ("PH", "ALL"):
-            registry = GeneratorRegistry()
-            db = Database()
-            db.upsert_facilities(registry.get_all_facilities(), country_code="PH")
-        if country in ("SG", "ALL"):
-            db = Database()
-            db.upsert_facilities(
-                SingaporeEMCProvider().fetch_facilities(), country_code="SG"
-            )
-        if country in ("MY", "ALL"):
-            db = Database()
-            db.upsert_facilities(
-                MalaysiaSingleBuyerProvider().fetch_facilities(), country_code="MY"
-            )
-        print("Facilities synced successfully.")
-        return
-
-    # Ingestion Modes
-    if country in ("PH", "ALL"):
-        start_d = None
-        end_d = None
-        if args.start_date:
-            start_d = datetime.strptime(args.start_date, "%Y-%m-%d").date()
-        if args.end_date:
-            end_d = datetime.strptime(args.end_date, "%Y-%m-%d").date()
-        if mode == "daily" and not start_d:
+        if cmd == "latest":
+            countries = resolve_countries(args.country)
             today = date.today()
             start_d = today - timedelta(days=args.days)
             end_d = today
-        run_ph_sync(start_d, end_d, max_files=args.max_files)
 
-    if country in ("SG", "ALL"):
-        sg_provider = SingaporeEMCProvider()
-        run_provider_sync(sg_provider, args.start_date, args.end_date, days=args.days)
+            reports = []
+            for c in countries:
+                prov_cls = PROVIDERS[c]
+                provider = prov_cls(conn=db.conn) if c == "PH" else prov_cls()
+                report = run_country_pipeline(
+                    provider=provider,
+                    db=db,
+                    start_date=start_d,
+                    end_date=end_d,
+                    days=args.days,
+                    sync_facilities_flag=True,
+                )
+                reports.append(report)
 
-    if country in ("MY", "ALL"):
-        my_provider = MalaysiaSingleBuyerProvider()
-        run_provider_sync(my_provider, args.start_date, args.end_date, days=args.days)
+            print("\n==================================================")
+            print("  ✓ OpenElectricity 'latest' Sync Complete!")
+            for r in reports:
+                print(
+                    f"  [{r.country_code}] Intervals: +{r.intervals_synced}, Facilities: {r.facilities_synced}"
+                )
+            print("==================================================")
+            return
 
-    print("\n==================================================")
-    print("  ✓ OpenNEM-SEA Pipeline Run Complete!")
-    print("==================================================")
+        if cmd == "backfill":
+            if not args.start_date or not args.end_date:
+                parser.error(
+                    "backfill requires both --start-date and --end-date (YYYY-MM-DD)"
+                )
+
+            start_d = datetime.strptime(args.start_date, "%Y-%m-%d").date()
+            end_d = datetime.strptime(args.end_date, "%Y-%m-%d").date()
+            countries = resolve_countries(args.country)
+
+            skip_fac = getattr(args, "skip_facilities", False)
+            for c in countries:
+                prov_cls = PROVIDERS[c]
+                provider = prov_cls(conn=db.conn) if c == "PH" else prov_cls()
+                run_country_pipeline(
+                    provider=provider,
+                    db=db,
+                    start_date=start_d,
+                    end_date=end_d,
+                    sync_facilities_flag=not skip_fac,
+                    max_files=args.max_files,
+                )
+
+            print("\n==================================================")
+            print("  ✓ OpenElectricity Backfill Complete!")
+            print("==================================================")
+            return
+
+        parser.print_help()
+    finally:
+        db.close()
 
 
 if __name__ == "__main__":

@@ -7,12 +7,12 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'Ingestion Mode (daily, backfill, sync-facilities, migrate)'
+        description: 'Ingestion Mode (latest, backfill, sync-facilities, migrate)'
         required: true
-        default: 'daily'
+        default: 'latest'
         type: choice
         options:
-          - daily
+          - latest
           - backfill
           - sync-facilities
           - migrate
@@ -46,13 +46,13 @@ jobs:
       - name: Install Dependencies
         run: uv sync --frozen || uv sync
 
-      - name: Run Daily Sync
-        if: "${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'daily') }}"
+      - name: Run Daily Ingestion (Latest)
+        if: "${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'latest') }}"
         env:
           MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN }}
           MOTHERDUCK_DATABASE: ${{ secrets.MOTHERDUCK_DATABASE || 'open_electricity_db' }}
         run: |
-          uv run ingest --mode daily --days 2
+          uv run ingest latest --target motherduck --days 2
 
       - name: Run Manual Backfill
         if: "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'backfill' }}"
@@ -60,7 +60,7 @@ jobs:
           MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN }}
           MOTHERDUCK_DATABASE: ${{ secrets.MOTHERDUCK_DATABASE || 'open_electricity_db' }}
         run: |
-          uv run ingest --mode backfill --start-date ${{ github.event.inputs.start_date }} --end-date ${{ github.event.inputs.end_date }}
+          uv run ingest backfill --target motherduck --start-date ${{ github.event.inputs.start_date }} --end-date ${{ github.event.inputs.end_date }}
 
       - name: Sync Facilities
         if: "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'sync-facilities' }}"
@@ -68,12 +68,12 @@ jobs:
           MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN }}
           MOTHERDUCK_DATABASE: ${{ secrets.MOTHERDUCK_DATABASE || 'open_electricity_db' }}
         run: |
-          uv run ingest --mode sync-facilities
+          uv run ingest sync-facilities --target motherduck
 
-      - name: Migrate Database
+      - name: Migrate Database Schema (Ducklembic)
         if: "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'migrate' }}"
         env:
           MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN }}
           MOTHERDUCK_DATABASE: ${{ secrets.MOTHERDUCK_DATABASE || 'open_electricity_db' }}
         run: |
-          uv run ingest migrate
+          uv run ducklembic migrate --mode motherduck
