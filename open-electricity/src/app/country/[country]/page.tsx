@@ -21,7 +21,6 @@ import { GenerationChart } from "@/components/GenerationChart";
 import { EmissionsChart } from "@/components/EmissionsChart";
 import { PriceChart } from "@/components/PriceChart";
 import { DataSidebar } from "@/components/DataSidebar";
-import { generateMockEnergyData } from "@/lib/mockData";
 import { alignPointsToTimeGrid } from "@/lib/chartUtils";
 
 interface CountryPageProps {
@@ -45,12 +44,12 @@ export default function CountryDetailPage({ params }: CountryPageProps) {
   const [interval, setInterval] = useState<TimeInterval>("30m");
   const [viewMode, setViewMode] = useState<ViewMode>("percentage");
   const [paletteMode, setPaletteMode] = useState<PaletteMode>("clean-fossil");
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const [points, setPoints] = useState<FuelGenerationPoint[]>([]);
   const [summary, setSummary] = useState<SummaryMetrics | null>(null);
   const [breakdown, setBreakdown] = useState<FuelBreakdownRow[]>([]);
-  const [dataSource, setDataSource] = useState<string>("motherduck_cloud");
+  const [dataSource, setDataSource] = useState<string>("connected");
 
   // Real-time hover cursor interaction state
   const [hoveredPoint, setHoveredPoint] = useState<FuelGenerationPoint | null>(null);
@@ -108,19 +107,20 @@ export default function CountryDetailPage({ params }: CountryPageProps) {
         setBreakdown(json.breakdown || []);
         if (json.summary) {
           setSummary(json.summary);
+        } else {
+          setSummary(null);
         }
-        setDataSource(json.source || "simulation");
+        setDataSource(json.source || "connected");
       } else {
         throw new Error("Failed to fetch API data");
       }
     } catch (e) {
-      console.warn("Using fallback dataset:", e);
-      const fallback = generateMockEnergyData(country, region, range, interval);
-      const alignedPoints = alignPointsToTimeGrid(fallback.points, range, interval);
-      setPoints(alignedPoints);
-      setBreakdown(fallback.breakdown || []);
-      setSummary(fallback.summary || null);
-      setDataSource("simulation");
+      console.warn("No data available or error fetching:", e);
+      const emptyPoints = alignPointsToTimeGrid([], range, interval);
+      setPoints(emptyPoints);
+      setBreakdown([]);
+      setSummary(null);
+      setDataSource("none");
     } finally {
       setIsLoading(false);
     }
@@ -151,20 +151,34 @@ export default function CountryDetailPage({ params }: CountryPageProps) {
         dataSource={dataSource}
       />
 
-      {/* API Fallback Warning Banner */}
-      {(dataSource === "simulation" || dataSource === "simulation_dataset") && (
-        <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-1.5 text-xs text-amber-800 dark:text-amber-300 flex items-center justify-between">
+      {/* No Public SCADA Notice Banner */}
+      {!countryInfo.hasLivePipeline && (
+        <div className="bg-neutral-100 dark:bg-[#121215] border-b border-neutral-200 dark:border-[#27272A] px-4 py-2 text-xs text-neutral-700 dark:text-neutral-300 flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+            <span className="font-semibold uppercase tracking-wider text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-mono">
+              Observation Mode
+            </span>
+            <span>
+              {countryInfo.unavailableReason ||
+                "Official utility dispatch telemetry is not published via public APIs."}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* No Live Telemetry Notice Banner */}
+      {countryInfo.hasLivePipeline && dataSource === "none" && !isLoading && (
+        <div className="bg-neutral-100 dark:bg-[#121215] border-b border-neutral-200 dark:border-[#27272A] px-4 py-2 text-xs text-neutral-600 dark:text-neutral-400 flex items-center justify-between">
+          <div className="flex items-center space-x-2">
             <span className="font-medium">
-              Database connection unavailable. Displaying simulated fallback dataset.
+              No live telemetry data available for this range and interval.
             </span>
           </div>
           <button
             onClick={fetchData}
-            className="underline hover:text-amber-950 dark:hover:text-amber-100 cursor-pointer font-medium text-[11px]"
+            className="underline hover:text-neutral-900 dark:hover:text-neutral-100 cursor-pointer text-[11px]"
           >
-            Retry Connection
+            Retry
           </button>
         </div>
       )}
@@ -174,16 +188,13 @@ export default function CountryDetailPage({ params }: CountryPageProps) {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-start">
           {/* Left Column (8 cols ~ 67% width): Synchronized Chart Stack */}
           <div className="lg:col-span-8 space-y-2.5">
-            {/* Chart 1: Generation by Fuel Tech (MW / GWh) */}
             <GenerationChart
               data={points}
               range={range}
               viewMode={viewMode}
               paletteMode={paletteMode}
-              unit={unit}
               height="310px"
               hoveredFuel={hoveredFuel}
-              onHoverPoint={setHoveredPoint}
             />
 
             {/* Chart 2: Emissions Volume (tCO2e/interval) */}
@@ -256,6 +267,6 @@ export default function CountryDetailPage({ params }: CountryPageProps) {
           </div>
         </div>
       </footer>
-    </div>
+    </div >
   );
 }

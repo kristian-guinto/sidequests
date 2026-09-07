@@ -1,4 +1,4 @@
-export type CountryCode = "PH" | "SG" | "MY" | "TH" | "VN";
+export type CountryCode = "PH" | "SG" | "MY" | "TH" | "VN" | "ID";
 
 export interface CountryInfo {
   code: CountryCode;
@@ -8,6 +8,10 @@ export interface CountryInfo {
   currencySymbol: string;
   defaultRegion: string;
   regions: { id: string; label: string }[];
+  hasLivePipeline?: boolean;
+  unavailableReason?: string;
+  gridOperator?: string;
+  installedCapacityGw?: string;
 }
 
 export const COUNTRIES_METADATA: Record<CountryCode, CountryInfo> = {
@@ -18,6 +22,8 @@ export const COUNTRIES_METADATA: Record<CountryCode, CountryInfo> = {
     currencyCode: "PHP",
     currencySymbol: "₱",
     defaultRegion: "ALL",
+    hasLivePipeline: true,
+    gridOperator: "IEMOP",
     regions: [
       { id: "ALL", label: "All PH" },
       { id: "LUZON", label: "Luzon" },
@@ -32,6 +38,8 @@ export const COUNTRIES_METADATA: Record<CountryCode, CountryInfo> = {
     currencyCode: "SGD",
     currencySymbol: "S$",
     defaultRegion: "SINGAPORE",
+    hasLivePipeline: true,
+    gridOperator: "EMA / EMC",
     regions: [{ id: "SINGAPORE", label: "National Grid" }],
   },
   MY: {
@@ -41,6 +49,8 @@ export const COUNTRIES_METADATA: Record<CountryCode, CountryInfo> = {
     currencyCode: "MYR",
     currencySymbol: "RM",
     defaultRegion: "PENINSULAR",
+    hasLivePipeline: true,
+    gridOperator: "Single Buyer / GSO",
     regions: [{ id: "PENINSULAR", label: "Peninsular" }],
   },
   TH: {
@@ -50,6 +60,8 @@ export const COUNTRIES_METADATA: Record<CountryCode, CountryInfo> = {
     currencyCode: "THB",
     currencySymbol: "฿",
     defaultRegion: "THAILAND",
+    hasLivePipeline: true,
+    gridOperator: "EGAT / SO Thailand",
     regions: [
       { id: "THAILAND", label: "All Thailand" },
       { id: "CENTRAL", label: "Central" },
@@ -65,11 +77,37 @@ export const COUNTRIES_METADATA: Record<CountryCode, CountryInfo> = {
     currencyCode: "VND",
     currencySymbol: "₫",
     defaultRegion: "VIETNAM",
+    hasLivePipeline: false,
+    gridOperator: "EVN / NSMO",
+    installedCapacityGw: "~80 GW",
+    unavailableReason:
+      "EVN and NSMO restrict real-time dispatch and market telemetry behind policy firewalls. No open public SCADA API is currently published.",
     regions: [
       { id: "VIETNAM", label: "All Vietnam" },
       { id: "NORTH", label: "Northern" },
       { id: "CENTRAL", label: "Central" },
       { id: "SOUTH", label: "Southern" },
+    ],
+  },
+  ID: {
+    code: "ID",
+    name: "Indonesia",
+    flag: "🇮🇩",
+    currencyCode: "IDR",
+    currencySymbol: "Rp",
+    defaultRegion: "ALL",
+    hasLivePipeline: false,
+    gridOperator: "PT PLN (Persero)",
+    installedCapacityGw: "~73 GW",
+    unavailableReason:
+      "PLN P2B SCADA operates on closed critical national infrastructure networks. No public real-time grid API is available.",
+    regions: [
+      { id: "ALL", label: "All Indonesia" },
+      { id: "JAVA_BALI", label: "Java-Bali" },
+      { id: "SUMATRA", label: "Sumatra" },
+      { id: "KALIMANTAN", label: "Kalimantan" },
+      { id: "SULAWESI", label: "Sulawesi" },
+      { id: "EASTERN", label: "Eastern Indonesia" },
     ],
   },
 };

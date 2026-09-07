@@ -11,7 +11,7 @@ import {
   COUNTRIES_METADATA,
 } from "@/lib/types";
 import { CountryWaffleCard } from "@/components/CountryWaffleCard";
-import { generateMockEnergyData } from "@/lib/mockData";
+import { UnavailableCountryCard } from "@/components/UnavailableCountryCard";
 import { useTheme } from "@/components/ThemeProvider";
 import {
   Palette,
@@ -21,7 +21,7 @@ import {
   RotateCw,
 } from "lucide-react";
 
-const COUNTRY_CODES: CountryCode[] = ["PH", "SG", "MY", "TH", "VN"];
+const COUNTRY_CODES: CountryCode[] = ["PH", "SG", "MY", "TH", "VN", "ID"];
 
 const TIME_RANGES: { id: TimeRange; label: string; sub: string }[] = [
   { id: "1d", label: "24 Hours", sub: "Daily dispatch" },
@@ -33,44 +33,28 @@ export default function SoutheastAsiaOverviewPage() {
   const { isDark, toggleTheme } = useTheme();
   const [paletteMode, setPaletteMode] = useState<PaletteMode>("clean-fossil");
   const [range, setRange] = useState<TimeRange>("7d");
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Initialize with simulated datasets to guarantee instant visual hydration
+  // Country datasets populated strictly from database API
   const [countryData, setCountryData] = useState<
     Record<
       CountryCode,
       {
         breakdown: FuelBreakdownRow[];
         summary: SummaryMetrics | null;
-        isSimulated: boolean;
       }
     >
-  >(() => {
-    const initial: Record<
-      CountryCode,
-      {
-        breakdown: FuelBreakdownRow[];
-        summary: SummaryMetrics | null;
-        isSimulated: boolean;
-      }
-    > = {} as any;
-
-    for (const code of COUNTRY_CODES) {
-      const mock = generateMockEnergyData(code, "ALL", "7d");
-      initial[code] = {
-        breakdown: mock.breakdown,
-        summary: mock.summary,
-        isSimulated: true,
-      };
-    }
-    return initial;
-  });
+  >({} as any);
 
   // Fetch or update data whenever time range changes
   const fetchAllCountriesData = useCallback(async () => {
     setIsLoading(true);
 
-    const promises = COUNTRY_CODES.map(async (code) => {
+    const liveCountries = COUNTRY_CODES.filter(
+      (code) => COUNTRIES_METADATA[code]?.hasLivePipeline !== false
+    );
+
+    const promises = liveCountries.map(async (code) => {
       try {
         const interval = range === "1d" ? "30m" : range === "7d" ? "1h" : "1d";
         const res = await fetch(
@@ -82,17 +66,14 @@ export default function SoutheastAsiaOverviewPage() {
             code,
             breakdown: json.breakdown || [],
             summary: json.summary || null,
-            isSimulated: false,
           };
         }
         throw new Error("API not ok");
       } catch {
-        const fallback = generateMockEnergyData(code, "ALL", range);
         return {
           code,
-          breakdown: fallback.breakdown,
-          summary: fallback.summary,
-          isSimulated: true,
+          breakdown: [],
+          summary: null,
         };
       }
     });
@@ -104,7 +85,6 @@ export default function SoutheastAsiaOverviewPage() {
         updated[res.code] = {
           breakdown: res.breakdown,
           summary: res.summary,
-          isSimulated: res.isSimulated,
         };
       }
       return updated;
@@ -231,9 +211,13 @@ export default function SoutheastAsiaOverviewPage() {
           </p>
         </div>
 
-        {/* 5-Country Grid — 3 cols, bottom row centered */}
+        {/* 6-Country Grid — 3 cols */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
           {COUNTRY_CODES.map((code) => {
+            const isLive = COUNTRIES_METADATA[code]?.hasLivePipeline !== false;
+            if (!isLive) {
+              return <UnavailableCountryCard key={code} country={code} />;
+            }
             const data = countryData[code];
             return (
               <CountryWaffleCard
@@ -255,11 +239,11 @@ export default function SoutheastAsiaOverviewPage() {
           <div className="flex items-center space-x-3 text-neutral-400">
             <span className="text-neutral-200 font-semibold">v4.54.10</span>
             <span>&bull;</span>
-            <span>5 Grids Tracked</span>
+            <span>4 Live Grids &bull; 2 Under Observation (VN, ID)</span>
           </div>
 
           <div className="flex items-center space-x-4 text-neutral-400">
-            <span>Sources: IEMOP (PH), EMA (SG), Single Buyer (MY), EGAT (TH), EVN (VN)</span>
+            <span>Sources: IEMOP (PH), EMA (SG), Single Buyer (MY), EGAT (TH)</span>
           </div>
         </div>
       </footer>

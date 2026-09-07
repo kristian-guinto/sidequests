@@ -5,11 +5,13 @@ from pipeline.classifiers.base import BaseFacilityClassifier, ClassifiedUnit
 from pipeline.classifiers.ph_wesm import PhilippinesFacilityClassifier
 from pipeline.classifiers.sg_emc import SingaporeFacilityClassifier
 from pipeline.classifiers.my_singlebuyer import MalaysiaFacilityClassifier
+from pipeline.classifiers.th_egat import ThailandFacilityClassifier
 
 CLASSIFIERS_MAP: Dict[str, Type[BaseFacilityClassifier]] = {
     "PH": PhilippinesFacilityClassifier,
     "SG": SingaporeFacilityClassifier,
     "MY": MalaysiaFacilityClassifier,
+    "TH": ThailandFacilityClassifier,
 }
 
 
@@ -26,6 +28,7 @@ __all__ = [
     "PhilippinesFacilityClassifier",
     "SingaporeFacilityClassifier",
     "MalaysiaFacilityClassifier",
+    "ThailandFacilityClassifier",
     "get_classifier_for_country",
     "CLASSIFIERS_MAP",
 ]

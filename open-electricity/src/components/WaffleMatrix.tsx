@@ -47,11 +47,11 @@ export function WaffleMatrix({
 
     const totalPct = Array.from(pctMap.values()).reduce((a, b) => a + b, 0);
     if (totalPct <= 0) {
-      const meta = getFuelMeta("gas", isDark, paletteMode);
+      const emptyColor = isDark ? "#18181B" : "#F4F4F5";
       return Array.from({ length: 100 }, () => ({
-        fuel: "gas" as FuelTech,
-        color: meta.color,
-        label: meta.label,
+        fuel: "other" as FuelTech,
+        color: emptyColor,
+        label: "No Data",
       }));
     }
 
@@ -115,13 +115,12 @@ export function WaffleMatrix({
               style={{
                 backgroundColor: tile.color,
               }}
-              className={`aspect-square rounded-[3px] transition-all duration-150 cursor-pointer ${
-                isDirectlyHovered
+              className={`aspect-square rounded-[3px] transition-all duration-150 cursor-pointer ${isDirectlyHovered
                   ? "ring-1.5 ring-white/80 dark:ring-white/70 shadow-lg z-10 scale-105"
                   : isHighlighted
-                  ? "opacity-90"
-                  : "opacity-20"
-              }`}
+                    ? "opacity-90"
+                    : "opacity-20"
+                }`}
               title={tile.label}
             />
           );

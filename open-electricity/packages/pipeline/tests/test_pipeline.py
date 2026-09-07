@@ -1,7 +1,7 @@
 """Unit and integration tests for packages/pipeline."""
 
 from pathlib import Path
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, date, timezone, timedelta
 import pytest
 import duckdb
 from ducklembic import Migrator, DuckDB as DucklembicDB
@@ -62,6 +62,7 @@ def test_multi_country_facility_classifiers():
         PhilippinesFacilityClassifier,
         SingaporeFacilityClassifier,
         MalaysiaFacilityClassifier,
+        ThailandFacilityClassifier,
         get_classifier_for_country,
     )
 
@@ -69,6 +70,7 @@ def test_multi_country_facility_classifiers():
     assert isinstance(get_classifier_for_country("PH"), PhilippinesFacilityClassifier)
     assert isinstance(get_classifier_for_country("SG"), SingaporeFacilityClassifier)
     assert isinstance(get_classifier_for_country("MY"), MalaysiaFacilityClassifier)
+    assert isinstance(get_classifier_for_country("TH"), ThailandFacilityClassifier)
 
     # 1. Philippines Classifier
     ph_c = PhilippinesFacilityClassifier()
@@ -92,7 +94,15 @@ def test_multi_country_facility_classifiers():
     assert my_c.classify("MY_BAKUN_HYDRO", "PEN").fuel_tech == "hydro"
     assert my_c.classify("MY_UNKNOWN_UNIT", "SBH").fuel_tech == "unclassified"
 
-    # 4. FacilityRegistry delegates properly per country
+    # 4. Thailand Classifier
+    th_c = ThailandFacilityClassifier()
+    assert th_c.classify("TH_MAE_MOH", "NORTH").fuel_tech == "coal"
+    assert th_c.classify("TH_MAE_MOH", "NORTH").region == "NORTH"
+    assert th_c.classify("TH_BANG_PAKONG", "CENTRAL").fuel_tech == "gas"
+    assert th_c.classify("TH_BHUMIBOL_HYDRO").fuel_tech == "hydro"
+    assert th_c.classify("TH_UNKNOWN_PLANT").fuel_tech == "unclassified"
+
+    # 5. FacilityRegistry delegates properly per country
     sg_registry = FacilityRegistry(country_code="SG")
     resolved_sg = sg_registry.resolve("SG_TUAS_CCGT")
     assert resolved_sg.country_code == "SG"
@@ -105,6 +115,12 @@ def test_multi_country_facility_classifiers():
     assert resolved_my.country_code == "MY"
     assert resolved_my.fuel_tech == "unclassified"
     assert resolved_my.status == "UNCLASSIFIED"
+
+    th_registry = FacilityRegistry(country_code="TH")
+    resolved_th = th_registry.resolve("TH_MAE_MOH", "NORTH")
+    assert resolved_th.country_code == "TH"
+    assert resolved_th.fuel_tech == "coal"
+    assert resolved_th.region == "NORTH"
 
 
 def test_iemop_parser():
@@ -532,3 +548,52 @@ def test_ph_iemop_provider_empty_files_warning(capsys):
     captured = capsys.readouterr()
     assert "No dispatch archive files found" in captured.out
     assert "90 rolling days" in captured.out
+
+
+def test_thailand_egat_provider():
+    from unittest.mock import MagicMock
+    from pipeline.providers.th_egat import ThailandEGATProvider
+    from pipeline.egat_client import EGATClient
+
+    mock_client = MagicMock(spec=EGATClient)
+    mock_client.get_actual_generation.return_value = {
+        "id": "1800142",
+        "day": "06-09-2026",
+        "list": [
+            [0, 28000.0, 28.5],
+            [60, 28050.0, 28.5],
+            [1800, 28200.0, 28.4],
+            [3600, 29000.0, 28.3],
+            [43200, 32000.0, 32.0],  # 12:00 noon (solar active)
+        ],
+    }
+
+    provider = ThailandEGATProvider(client=mock_client)
+    facs = provider.fetch_facilities()
+    assert len(facs) >= 20
+    assert any(f.resource_id == "TH_MAE_MOH" for f in facs)
+    assert any(f.resource_id == "TH_BANG_PAKONG" for f in facs)
+
+    # Test fuel decomposition
+    noon_alloc = provider._calculate_fuel_allocation(
+        total_mw=32000.0, hour=12, minute=0
+    )
+    assert noon_alloc["solar"] > 2000.0
+    assert noon_alloc["coal"] > 0.0
+    assert noon_alloc["gas"] > 0.0
+    assert noon_alloc["hydro"] > 0.0
+
+    midnight_alloc = provider._calculate_fuel_allocation(
+        total_mw=25000.0, hour=0, minute=0
+    )
+    assert midnight_alloc["solar"] == 0.0
+
+    # Test interval fetching
+    target_d = date(2026, 9, 6)
+    intervals = provider.fetch_energy_intervals(
+        start_date=target_d,
+        end_date=target_d,
+    )
+    assert len(intervals) > 0
+    assert all(r.country_code == "TH" for r in intervals)
+    assert all(r.region == "THAILAND" for r in intervals)

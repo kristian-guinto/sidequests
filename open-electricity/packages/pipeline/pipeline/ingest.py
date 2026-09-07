@@ -1,7 +1,7 @@
 """Runner and execution engine for OpenElectricity data ingestion pipeline."""
 
 from datetime import date, timedelta
-from typing import Optional, List, Dict
+from typing import Optional, List
 from rich.console import Console
 from rich.panel import Panel
 
@@ -9,15 +9,7 @@ from pipeline.db import Database
 from pipeline.models import IngestRunReport, EnergyIntervalRecord
 from pipeline.fx import sync_exchange_rates, COUNTRY_TO_CURRENCY
 from pipeline.providers.base import BaseProvider
-from pipeline.providers.ph_iemop import PhilippinesIEMOPProvider
-from pipeline.providers.sg_emc import SingaporeEMCProvider
-from pipeline.providers.my_singlebuyer import MalaysiaSingleBuyerProvider
-
-PROVIDERS: Dict[str, type] = {
-    "PH": PhilippinesIEMOPProvider,
-    "SG": SingaporeEMCProvider,
-    "MY": MalaysiaSingleBuyerProvider,
-}
+from pipeline.providers import PROVIDERS
 
 console = Console()
 
@@ -125,11 +117,12 @@ def resolve_countries(country_arg: str) -> List[str]:
     """Resolves target country codes from CLI argument."""
     c = country_arg.upper()
     if c == "ALL":
-        return ["PH", "SG", "MY"]
+        return list(PROVIDERS.keys())
     if c in PROVIDERS:
         return [c]
+    valid_opts = ", ".join(["ALL"] + sorted(PROVIDERS.keys()))
     raise ValueError(
-        f"Unsupported country code: {country_arg}. Choose from: ALL, PH, SG, MY."
+        f"Unsupported country code: {country_arg}. Choose from: {valid_opts}."
     )
 
 

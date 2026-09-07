@@ -18,7 +18,7 @@ on:
           - migrate
           - inspect
       country:
-        description: 'Target Country (ALL, PH, SG, MY)'
+        description: 'Target Country (ALL, PH, SG, MY, TH)'
         required: true
         default: 'ALL'
         type: choice
@@ -27,6 +27,7 @@ on:
           - PH
           - SG
           - MY
+          - TH
       days:
         description: 'Past days to ingest (for latest mode, default: 2)'
         required: false

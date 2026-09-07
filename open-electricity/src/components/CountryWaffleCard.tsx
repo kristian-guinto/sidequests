@@ -59,6 +59,10 @@ export function CountryWaffleCard({
     return otherFuels.reduce((acc, r) => acc + r.percentage, 0);
   }, [otherFuels]);
 
+  const hasData =
+    Boolean(summary && summary.totalGenerationGWh > 0) ||
+    breakdown.some((r) => r.percentage > 0 || (r.energyGWh && r.energyGWh > 0));
+
   return (
     <Link
       href={`/country/${country}`}
@@ -75,23 +79,30 @@ export function CountryWaffleCard({
           </h3>
         </div>
 
-        {/* Clean Energy Badge */}
-        <span
-          className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${
-            cleanPct >= 35
-              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-              : cleanPct >= 15
-              ? "bg-amber-500/8 text-amber-600 dark:text-amber-400"
-              : "bg-neutral-100 dark:bg-neutral-800/50 text-neutral-500 dark:text-neutral-400"
-          }`}
-        >
-          {cleanPct >= 20 ? (
-            <Leaf className="w-3 h-3" />
-          ) : (
-            <Flame className="w-3 h-3" />
-          )}
-          <span>{cleanPct}%</span>
-        </span>
+        {/* Clean Energy Badge / Skeleton */}
+        {isLoading ? (
+          <div className="w-12 h-5 rounded-full bg-neutral-100 dark:bg-neutral-800/60 animate-pulse" />
+        ) : hasData ? (
+          <span
+            className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${cleanPct >= 35
+                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                : cleanPct >= 15
+                  ? "bg-amber-500/8 text-amber-600 dark:text-amber-400"
+                  : "bg-neutral-100 dark:bg-neutral-800/50 text-neutral-500 dark:text-neutral-400"
+              }`}
+          >
+            {cleanPct >= 20 ? (
+              <Leaf className="w-3 h-3" />
+            ) : (
+              <Flame className="w-3 h-3" />
+            )}
+            <span suppressHydrationWarning>{cleanPct}%</span>
+          </span>
+        ) : (
+          <span className="text-[11px] font-medium text-neutral-400 dark:text-neutral-500 bg-neutral-100 dark:bg-[#161619] px-2 py-0.5 rounded-full border border-neutral-200/50 dark:border-[#242428]">
+            No Data
+          </span>
+        )}
       </div>
 
       {/* Waffle Grid — full bleed within card padding */}
@@ -109,55 +120,75 @@ export function CountryWaffleCard({
       </div>
 
       {/* Fuel Breakdown — compact, no table headers */}
-      <div className="px-4 pt-1 pb-3 space-y-0">
-        {topFuels.map((fuelRow) => {
-          const meta = getFuelMeta(fuelRow.fuelTech, isDark, paletteMode);
-          const isHovered = hoveredFuel === fuelRow.fuelTech;
-          const isAnyHovered = hoveredFuel !== null;
+      <div className="px-4 pt-1 pb-3 space-y-0 min-h-[75px]">
+        {isLoading ? (
+          <div className="space-y-2 py-2">
+            <div className="h-3 rounded bg-neutral-100 dark:bg-neutral-800/60 animate-pulse w-3/4" />
+            <div className="h-3 rounded bg-neutral-100 dark:bg-neutral-800/60 animate-pulse w-1/2" />
+            <div className="h-3 rounded bg-neutral-100 dark:bg-neutral-800/60 animate-pulse w-2/3" />
+          </div>
+        ) : hasData ? (
+          <>
+            {topFuels.map((fuelRow) => {
+              const meta = getFuelMeta(fuelRow.fuelTech, isDark, paletteMode);
+              const isHovered = hoveredFuel === fuelRow.fuelTech;
+              const isAnyHovered = hoveredFuel !== null;
 
-          return (
-            <div
-              key={fuelRow.fuelTech}
-              onMouseEnter={(e) => {
-                e.preventDefault();
-                setHoveredFuel(fuelRow.fuelTech);
-              }}
-              onMouseLeave={() => setHoveredFuel(null)}
-              className={`flex items-center justify-between py-1.5 cursor-pointer transition-opacity ${
-                isHovered
-                  ? "opacity-100"
-                  : isAnyHovered
-                  ? "opacity-30"
-                  : "opacity-80 hover:opacity-100"
-              }`}
-            >
-              <div className="flex items-center space-x-2">
+              return (
+                <div
+                  key={fuelRow.fuelTech}
+                  onMouseEnter={(e) => {
+                    e.preventDefault();
+                    setHoveredFuel(fuelRow.fuelTech);
+                  }}
+                  onMouseLeave={() => setHoveredFuel(null)}
+                  className={`flex items-center justify-between py-1.5 cursor-pointer transition-opacity ${isHovered
+                      ? "opacity-100"
+                      : isAnyHovered
+                        ? "opacity-30"
+                        : "opacity-80 hover:opacity-100"
+                    }`}
+                >
+                  <div className="flex items-center space-x-2">
+                    <span
+                      className="w-2 h-2 rounded-sm flex-shrink-0"
+                      style={{ backgroundColor: meta.color }}
+                    />
+                    <span className="text-xs text-neutral-700 dark:text-neutral-300">
+                      {meta.label}
+                    </span>
+                  </div>
+                  <span
+                    suppressHydrationWarning
+                    className="font-mono text-xs tabular-nums text-neutral-500 dark:text-neutral-400"
+                  >
+                    {Math.round(fuelRow.percentage)}%
+                  </span>
+                </div>
+              );
+            })}
+
+            {/* Other sources indicator */}
+            {otherFuels.length > 0 && (
+              <div
+                className={`flex items-center justify-between py-1 transition-opacity ${hoveredFuel !== null ? "opacity-30" : "opacity-50"
+                  }`}
+              >
+                <span className="text-[11px] text-neutral-400 dark:text-neutral-500">
+                  +{otherFuels.length} other
+                </span>
                 <span
-                  className="w-2 h-2 rounded-sm flex-shrink-0"
-                  style={{ backgroundColor: meta.color }}
-                />
-                <span className="text-xs text-neutral-700 dark:text-neutral-300">
-                  {meta.label}
+                  suppressHydrationWarning
+                  className="font-mono text-[11px] tabular-nums text-neutral-400 dark:text-neutral-500"
+                >
+                  {Math.round(otherPercentage)}%
                 </span>
               </div>
-              <span className="font-mono text-xs tabular-nums text-neutral-500 dark:text-neutral-400">
-                {Math.round(fuelRow.percentage)}%
-              </span>
-            </div>
-          );
-        })}
-
-        {/* Other sources indicator */}
-        {otherFuels.length > 0 && (
-          <div className={`flex items-center justify-between py-1 transition-opacity ${
-            hoveredFuel !== null ? "opacity-30" : "opacity-50"
-          }`}>
-            <span className="text-[11px] text-neutral-400 dark:text-neutral-500">
-              +{otherFuels.length} other
-            </span>
-            <span className="font-mono text-[11px] tabular-nums text-neutral-400 dark:text-neutral-500">
-              {Math.round(otherPercentage)}%
-            </span>
+            )}
+          </>
+        ) : (
+          <div className="py-4 text-center text-xs text-neutral-400 dark:text-neutral-500">
+            No telemetry reported
           </div>
         )}
       </div>

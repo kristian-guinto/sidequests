@@ -67,6 +67,7 @@ yarn-error.log*
 pnpm-debug.log*
 .turbo/
 .vercel
+*.tsbuildinfo
 
 # 5. OS & IDE
 .DS_Store

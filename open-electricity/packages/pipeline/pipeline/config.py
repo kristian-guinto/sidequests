@@ -65,6 +65,21 @@ COUNTRIES_CONFIG = {
         "default_region": "VIETNAM",
         "regions": ["VIETNAM", "NORTH", "CENTRAL", "SOUTH"],
     },
+    "ID": {
+        "name": "Indonesia",
+        "currency": "IDR",
+        "currency_symbol": "Rp",
+        "timezone": "Asia/Jakarta",
+        "default_region": "ALL",
+        "regions": [
+            "ALL",
+            "JAVA_BALI",
+            "SUMATRA",
+            "KALIMANTAN",
+            "SULAWESI",
+            "EASTERN",
+        ],
+    },
 }
 
 # IEMOP Constants (Philippines)

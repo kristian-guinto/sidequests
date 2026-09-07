@@ -23,7 +23,10 @@ console = Console()
 @app.command("latest")
 def latest(
     country: str = typer.Option(
-        "ALL", "--country", "-c", help="Target country (PH, SG, MY, ALL). Default: ALL"
+        "ALL",
+        "--country",
+        "-c",
+        help="Target country (PH, SG, MY, TH, ALL). Default: ALL",
     ),
     days: int = typer.Option(
         2, "--days", "-d", help="Number of past days to ingest (default: 2)"
@@ -97,7 +100,7 @@ def backfill(
     ),
     end_date: str = typer.Option(..., "--end-date", "-e", help="End date (YYYY-MM-DD)"),
     country: str = typer.Option(
-        "PH", "--country", "-c", help="Target country (PH, SG, MY). Default: PH"
+        "PH", "--country", "-c", help="Target country (PH, SG, MY, TH). Default: PH"
     ),
     target: str = typer.Option(
         "local", "--target", "-t", help="Target database ('local' or 'motherduck')"
@@ -152,7 +155,10 @@ def backfill(
 @app.command("sync-facilities")
 def sync_facilities(
     country: str = typer.Option(
-        "ALL", "--country", "-c", help="Target country (PH, SG, MY, ALL). Default: ALL"
+        "ALL",
+        "--country",
+        "-c",
+        help="Target country (PH, SG, MY, TH, ALL). Default: ALL",
     ),
     target: str = typer.Option(
         "local", "--target", "-t", help="Target database ('local' or 'motherduck')"

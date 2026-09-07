@@ -83,8 +83,7 @@ COUNTRIES_METADATA = {
         "currencySymbol": "฿",
         "currencyCode": "THB",
         "defaultRegion": "THAILAND",
-        "minInterval": "30m",
-        "timezone": "Asia/Bangkok",
+        "minInterval": "5m",
         "tzOffset": "+07:00",
     },
     "VN": {
@@ -94,6 +93,15 @@ COUNTRIES_METADATA = {
         "defaultRegion": "VIETNAM",
         "minInterval": "30m",
         "timezone": "Asia/Ho_Chi_Minh",
+        "tzOffset": "+07:00",
+    },
+    "ID": {
+        "name": "Indonesia",
+        "currencySymbol": "Rp",
+        "currencyCode": "IDR",
+        "defaultRegion": "ALL",
+        "minInterval": "1h",
+        "timezone": "Asia/Jakarta",
         "tzOffset": "+07:00",
     },
 }

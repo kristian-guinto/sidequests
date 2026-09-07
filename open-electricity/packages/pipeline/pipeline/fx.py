@@ -11,6 +11,7 @@ COUNTRY_TO_CURRENCY: Dict[str, str] = {
     "MY": "MYR",
     "TH": "THB",
     "VN": "VND",
+    "ID": "IDR",
 }
 
 
@@ -55,6 +56,15 @@ def get_fx_rate(
     if row and row[0] is not None and row[0] > 0:
         return float(row[0])
 
+    # Carry forward last available market closing rate for weekends/holidays
+    fallback_row = conn.execute(
+        "SELECT rate_to_usd FROM exchange_rates WHERE currency = ? AND date <= ?::DATE ORDER BY date DESC LIMIT 1",
+        [curr, d_str],
+    ).fetchone()
+
+    if fallback_row and fallback_row[0] is not None and fallback_row[0] > 0:
+        return float(fallback_row[0])
+
     raise ExchangeRateNotFoundError(
         f"Exchange rate to USD not found for currency '{curr}' on date '{d_str}'. "
         "No default fallback rates are configured to prevent silent errors. "
@@ -85,7 +95,7 @@ def sync_exchange_rates(
         else date.today()
     )
 
-    url = f"https://api.frankfurter.dev/v1/{start.isoformat()}..{end.isoformat()}?from=USD&to=PHP,SGD,MYR,THB"
+    url = f"https://api.frankfurter.dev/v1/{start.isoformat()}..{end.isoformat()}?from=USD&to=PHP,SGD,MYR,THB,IDR"
     try:
         with httpx.Client(timeout=10.0) as client:
             resp = client.get(url)
