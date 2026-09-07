@@ -64,10 +64,6 @@ export const COUNTRIES_METADATA: Record<CountryCode, CountryInfo> = {
     gridOperator: "EGAT / SO Thailand",
     regions: [
       { id: "THAILAND", label: "All Thailand" },
-      { id: "CENTRAL", label: "Central" },
-      { id: "NORTH", label: "North" },
-      { id: "NORTHEAST", label: "Northeast" },
-      { id: "SOUTH", label: "South" },
     ],
   },
   VN: {
@@ -116,7 +112,7 @@ export type Region = string;
 
 export type TimeRange = "1d" | "3d" | "7d" | "30d" | "1y";
 
-export type TimeInterval = "5m" | "30m" | "1h" | "1d" | "1w" | "1M";
+export type TimeInterval = "5m" | "30m" | "1h" | "1d" | "1w" | "1m" | "1M";
 
 export const RANGE_CONFIG: Record<
   TimeRange,
@@ -169,7 +165,7 @@ export const RANGE_CONFIG: Record<
     defaultInterval: "1w",
     allowedIntervals: [
       { id: "1w", label: "1w" },
-      { id: "1M", label: "1M" },
+      { id: "1m", label: "1m" },
     ],
     unit: "GWh",
   },
@@ -192,19 +188,19 @@ export type FuelTech =
 
 export interface FuelGenerationPoint {
   timestamp: string;
-  solar: number;
-  wind: number;
-  hydro: number;
-  geothermal: number;
-  biomass: number;
-  gas: number;
-  coal: number;
-  oil: number;
-  battery: number;
-  price?: number;
-  priceDollar?: number;
-  totalGeneration?: number;
-  renewablesPct?: number;
+  solar: number | null;
+  wind: number | null;
+  hydro: number | null;
+  geothermal: number | null;
+  biomass: number | null;
+  gas: number | null;
+  coal: number | null;
+  oil: number | null;
+  battery: number | null;
+  price?: number | null;
+  priceDollar?: number | null;
+  totalGeneration?: number | null;
+  renewablesPct?: number | null;
   hasData?: boolean;
 }
 

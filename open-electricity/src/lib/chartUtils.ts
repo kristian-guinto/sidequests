@@ -24,211 +24,144 @@ export function createShadcnGradient(hexColor: string, topOpacity = 0.65, bottom
 }
 
 /**
- * Ensures that the returned dataset spans the full expected time range ending at yesterday.
- * Any points that fall on or after today (current day) are excluded for data completeness.
- * Time buckets within the full range that have no data are padded with empty points (hasData: false)
- * so that the x-axis displays the complete time range and missing periods render as blank.
+ * Parses an ISO timestamp string representing the country's local market time
+ * into a Date object without applying browser timezone shifting.
+ */
+export function parseMarketDate(timestamp: string): Date {
+  if (!timestamp) return new Date();
+  const s = timestamp.includes("T")
+    ? timestamp.substring(0, 19)
+    : timestamp.substring(0, 10);
+  return parseISO(s);
+}
+
+/**
+ * Formats a market timestamp in local market wall-clock time.
+ */
+export function formatMarketDate(
+  timestamp: string,
+  formatStr: string = "d MMM yyyy, h:mm a"
+): string {
+  try {
+    const d = parseMarketDate(timestamp);
+    if (isNaN(d.getTime())) return timestamp;
+    return format(d, formatStr);
+  } catch {
+    return timestamp;
+  }
+}
+
+/**
+ * Calculates start_date and end_date (YYYY-MM-DD) for a given range,
+ * anchoring end_date to yesterday (up to 00:00:00 of the current day)
+ * so that only fully completed operational day data is queried across all countries.
+ */
+export function getDateRangeParams(range: TimeRange = "7d"): {
+  startDate: string;
+  endDate: string;
+} {
+  const now = new Date();
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  const endDate = format(yesterday, "yyyy-MM-dd");
+
+  let days = 1;
+  if (range === "3d") days = 3;
+  else if (range === "7d") days = 7;
+  else if (range === "30d") days = 30;
+  else if (range === "1y") days = 365;
+
+  const startDateObj = new Date(
+    yesterday.getFullYear(),
+    yesterday.getMonth(),
+    yesterday.getDate() - (days - 1)
+  );
+  const startDate = format(startDateObj, "yyyy-MM-dd");
+
+  return { startDate, endDate };
+}
+
+/**
+ * Ensures that the returned dataset maintains consistent time spacing.
+ * Preserves all incoming valid telemetry points, and inserts blank placeholders
+ * (hasData: false) only across genuine data gaps so that missing periods render
+ * faithfully without distorting the time axis.
  */
 export function alignPointsToTimeGrid(
   points: FuelGenerationPoint[],
   range: TimeRange,
   interval?: TimeInterval
 ): FuelGenerationPoint[] {
-  const activeInterval = interval || RANGE_CONFIG[range]?.defaultInterval || "30m";
-  const now = new Date();
-  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0, 0);
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+  if (!points || points.length === 0) return [];
 
-  // Filter out any incoming points on or after today (incomplete current day)
-  const validPoints = (points || []).filter((p) => {
+  const activeInterval =
+    interval || (range ? RANGE_CONFIG[range]?.defaultInterval : "30m") || "30m";
+  let stepMs = 30 * 60 * 1000;
+  if (activeInterval === "5m") stepMs = 5 * 60 * 1000;
+  else if (activeInterval === "30m") stepMs = 30 * 60 * 1000;
+  else if (activeInterval === "1h") stepMs = 60 * 60 * 1000;
+  else if (activeInterval === "1d") stepMs = 24 * 60 * 60 * 1000;
+  else if (activeInterval === "1w") stepMs = 7 * 24 * 60 * 60 * 1000;
+  else if (activeInterval === "1M" || activeInterval === "1m")
+    stepMs = 30 * 24 * 60 * 60 * 1000;
+  else if (points.length >= 2) {
     try {
-      const d = parseISO(p.timestamp);
-      return d.getTime() < todayStart.getTime();
-    } catch {
-      return true;
-    }
-  });
-
-  // Reference end date is yesterday
-  let refDate = yesterday;
-  if (validPoints.length > 0) {
-    const maxPtTime = Math.max(
-      ...validPoints
-        .map((p) => {
-          try {
-            return parseISO(p.timestamp).getTime();
-          } catch {
-            return NaN;
-          }
-        })
-        .filter((t) => !isNaN(t))
-    );
-    if (isFinite(maxPtTime)) {
-      const maxPtDate = new Date(maxPtTime);
-      const daysDiff = (yesterday.getTime() - maxPtDate.getTime()) / (1000 * 60 * 60 * 24);
-      if (daysDiff > 2) {
-        refDate = new Date(maxPtDate.getFullYear(), maxPtDate.getMonth(), maxPtDate.getDate(), 0, 0, 0, 0);
+      const t0 = parseMarketDate(points[0].timestamp).getTime();
+      const t1 = parseMarketDate(points[1].timestamp).getTime();
+      const diff = Math.abs(t1 - t0);
+      if (diff > 0 && !isNaN(diff)) {
+        stepMs = diff;
       }
-    }
+    } catch { }
   }
 
-  interface SlotInfo {
-    timestamp: string;
-    date: Date;
-    matchKey: string;
-  }
+  const result: FuelGenerationPoint[] = [];
 
-  const slots: SlotInfo[] = [];
-
-  if (range === "30d") {
-    if (activeInterval === "1w") {
-      for (let i = 0; i < 4; i++) {
-        const d = new Date(refDate.getFullYear(), refDate.getMonth(), refDate.getDate() - (3 - i) * 7, 0, 0, 0, 0);
-        const ts = format(d, "yyyy-MM-dd");
-        slots.push({ timestamp: ts, date: d, matchKey: ts });
-      }
-    } else {
-      for (let i = 0; i < 30; i++) {
-        const d = new Date(refDate.getFullYear(), refDate.getMonth(), refDate.getDate() - (29 - i), 0, 0, 0, 0);
-        const ts = format(d, "yyyy-MM-dd");
-        slots.push({ timestamp: ts, date: d, matchKey: ts });
-      }
-    }
-  } else if (range === "1y") {
-    if (activeInterval === "1M") {
-      for (let i = 0; i < 12; i++) {
-        const d = new Date(refDate.getFullYear(), refDate.getMonth() - (11 - i), 1, 0, 0, 0, 0);
-        const ts = format(d, "yyyy-MM-dd");
-        slots.push({ timestamp: ts, date: d, matchKey: format(d, "yyyy-MM") });
-      }
-    } else {
-      for (let i = 0; i < 52; i++) {
-        const d = new Date(refDate.getFullYear(), refDate.getMonth(), refDate.getDate() - (51 - i) * 7, 0, 0, 0, 0);
-        const ts = format(d, "yyyy-MM-dd");
-        slots.push({ timestamp: ts, date: d, matchKey: ts });
-      }
-    }
-  } else if (range === "7d") {
-    if (activeInterval === "1d") {
-      for (let i = 0; i < 7; i++) {
-        const d = new Date(refDate.getFullYear(), refDate.getMonth(), refDate.getDate() - (6 - i), 0, 0, 0, 0);
-        const ts = format(d, "yyyy-MM-dd");
-        slots.push({ timestamp: ts, date: d, matchKey: ts });
-      }
-    } else {
-      const stepMins = activeInterval === "1h" ? 60 : 30;
-      const count = 7 * (1440 / stepMins);
-      const start = new Date(refDate.getFullYear(), refDate.getMonth(), refDate.getDate() - 6, 0, 0, 0, 0);
-      for (let i = 0; i < count; i++) {
-        const d = new Date(start.getTime() + i * stepMins * 60 * 1000);
-        const ts = format(d, "yyyy-MM-dd'T'HH:mm:ssXXX");
-        const matchKey = format(d, "yyyy-MM-dd'T'HH:mm");
-        slots.push({ timestamp: ts, date: d, matchKey });
-      }
-    }
-  } else if (range === "3d") {
-    const stepMins = activeInterval === "1h" ? 60 : 30;
-    const count = 3 * (1440 / stepMins);
-    const start = new Date(refDate.getFullYear(), refDate.getMonth(), refDate.getDate() - 2, 0, 0, 0, 0);
-    for (let i = 0; i < count; i++) {
-      const d = new Date(start.getTime() + i * stepMins * 60 * 1000);
-      const ts = format(d, "yyyy-MM-dd'T'HH:mm:ssXXX");
-      const matchKey = format(d, "yyyy-MM-dd'T'HH:mm");
-      slots.push({ timestamp: ts, date: d, matchKey });
-    }
-  } else if (range === "1d") {
-    const stepMins = activeInterval === "30m" ? 30 : 5;
-    const count = 1440 / stepMins;
-    const start = new Date(refDate.getFullYear(), refDate.getMonth(), refDate.getDate(), 0, 0, 0, 0);
-    for (let i = 0; i < count; i++) {
-      const d = new Date(start.getTime() + i * stepMins * 60 * 1000);
-      const ts = format(d, "yyyy-MM-dd'T'HH:mm:ssXXX");
-      const matchKey = format(d, "yyyy-MM-dd'T'HH:mm");
-      slots.push({ timestamp: ts, date: d, matchKey });
-    }
-  }
-
-  // Create lookup maps
-  const dayMap = new Map<string, FuelGenerationPoint>();
-  const monthMap = new Map<string, FuelGenerationPoint>();
-  const subDailyMap = new Map<string, FuelGenerationPoint>();
-
-  validPoints.forEach((p) => {
-    try {
-      const d = parseISO(p.timestamp);
-      if (!isNaN(d.getTime())) {
-        dayMap.set(format(d, "yyyy-MM-dd"), p);
-        monthMap.set(format(d, "yyyy-MM"), p);
-        subDailyMap.set(format(d, "yyyy-MM-dd'T'HH:mm"), p);
-      }
-    } catch {
-      dayMap.set(p.timestamp.substring(0, 10), p);
-    }
-  });
-
-  const isMonthly = range === "1y" && activeInterval === "1M";
-  const isDailyOrWeekly = activeInterval === "1d" || activeInterval === "1w";
-
-  return slots.map((slot) => {
-    let matched: FuelGenerationPoint | undefined;
-    if (isMonthly) {
-      matched = monthMap.get(slot.matchKey);
-    } else if (isDailyOrWeekly) {
-      matched = dayMap.get(slot.matchKey);
-      if (!matched && activeInterval === "1w") {
-        const slotMs = slot.date.getTime();
-        for (const vp of validPoints) {
-          try {
-            const vpMs = parseISO(vp.timestamp).getTime();
-            if (vpMs >= slotMs && vpMs < slotMs + 7 * 24 * 3600 * 1000) {
-              matched = vp;
-              break;
-            }
-          } catch { }
-        }
-      }
-    } else {
-      matched = subDailyMap.get(slot.matchKey);
-      if (!matched) {
-        const slotMs = slot.date.getTime();
-        for (const vp of validPoints) {
-          try {
-            const vpMs = parseISO(vp.timestamp).getTime();
-            if (Math.abs(vpMs - slotMs) <= 15 * 60 * 1000) {
-              matched = vp;
-              break;
-            }
-          } catch { }
-        }
-      }
-    }
-
-    if (matched) {
-      return {
-        ...matched,
-        timestamp: slot.timestamp,
-        hasData: true,
-      };
-    }
-
-    return {
-      timestamp: slot.timestamp,
-      solar: 0,
-      wind: 0,
-      hydro: 0,
-      geothermal: 0,
-      biomass: 0,
-      gas: 0,
-      coal: 0,
-      oil: 0,
-      battery: 0,
-      price: undefined,
-      priceDollar: undefined,
-      totalGeneration: 0,
-      renewablesPct: 0,
-      hasData: false,
+  for (let i = 0; i < points.length; i++) {
+    const pt = {
+      ...points[i],
+      hasData: points[i].hasData !== undefined ? points[i].hasData : true,
     };
-  });
+    if (i > 0) {
+      const prevTime = parseMarketDate(points[i - 1].timestamp).getTime();
+      const currTime = parseMarketDate(points[i].timestamp).getTime();
+      const diff = currTime - prevTime;
+
+      // If there is an internal gap significantly larger than expected step
+      if (diff > stepMs * 1.8 && !isNaN(prevTime) && !isNaN(currTime)) {
+        let gapTime = prevTime + stepMs;
+        while (gapTime < currTime - stepMs * 0.5) {
+          const d = new Date(gapTime);
+          const pad = (n: number) => String(n).padStart(2, "0");
+          const tzOffset = points[0].timestamp.includes("+")
+            ? points[0].timestamp.substring(points[0].timestamp.indexOf("+"))
+            : "+08:00";
+          result.push({
+            timestamp: points[0].timestamp.includes("T")
+              ? `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00${tzOffset}`
+              : `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+            solar: 0,
+            wind: 0,
+            hydro: 0,
+            geothermal: 0,
+            biomass: 0,
+            gas: 0,
+            coal: 0,
+            oil: 0,
+            battery: 0,
+            price: undefined,
+            priceDollar: undefined,
+            totalGeneration: 0,
+            renewablesPct: 0,
+            hasData: false,
+          });
+          gapTime += stepMs;
+        }
+      }
+    }
+    result.push(pt);
+  }
+
+  return result;
 }
 
 /**
@@ -254,7 +187,7 @@ export function computeXAxisConfig(
   let spanHours = 24;
   let parsedDates: Date[] = [];
   try {
-    parsedDates = data.map((d) => parseISO(d.timestamp));
+    parsedDates = data.map((d) => parseMarketDate(d.timestamp));
     const firstDate = parsedDates[0];
     const lastDate = parsedDates[n - 1];
     spanHours = Math.max(1, Math.abs(differenceInHours(lastDate, firstDate)));
@@ -320,7 +253,7 @@ export function computeXAxisConfig(
 
   const timestamps = data.map((d, idx) => {
     try {
-      const date = parsedDates[idx] || parseISO(d.timestamp);
+      const date = parsedDates[idx] || parseMarketDate(d.timestamp);
       if (isNaN(date.getTime())) return d.timestamp;
 
       if (is1Day) {

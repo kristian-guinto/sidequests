@@ -13,6 +13,7 @@ import {
 import { CountryWaffleCard } from "@/components/CountryWaffleCard";
 import { UnavailableCountryCard } from "@/components/UnavailableCountryCard";
 import { useTheme } from "@/components/ThemeProvider";
+import { getDateRangeParams } from "@/lib/chartUtils";
 import {
   Palette,
   Leaf,
@@ -54,11 +55,19 @@ export default function SoutheastAsiaOverviewPage() {
       (code) => COUNTRIES_METADATA[code]?.hasLivePipeline !== false
     );
 
+    const { startDate, endDate } = getDateRangeParams(range);
     const promises = liveCountries.map(async (code) => {
       try {
-        const interval = range === "1d" ? "30m" : range === "7d" ? "1h" : "1d";
+        const interval =
+          range === "1d"
+            ? "30m"
+            : range === "7d"
+              ? "1h"
+              : range === "1y"
+                ? "1w"
+                : "1d";
         const res = await fetch(
-          `/api/energy?country=${code}&region=ALL&range=${range}&interval=${interval}`
+          `/api/energy?country=${code}&region=ALL&start_date=${startDate}&end_date=${endDate}&range=${range}&interval=${interval}`
         );
         if (res.ok) {
           const json = await res.json();

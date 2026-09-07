@@ -5,7 +5,7 @@ import ReactECharts from "echarts-for-react";
 import * as echarts from "echarts";
 import { FuelGenerationPoint, ViewMode, FuelTech, TimeRange } from "@/lib/types";
 import { getFuelMeta } from "@/lib/colors";
-import { computeXAxisConfig, getShadcnTooltipConfig } from "@/lib/chartUtils";
+import { computeXAxisConfig, formatMarketDate, getShadcnTooltipConfig } from "@/lib/chartUtils";
 import {
   ChartCard,
   ChartCardHeader,
@@ -160,9 +160,7 @@ export function EmissionsChart({
           const item = emissionsData[idx];
           let formattedTime = params[0].axisValue;
           if (rawPt?.timestamp) {
-            try {
-              formattedTime = format(parseISO(rawPt.timestamp), "d MMM yyyy, h:mm a");
-            } catch { }
+            formattedTime = formatMarketDate(rawPt.timestamp, "d MMM yyyy, h:mm a");
           }
 
           const rows = params.map((p) => {

@@ -4,7 +4,7 @@ import React, { useMemo, useCallback } from "react";
 import ReactECharts from "echarts-for-react";
 import * as echarts from "echarts";
 import { FuelGenerationPoint, TimeRange } from "@/lib/types";
-import { computeXAxisConfig, createShadcnGradient, getShadcnTooltipConfig } from "@/lib/chartUtils";
+import { computeXAxisConfig, createShadcnGradient, formatMarketDate, getShadcnTooltipConfig } from "@/lib/chartUtils";
 import {
   ChartCard,
   ChartCardHeader,
@@ -64,9 +64,7 @@ export function PriceChart({
           const rawPt = data[idx];
           let formattedTime = params[0].axisValue;
           if (rawPt?.timestamp) {
-            try {
-              formattedTime = format(parseISO(rawPt.timestamp), "d MMM yyyy, h:mm a");
-            } catch { }
+            formattedTime = formatMarketDate(rawPt.timestamp, "d MMM yyyy, h:mm a");
           }
 
           const borderCls = isDark ? "border-[#27272A]" : "border-neutral-100";

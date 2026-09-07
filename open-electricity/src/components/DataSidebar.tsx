@@ -12,6 +12,7 @@ import { getFuelMeta } from "@/lib/colors";
 import { ChevronDown, PieChart as PieIcon, List, Zap, CloudFog, TrendingUp } from "lucide-react";
 import ReactECharts from "echarts-for-react";
 import { format, parseISO } from "date-fns";
+import { formatMarketDate } from "@/lib/chartUtils";
 import { useTheme } from "@/components/ThemeProvider";
 
 interface DataSidebarProps {
@@ -59,19 +60,12 @@ export function DataSidebar({
   // Format header time text
   const formattedTimeHeader = useMemo(() => {
     if (isHovered && hoveredPoint?.timestamp) {
-      try {
-        const d = parseISO(hoveredPoint.timestamp);
-        return format(d, "d MMM yyyy, h:mm a");
-      } catch {
-        return hoveredPoint.timestamp;
-      }
+      return formatMarketDate(hoveredPoint.timestamp, "d MMM yyyy, h:mm a");
     }
     if (timeSpan?.start && timeSpan?.end) {
       try {
-        const s = parseISO(timeSpan.start);
-        const e = parseISO(timeSpan.end);
-        const sFormatted = format(s, "d MMM yyyy");
-        const eFormatted = format(e, "d MMM yyyy");
+        const sFormatted = formatMarketDate(timeSpan.start, "d MMM yyyy");
+        const eFormatted = formatMarketDate(timeSpan.end, "d MMM yyyy");
         if (sFormatted === eFormatted) {
           return sFormatted;
         }

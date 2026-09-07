@@ -21,7 +21,7 @@ import { GenerationChart } from "@/components/GenerationChart";
 import { EmissionsChart } from "@/components/EmissionsChart";
 import { PriceChart } from "@/components/PriceChart";
 import { DataSidebar } from "@/components/DataSidebar";
-import { alignPointsToTimeGrid } from "@/lib/chartUtils";
+import { alignPointsToTimeGrid, getDateRangeParams } from "@/lib/chartUtils";
 
 interface CountryPageProps {
   params: {
@@ -97,8 +97,9 @@ export default function CountryDetailPage({ params }: CountryPageProps) {
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
+      const { startDate, endDate } = getDateRangeParams(range);
       const res = await fetch(
-        `/api/energy?country=${country}&region=${region}&range=${range}&interval=${interval}`
+        `/api/energy?country=${country}&region=${region}&start_date=${startDate}&end_date=${endDate}&range=${range}&interval=${interval}`
       );
       if (res.ok) {
         const json = await res.json();
