@@ -241,6 +241,15 @@ export default function SoutheastAsiaOverviewPage() {
                 country={code}
                 breakdown={data?.breakdown || []}
                 summary={data?.summary || null}
+                paletteMode={paletteMode}
+                isLoading={isLoading && !data}
+              />
+            );
+          })}
+        </div>
+      </main>
+
+      {/* Sleek Bottom OpenNEM Status Bar */}
       <footer className="border-t border-neutral-200 dark:border-[#27272A] bg-neutral-900 dark:bg-[#09090B] text-neutral-300 py-2.5 px-4 sm:px-8 text-[11px] font-mono select-none mt-auto">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
           <div className="flex items-center space-x-3 text-neutral-400">
@@ -255,5 +264,5 @@ export default function SoutheastAsiaOverviewPage() {
         </div>
       </footer>
     </div>
-        );
+  );
 }
