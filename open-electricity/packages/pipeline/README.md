@@ -145,7 +145,8 @@ packages/pipeline/
 │   ├── iemop_client.py                 # IEMOP HTTP client, archive scraper, and CSV extractor
 │   ├── emc_client.py                   # Singapore EMC API and CSV catalog client
 │   ├── singlebuyer_client.py           # Malaysia Single Buyer & GSO client
-│   ├── ingest.py                       # CLI application (latest, backfill, sync-facilities, inspect)
+│   ├── cli.py                          # Dedicated Typer & Rich CLI app (latest, backfill, sync-facilities, inspect)
+│   ├── ingest.py                       # Pipeline runner and orchestration engine (run_country_pipeline)
 │   ├── classifiers/                    # Multi-country facility classification strategy
 │   │   ├── __init__.py                 # Factory get_classifier_for_country()
 │   │   ├── base.py                     # BaseFacilityClassifier & ClassifiedUnit NamedTuple

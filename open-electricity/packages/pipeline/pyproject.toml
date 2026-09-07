@@ -20,8 +20,8 @@ dependencies = [
 ducklembic = { workspace = true }
 
 [project.scripts]
-open-electricity = "pipeline.ingest:app"
-ingest = "pipeline.ingest:app"
+open-electricity = "pipeline.cli:app"
+ingest = "pipeline.cli:app"
 
 [build-system]
 requires = ["hatchling"]

@@ -70,11 +70,11 @@ We use [`uv`](https://docs.astral.sh/uv/) for Python package management:
 # Sync dependencies
 uv sync
 
-# Run daily sync (fetches latest IEMOP files)
-uv run ingest --mode daily
+# Run daily sync (fetches latest market data)
+uv run ingest latest
 
 # Run historical backfill for custom date range
-uv run ingest --mode backfill --start-date 2026-08-01 --end-date 2026-08-31
+uv run ingest backfill --start-date 2026-08-01 --end-date 2026-08-31
 
 # Sync local DuckDB data to MotherDuck Cloud
 uv run ingest sync-cloud

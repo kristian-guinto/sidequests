@@ -5,6 +5,9 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional, Union, Sequence, Tuple
 from enum import Enum
 import duckdb
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
 from ducklembic import DuckDB as DucklembicDB
 from pipeline.config import (
     DUCKDB_PATH,
@@ -381,13 +384,14 @@ class Database:
         country_filter = " WHERE country_code = ?" if country != "ALL" else ""
         c_params = [country] if country != "ALL" else []
 
-        print(
-            "================================================================================"
-        )
-        print(f"  OpenNEM-SEA Database Inspector ({self.conn_str})")
-        print(f"  Target: [{self.target.value}] | Scope: Country = [{country}]")
-        print(
-            "================================================================================"
+        console = Console()
+        console.print(
+            Panel(
+                f"[bold yellow]OpenNEM-SEA Database Inspector[/bold yellow] ([dim]{self.conn_str}[/dim])\n"
+                f"[dim]Target:[/dim] \\[{self.target.value}\\] | [dim]Scope:[/dim] Country = \\[{country}\\]",
+                border_style="cyan",
+                expand=False,
+            )
         )
 
         tables_info = [
@@ -397,12 +401,11 @@ class Database:
             ("exchange_rates", "Daily Reference FX Rates to USD"),
         ]
 
-        print(f"\n📊 TABLE OVERVIEW ({country}):")
-        print(f"  {'-' * 76}")
-        print(
-            f"  {'Table Name':<24} | {'Rows':<8} | {'Date / Time Span':<22} | {'Description'}"
-        )
-        print(f"  {'-' * 76}")
+        overview_tbl = Table(title=f"Table Overview ({country})", border_style="blue")
+        overview_tbl.add_column("Table Name", style="bold cyan")
+        overview_tbl.add_column("Rows", justify="right")
+        overview_tbl.add_column("Date / Time Span", style="dim")
+        overview_tbl.add_column("Description")
 
         for tbl, desc in tables_info:
             try:
@@ -429,15 +432,14 @@ class Database:
                     if span_row and span_row[0] and span_row[1]:
                         time_span = f"{span_row[0]} -> {span_row[1]}"
 
-                print(f"  {tbl:<24} | {cnt:<8} | {time_span:<22} | {desc}")
+                overview_tbl.add_row(tbl, f"{cnt:,}", time_span, desc)
             except Exception as e:
-                print(f"  {tbl:<24} | {'0':<8} | {'—':<22} | (Error: {e})")
+                overview_tbl.add_row(tbl, "0", "—", f"[red]Error: {e}[/red]")
 
-        print(f"  {'-' * 76}")
+        console.print(overview_tbl)
 
         target_table = (table or "").lower()
         if target_table in ("facilities", "facility", "all"):
-            print(f"\n🏭 FACILITIES SAMPLE (Top {limit}):")
             filter_clauses = []
             params = []
             if country != "ALL":
@@ -454,17 +456,32 @@ class Database:
                 f"SELECT country_code, resource_id, facility_name, region, fuel_tech, capacity_mw, is_renewable FROM facilities{where_str} ORDER BY capacity_mw DESC LIMIT ?",
                 params + [limit],
             ).fetchall()
-            print(
-                f"  {'CT':<4} | {'ID':<14} | {'Facility Name':<30} | {'Region':<8} | {'Fuel':<10} | {'Cap(MW)':<8} | {'RE?'}"
+
+            fac_tbl = Table(
+                title=f"Facilities Sample (Top {limit})", border_style="magenta"
             )
-            print(f"  {'-' * 92}")
+            fac_tbl.add_column("CT", style="bold", justify="center")
+            fac_tbl.add_column("ID", style="cyan")
+            fac_tbl.add_column("Facility Name")
+            fac_tbl.add_column("Region")
+            fac_tbl.add_column("Fuel")
+            fac_tbl.add_column("Cap (MW)", justify="right")
+            fac_tbl.add_column("RE?", justify="center")
+
             for r in rows:
-                print(
-                    f"  {r[0]:<4} | {r[1]:<14} | {r[2][:30]:<30} | {r[3]:<8} | {r[4]:<10} | {r[5] or 0:<8.1f} | {'Yes' if r[6] else 'No'}"
+                fac_tbl.add_row(
+                    r[0],
+                    r[1],
+                    r[2][:30],
+                    r[3],
+                    r[4],
+                    f"{r[5] or 0:.1f}",
+                    "[green]Yes[/green]" if r[6] else "[dim]No[/dim]",
                 )
+            console.print()
+            console.print(fac_tbl)
 
         if target_table in ("energy_interval", "dispatch", "all") or not table:
-            print(f"\n⚡ ENERGY INTERVAL SAMPLE (Latest {limit} entries):")
             filter_clauses = []
             params = []
             if country != "ALL":
@@ -481,18 +498,33 @@ class Database:
                 f"SELECT country_code, interval_start, region, fuel_tech, generation_mw, price_local, price_dollar FROM energy_interval{where_str} ORDER BY interval_start DESC, region ASC LIMIT ?",
                 params + [limit],
             ).fetchall()
-            print(
-                f"  {'CT':<4} | {'Interval Start':<24} | {'Region':<8} | {'Fuel Tech':<12} | {'Output(MW)':<11} | {'Local Price'} | {'USD Price'}"
+
+            int_tbl = Table(
+                title=f"Energy Interval Sample (Latest {limit} entries)",
+                border_style="green",
             )
-            print(f"  {'-' * 96}")
+            int_tbl.add_column("CT", style="bold", justify="center")
+            int_tbl.add_column("Interval Start", style="dim")
+            int_tbl.add_column("Region")
+            int_tbl.add_column("Fuel Tech")
+            int_tbl.add_column("Output (MW)", justify="right")
+            int_tbl.add_column("Local Price", justify="right")
+            int_tbl.add_column("USD Price", justify="right")
+
             for r in rows:
                 p_sym = COUNTRIES_CONFIG.get(r[0], {}).get("currency_symbol", "$")
                 p_local_str = f"{p_sym}{r[5]:.2f}" if r[5] is not None else "—"
                 p_dollar_str = f"${r[6]:.2f}" if r[6] is not None else "—"
-                print(
-                    f"  {r[0]:<4} | {str(r[1]):<24} | {r[2]:<8} | {r[3]:<12} | {r[4]:<11.1f} | {p_local_str:<11} | {p_dollar_str}"
+                int_tbl.add_row(
+                    r[0],
+                    str(r[1]),
+                    r[2],
+                    r[3],
+                    f"{r[4]:.1f}",
+                    p_local_str,
+                    p_dollar_str,
                 )
+            console.print()
+            console.print(int_tbl)
 
-        print(
-            "\n================================================================================\n"
-        )
+        console.print()

@@ -1,9 +1,10 @@
-"""Main CLI and runner for OpenElectricity data ingestion pipeline."""
+"""Runner and execution engine for OpenElectricity data ingestion pipeline."""
 
-import argparse
-from datetime import datetime, date, timedelta
+from datetime import date, timedelta
 from typing import Optional, List, Dict
-from pipeline.config import DUCKDB_PATH
+from rich.console import Console
+from rich.panel import Panel
+
 from pipeline.db import Database
 from pipeline.models import IngestRunReport, EnergyIntervalRecord
 from pipeline.fx import sync_exchange_rates, COUNTRY_TO_CURRENCY
@@ -18,6 +19,8 @@ PROVIDERS: Dict[str, type] = {
     "MY": MalaysiaSingleBuyerProvider,
 }
 
+console = Console()
+
 
 def run_country_pipeline(
     provider: BaseProvider,
@@ -30,21 +33,32 @@ def run_country_pipeline(
 ) -> IngestRunReport:
     """Executes the standard 4-step pipeline lifecycle for a single market provider."""
     country = provider.country_code
-    print("==================================================")
-    print(f"  OpenNEM-SEA: Country [{country}] Pipeline")
-    print(f"  Date Range: {start_date or f'Past {days} days'} -> {end_date or 'Today'}")
-    print("==================================================")
+    date_range = f"{start_date or f'Past {days} days'} -> {end_date or 'Today'}"
+    console.print(
+        Panel(
+            f"[bold yellow]OpenNEM-SEA:[/bold yellow] Country: [bold cyan]{country}[/bold cyan] Pipeline\n"
+            f"[dim]Date Range:[/dim] {date_range}",
+            border_style="cyan",
+            expand=False,
+        )
+    )
 
     fac_count = 0
     if sync_facilities_flag:
-        print(f"\n[1/4] Syncing Generator Catalog ({country})...")
+        console.print(
+            f"\n[bold blue][1/4][/bold blue] Syncing Generator Catalog ({country})..."
+        )
         facilities = provider.fetch_facilities(conn=db.conn)
         fac_count = db.upsert_facilities(facilities, country_code=country)
-        print(f"  ✓ Synced {fac_count} facilities.")
+        console.print(f"  [green]✓[/green] Synced {fac_count} facilities.")
     else:
-        print(f"\n[1/4] Skipping Generator Catalog Sync ({country}).")
+        console.print(
+            f"\n[bold blue][1/4][/bold blue] [dim]Skipping Generator Catalog Sync ({country}).[/dim]"
+        )
 
-    print("\n[2/4] Verifying Exchange Rates (USD Reference)...")
+    console.print(
+        "\n[bold blue][2/4][/bold blue] Verifying Exchange Rates (USD Reference)..."
+    )
     curr = COUNTRY_TO_CURRENCY.get(country, "PHP")
     s_d = start_date or (date.today() - timedelta(days=days))
     e_d = end_date or date.today()
@@ -55,13 +69,19 @@ def run_country_pipeline(
     existing_cnt = existing_cnt_row[0] if existing_cnt_row else 0
 
     if existing_cnt == 0:
-        print(f"  Missing FX rates for {curr} ({s_d} -> {e_d}). Fetching online...")
+        console.print(
+            f"  [yellow]Missing FX rates for {curr} ({s_d} -> {e_d}). Fetching online...[/yellow]"
+        )
         synced_fx = sync_exchange_rates(db, start_date=s_d, end_date=e_d)
-        print(f"  ✓ Synced {synced_fx} FX rate records.")
+        console.print(f"  [green]✓[/green] Synced {synced_fx} FX rate records.")
     else:
-        print(f"  ✓ Verified {existing_cnt} existing FX rate records for {curr}.")
+        console.print(
+            f"  [green]✓[/green] Verified {existing_cnt} existing FX rate records for {curr}."
+        )
 
-    print(f"\n[3/4] Ingesting Energy Intervals & Spot Prices ({country})...")
+    console.print(
+        f"\n[bold blue][3/4][/bold blue] Ingesting Energy Intervals & Spot Prices ({country})..."
+    )
     batched_intervals_count = 0
 
     def on_batch_handler(batch: List[EnergyIntervalRecord]) -> None:
@@ -83,11 +103,15 @@ def run_country_pipeline(
     else:
         synced_intervals = db.upsert_energy_interval(intervals, country_code=country)
 
-    print(f"  ✓ Synced {synced_intervals} interval records into energy_interval.")
+    console.print(
+        f"  [green]✓[/green] Synced {synced_intervals} interval records into energy_interval."
+    )
 
-    print(f"\n[4/4] Populating energy_daily Rollups ({country})...")
+    console.print(
+        f"\n[bold blue][4/4][/bold blue] Populating energy_daily Rollups ({country})..."
+    )
     db.populate_energy_daily(country, start_date=start_date, end_date=end_date)
-    print("  ✓ Populated daily rollup records in energy_daily.")
+    console.print("  [green]✓[/green] Populated daily rollup records in energy_daily.")
 
     return IngestRunReport(
         country_code=country,
@@ -109,229 +133,14 @@ def resolve_countries(country_arg: str) -> List[str]:
     )
 
 
-def app():
-    """Main CLI entrypoint for open-electricity / ingest CLI."""
-    parser = argparse.ArgumentParser(description="OpenElectricity Data Ingestion CLI")
-    subparsers = parser.add_subparsers(dest="subcommand", help="Pipeline commands")
+def app() -> None:
+    """CLI entrypoint proxying to pipeline.cli:app."""
+    from pipeline.cli import app as cli_app
 
-    # Command: latest (used by GitHub Actions daily cron)
-    p_latest = subparsers.add_parser(
-        "latest", help="Ingest latest market data across active countries"
-    )
-    p_latest.add_argument(
-        "--target",
-        choices=["local", "motherduck"],
-        default=None,
-        help="Target database",
-    )
-    p_latest.add_argument(
-        "--db-path", type=str, default=None, help="Path to local DuckDB file"
-    )
-    p_latest.add_argument(
-        "--country",
-        type=str,
-        default="ALL",
-        help="Target country (PH, SG, MY, ALL). Default: ALL",
-    )
-    p_latest.add_argument(
-        "--days", type=int, default=2, help="Number of past days to ingest (default: 2)"
-    )
+    cli_app()
 
-    # Command: backfill (used for local historical backfilling)
-    p_backfill = subparsers.add_parser(
-        "backfill", help="Historical backfill for a custom date range"
-    )
-    p_backfill.add_argument(
-        "--target",
-        choices=["local", "motherduck"],
-        default=None,
-        help="Target database",
-    )
-    p_backfill.add_argument(
-        "--db-path", type=str, default=None, help="Path to local DuckDB file"
-    )
-    p_backfill.add_argument(
-        "--country",
-        type=str,
-        default="PH",
-        help="Target country (PH, SG, MY). Default: PH",
-    )
-    p_backfill.add_argument(
-        "--start-date", type=str, required=True, help="Start date (YYYY-MM-DD)"
-    )
-    p_backfill.add_argument(
-        "--end-date", type=str, required=True, help="End date (YYYY-MM-DD)"
-    )
-    p_backfill.add_argument(
-        "--max-files",
-        type=int,
-        default=None,
-        help="Optional max files limit for testing",
-    )
-    p_backfill.add_argument(
-        "--skip-facilities", action="store_true", help="Skip catalog sync"
-    )
 
-    # Command: sync-facilities
-    p_fac = subparsers.add_parser(
-        "sync-facilities", help="Synchronize generator facility catalog"
-    )
-    p_fac.add_argument(
-        "--target",
-        choices=["local", "motherduck"],
-        default=None,
-        help="Target database",
-    )
-    p_fac.add_argument(
-        "--db-path", type=str, default=None, help="Path to local DuckDB file"
-    )
-    p_fac.add_argument(
-        "--country",
-        type=str,
-        default="ALL",
-        help="Target country (PH, SG, MY, ALL). Default: ALL",
-    )
-
-    # Command: inspect
-    p_inspect = subparsers.add_parser(
-        "inspect", help="Inspect database tables and sample rows"
-    )
-    p_inspect.add_argument(
-        "--target",
-        choices=["local", "motherduck"],
-        default=None,
-        help="Target database",
-    )
-    p_inspect.add_argument(
-        "--db-path", type=str, default=None, help="Path to local DuckDB file"
-    )
-    p_inspect.add_argument(
-        "--country", type=str, default="ALL", help="Filter by country (default: ALL)"
-    )
-    p_inspect.add_argument(
-        "--table",
-        choices=["facilities", "energy_interval", "energy_daily", "all"],
-        default=None,
-    )
-    p_inspect.add_argument("--region", type=str, default=None, help="Filter by region")
-    p_inspect.add_argument(
-        "--limit",
-        type=int,
-        default=15,
-        help="Number of records to display (default: 15)",
-    )
-
-    # Backward-compatible flags support when invoked as `ingest --mode ...`
-    parser.add_argument(
-        "--mode",
-        choices=["latest", "daily", "backfill", "sync-facilities", "inspect"],
-        default=None,
-    )
-    parser.add_argument("--target", choices=["local", "motherduck"], default=None)
-    parser.add_argument("--db-path", type=str, default=None)
-    parser.add_argument("--country", type=str, default="PH")
-    parser.add_argument("--start-date", type=str, default=None)
-    parser.add_argument("--end-date", type=str, default=None)
-    parser.add_argument("--days", type=int, default=2)
-    parser.add_argument("--max-files", type=int, default=None)
-    parser.add_argument("--table", type=str, default=None)
-    parser.add_argument("--region", type=str, default=None)
-    parser.add_argument("--limit", type=int, default=15)
-
-    args = parser.parse_args()
-
-    # Determine execution command
-    cmd = args.subcommand or args.mode or "latest"
-    if cmd == "daily":
-        cmd = "latest"
-
-    target = args.target or "local"
-    local_path = args.db_path or DUCKDB_PATH
-
-    db = Database(target=target, local_path=local_path)
-
-    try:
-        if cmd == "inspect":
-            db.inspect_database(
-                country_code=args.country,
-                table=args.table,
-                region=args.region,
-                limit=args.limit,
-            )
-            return
-
-        if cmd == "sync-facilities":
-            countries = resolve_countries(args.country)
-            for c in countries:
-                prov_cls = PROVIDERS[c]
-                provider = prov_cls(conn=db.conn) if c == "PH" else prov_cls()
-                facs = provider.fetch_facilities(conn=db.conn)
-                count = db.upsert_facilities(facs, country_code=c)
-                print(f"  ✓ Synced {count} facilities for {c}.")
-            print("\nFacilities catalog sync complete.")
-            return
-
-        if cmd == "latest":
-            countries = resolve_countries(args.country)
-            today = date.today()
-            start_d = today - timedelta(days=args.days)
-            end_d = today
-
-            reports = []
-            for c in countries:
-                prov_cls = PROVIDERS[c]
-                provider = prov_cls(conn=db.conn) if c == "PH" else prov_cls()
-                report = run_country_pipeline(
-                    provider=provider,
-                    db=db,
-                    start_date=start_d,
-                    end_date=end_d,
-                    days=args.days,
-                    sync_facilities_flag=True,
-                )
-                reports.append(report)
-
-            print("\n==================================================")
-            print("  ✓ OpenElectricity 'latest' Sync Complete!")
-            for r in reports:
-                print(
-                    f"  [{r.country_code}] Intervals: +{r.intervals_synced}, Facilities: {r.facilities_synced}"
-                )
-            print("==================================================")
-            return
-
-        if cmd == "backfill":
-            if not args.start_date or not args.end_date:
-                parser.error(
-                    "backfill requires both --start-date and --end-date (YYYY-MM-DD)"
-                )
-
-            start_d = datetime.strptime(args.start_date, "%Y-%m-%d").date()
-            end_d = datetime.strptime(args.end_date, "%Y-%m-%d").date()
-            countries = resolve_countries(args.country)
-
-            skip_fac = getattr(args, "skip_facilities", False)
-            for c in countries:
-                prov_cls = PROVIDERS[c]
-                provider = prov_cls(conn=db.conn) if c == "PH" else prov_cls()
-                run_country_pipeline(
-                    provider=provider,
-                    db=db,
-                    start_date=start_d,
-                    end_date=end_d,
-                    sync_facilities_flag=not skip_fac,
-                    max_files=args.max_files,
-                )
-
-            print("\n==================================================")
-            print("  ✓ OpenElectricity Backfill Complete!")
-            print("==================================================")
-            return
-
-        parser.print_help()
-    finally:
-        db.close()
-
+__all__ = ["app", "run_country_pipeline", "resolve_countries", "PROVIDERS"]
 
 if __name__ == "__main__":
     app()
