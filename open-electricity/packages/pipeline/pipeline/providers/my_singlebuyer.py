@@ -1,19 +1,21 @@
 """Malaysia Single Buyer / Grid System Operator (GSO) Provider."""
 
-import math
-import random
-from typing import List, Optional, Any
+import logging
+from typing import List, Optional, Any, Dict
 from datetime import datetime, date, timedelta, timezone
 from pipeline.providers.base import BaseProvider
 from pipeline.models import FacilityRecord, EnergyIntervalRecord
+from pipeline.singlebuyer_client import SingleBuyerClient
+from pipeline.parsers.singlebuyer import SingleBuyerParser
 
+logger = logging.getLogger(__name__)
 MYT = timezone(timedelta(hours=8))
 
 
 class MalaysiaSingleBuyerProvider(BaseProvider):
     """
     Malaysia Single Buyer / Grid System Operator (GSO) Provider.
-    Tracks Peninsular Malaysia, Sabah, and Sarawak generation, demand, and system spot metrics.
+    Tracks Peninsular Malaysia generation mix, demand, and System Marginal Price (SMP).
     """
 
     MAJOR_FACILITIES = [
@@ -119,11 +121,31 @@ class MalaysiaSingleBuyerProvider(BaseProvider):
         },
     ]
 
-    def __init__(self):
+    def __init__(
+        self,
+        conn: Optional[Any] = None,
+        client: Optional[SingleBuyerClient] = None,
+    ):
         super().__init__("MY")
+        self.client = client or SingleBuyerClient()
+        self.parser = SingleBuyerParser()
 
     def fetch_facilities(self, conn: Optional[Any] = None) -> List[FacilityRecord]:
-        """Returns registered facilities for Malaysia."""
+        """
+        Fetches registered power plant catalog for Malaysia.
+        Attempts live fetch from GSO PowerStation endpoint, falling back to curated list if unreachable.
+        """
+        try:
+            plants = self.client.get_power_stations()
+            facs = self.parser.parse_power_stations(plants)
+            if facs:
+                logger.info("Fetched %d registered facilities from GSO.", len(facs))
+                return facs
+        except Exception as e:
+            logger.warning(
+                "Failed to fetch facilities from GSO: %s. Using curated baseline.", e
+            )
+
         return [
             FacilityRecord(
                 country_code="MY",
@@ -147,82 +169,70 @@ class MalaysiaSingleBuyerProvider(BaseProvider):
         conn: Optional[Any] = None,
         max_files: Optional[int] = None,
     ) -> List[EnergyIntervalRecord]:
-        """Generates/fetches 30-minute interval generation records for Malaysia."""
-        end_dt = datetime.now(MYT)
-        start_dt = end_dt - timedelta(days=days)
+        """
+        Fetches 30-minute interval generation and SMP price records for Malaysia.
+        Combines Single Buyer 30-minute day generation mix with SMP spot prices,
+        falling back to GSO real-time dispatch if needed.
+        """
+        end_d = end_date or datetime.now(MYT).date()
+        start_d = start_date or (end_d - timedelta(days=days))
 
-        if start_date:
-            start_dt = datetime(
-                start_date.year, start_date.month, start_date.day, tzinfo=MYT
-            )
-        if end_date:
-            end_dt = datetime(
-                end_date.year, end_date.month, end_date.day, 23, 59, tzinfo=MYT
-            )
+        all_records: List[EnergyIntervalRecord] = []
 
-        records: List[EnergyIntervalRecord] = []
-        curr = start_dt
-        interval_mins = 30
-
-        while curr <= end_dt:
-            hour = curr.hour + curr.minute / 60.0
-
-            # Demand curve
-            demand_shape = (
-                0.72
-                + 0.20 * math.sin(((hour - 5) / 24) * 2 * math.pi)
-                + 0.12 * math.exp(-((hour - 15) ** 2) / 10)
-            )
-            system_demand = 18500 * demand_shape * (0.98 + 0.04 * random.random())
-
-            # Fuel components (MW)
-            solar_mw = (
-                1200.0
-                * (math.sin(((hour - 6.5) / 12) * math.pi) ** 1.7)
-                * (0.85 + 0.25 * random.random())
-                if 6.5 <= hour <= 18.5
-                else 0.0
-            )
-            hydro_mw = 2600.0 * (0.7 + 0.5 * demand_shape)
-            biomass_mw = 320.0 * (0.9 + 0.1 * random.random())
-            coal_mw = 7800.0 * (0.85 + 0.25 * demand_shape)
-            gas_mw = max(
-                0.0, system_demand - (solar_mw + hydro_mw + biomass_mw + coal_mw)
-            )
-
-            price_myr = max(
-                180.0,
-                240.0 + (demand_shape - 0.75) * 160.0 + (random.random() * 25 - 12),
-            )
-
-            fuel_outputs = [
-                ("coal", coal_mw),
-                ("gas", gas_mw),
-                ("hydro", hydro_mw),
-                ("solar", solar_mw),
-                ("biomass", biomass_mw),
-                ("oil", 150.0),
-                ("battery", 0.0),
-                ("wind", 0.0),
-                ("geothermal", 0.0),
-            ]
-
-            for fuel, gen in fuel_outputs:
-                gen_val = round(gen, 2)
-                energy_val = round(gen_val * (interval_mins / 60.0), 4)
-                records.append(
-                    EnergyIntervalRecord(
-                        country_code="MY",
-                        interval_start=curr,
-                        region="PENINSULAR",
-                        fuel_tech=fuel,
-                        generation_mw=gen_val,
-                        energy_mwh=energy_val,
-                        price_local=round(price_myr, 2),
-                        price_dollar=None,
-                    )
+        # 1. Fetch SMP prices across the date range
+        smp_lookup: Dict[datetime, float] = {}
+        try:
+            smp_json = self.client.get_smp_prices(start_d, end_d)
+            smp_lookup = self.parser.parse_smp_prices(smp_json)
+            if smp_lookup:
+                logger.info(
+                    "Fetched %d SMP price points for Malaysia.", len(smp_lookup)
                 )
+        except Exception as e:
+            logger.warning("Failed to fetch Single Buyer SMP prices: %s", e)
 
-            curr += timedelta(minutes=interval_mins)
+        # 2. Fetch Single Buyer 30-minute Day Generation Mix per day
+        curr_d = start_d
+        while curr_d <= end_d:
+            try:
+                mix_json = self.client.get_day_generation_mix(curr_d)
+                day_records = self.parser.parse_day_generation_mix(
+                    mix_json, smp_lookup=smp_lookup
+                )
+                if day_records:
+                    all_records.extend(day_records)
+            except Exception as e:
+                logger.warning(
+                    "Failed to fetch Single Buyer generation mix for %s: %s",
+                    curr_d,
+                    e,
+                )
+            curr_d += timedelta(days=1)
 
-        return records
+        if all_records:
+            logger.info(
+                "Ingested %d 30-minute generation records from Single Buyer.",
+                len(all_records),
+            )
+            return all_records
+
+        # 3. If Single Buyer day mix returned no records, try GSO 10-minute real-time dispatch
+        try:
+            gso_rows = self.client.get_gso_current_gen(start_d, end_d)
+            all_records = self.parser.parse_gso_current_gen(
+                gso_rows, smp_lookup=smp_lookup
+            )
+            if all_records:
+                logger.info("Ingested %d dispatch records from GSO.", len(all_records))
+                return all_records
+        except Exception as e:
+            logger.warning("Failed to fetch GSO real-time generation: %s", e)
+
+        if not all_records:
+            logger.warning(
+                "No energy interval records found for Malaysia in date range %s to %s.",
+                start_d,
+                end_d,
+            )
+
+        return all_records

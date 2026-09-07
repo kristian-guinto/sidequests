@@ -1,12 +1,14 @@
 """Singapore Energy Market Company (EMC) & Energy Market Authority (EMA) Provider."""
 
-import math
-import random
-from typing import List, Optional, Any
+import logging
+from typing import List, Optional, Any, Dict
 from datetime import datetime, date, timedelta, timezone
 from pipeline.providers.base import BaseProvider
 from pipeline.models import FacilityRecord, EnergyIntervalRecord
+from pipeline.emc_client import EMCClient
+from pipeline.parsers.emc import EMCParser
 
+logger = logging.getLogger(__name__)
 SGT = timezone(timedelta(hours=8))
 
 
@@ -119,11 +121,28 @@ class SingaporeEMCProvider(BaseProvider):
         },
     ]
 
-    def __init__(self):
+    def __init__(self, conn: Optional[Any] = None, client: Optional[EMCClient] = None):
         super().__init__("SG")
+        self.client = client or EMCClient()
+        self.parser = EMCParser()
 
     def fetch_facilities(self, conn: Optional[Any] = None) -> List[FacilityRecord]:
-        """Returns registered facilities for Singapore."""
+        """
+        Fetches registered power plant and generator capacity catalog.
+        Attempts live download from EMC NEMS portal, falling back to curated registry if unreachable.
+        """
+        try:
+            csv_text = self.client.download_facilities_csv()
+            facs = self.parser.parse_registered_facilities(csv_text)
+            if facs:
+                logger.info("Fetched %d registered facilities from EMC.", len(facs))
+                return facs
+        except Exception as e:
+            logger.warning(
+                "Failed to fetch facilities from EMC portal: %s. Using curated baseline.",
+                e,
+            )
+
         return [
             FacilityRecord(
                 country_code="SG",
@@ -147,91 +166,64 @@ class SingaporeEMCProvider(BaseProvider):
         conn: Optional[Any] = None,
         max_files: Optional[int] = None,
     ) -> List[EnergyIntervalRecord]:
-        """Generates/fetches 30-minute interval generation and USEP price records for Singapore."""
-        end_dt = datetime.now(SGT)
-        start_dt = end_dt - timedelta(days=days)
+        """
+        Fetches 30-minute interval generation and USEP price records for Singapore.
+        Combines historical metered generation with USEP prices, and provisional real-time feeds for current days.
+        """
+        end_d = end_date or datetime.now(SGT).date()
+        start_d = start_date or (end_d - timedelta(days=days))
 
-        if start_date:
-            start_dt = datetime(
-                start_date.year, start_date.month, start_date.day, tzinfo=SGT
+        all_records: List[EnergyIntervalRecord] = []
+        today = datetime.now(SGT).date()
+
+        # 1. Try fetching historical USEP and metered generation for dates <= today - 6 days
+        # (or for the requested range if finalized)
+        price_map: Dict[datetime, float] = {}
+        try:
+            usep_csv = self.client.download_usep_demand_csv(start_d, end_d)
+            parsed_usep = self.parser.parse_usep_demand(usep_csv)
+            for dt, val in parsed_usep.items():
+                price_map[dt] = val["usep"]
+        except Exception as e:
+            logger.debug("USEP download error: %s", e)
+
+        # Try metered generation
+        try:
+            mg_csv = self.client.download_metered_generation_csv(start_d, end_d)
+            mg_records = self.parser.parse_metered_generation(
+                mg_csv, price_map=price_map
             )
-        if end_date:
-            end_dt = datetime(
-                end_date.year, end_date.month, end_date.day, 23, 59, tzinfo=SGT
+            all_records.extend(mg_records)
+            logger.info(
+                "Ingested %d metered generation records for Singapore.", len(mg_records)
             )
+        except Exception as e:
+            logger.debug("Metered generation download error: %s", e)
 
-        records: List[EnergyIntervalRecord] = []
-        curr = start_dt
-        interval_mins = 30
-
-        while curr <= end_dt:
-            hour = curr.hour + curr.minute / 60.0
-
-            # Singapore demand profile (base ~6000 MW, peak ~7800 MW in afternoon)
-            demand_factor = (
-                0.78
-                + 0.18 * math.sin(((hour - 6) / 24) * 2 * math.pi)
-                + 0.08 * math.exp(-((hour - 14.5) ** 2) / 8)
-            )
-            system_demand = 7200 * demand_factor * (0.98 + 0.04 * random.random())
-
-            # Solar profile
-            solar_mw = 0.0
-            if 7.0 <= hour <= 18.5:
-                solar_factor = math.sin(((hour - 7) / 11.5) * math.pi)
-                solar_mw = 850.0 * (solar_factor**1.6) * (0.85 + 0.25 * random.random())
-
-            # Waste to Energy / Biomass (baseload ~95 MW)
-            biomass_mw = 95.0 + 8.0 * random.random()
-
-            # Clean Hydro Import (LTMS-PIP ~85 MW)
-            hydro_mw = 85.0 + 10.0 * random.random()
-
-            # Battery ESS (dispatches in peak evening ~60 MW)
-            battery_mw = 60.0 if (18.5 <= hour <= 21.0) else 0.0
-
-            # Gas (Combined Cycle) meets remaining balance
-            gas_mw = max(
-                0.0, system_demand - (solar_mw + biomass_mw + hydro_mw + battery_mw)
-            )
-
-            # USEP spot price in SGD/MWh (averages ~120-180 SGD/MWh)
-            price_sgd = max(
-                60.0,
-                110.0
-                + (demand_factor - 0.8) * 140.0
-                + (50.0 if 18.5 <= hour <= 21.0 else 0.0)
-                + (random.random() * 20 - 10),
-            )
-
-            fuel_outputs = [
-                ("gas", gas_mw),
-                ("solar", solar_mw),
-                ("biomass", biomass_mw),
-                ("hydro", hydro_mw),
-                ("battery", battery_mw),
-                ("oil", 0.0),
-                ("coal", 0.0),
-                ("wind", 0.0),
-                ("geothermal", 0.0),
-            ]
-
-            for fuel, gen in fuel_outputs:
-                gen_val = round(gen, 2)
-                energy_val = round(gen_val * (interval_mins / 60.0), 4)
-                records.append(
-                    EnergyIntervalRecord(
-                        country_code="SG",
-                        interval_start=curr,
-                        region="SINGAPORE",
-                        fuel_tech=fuel,
-                        generation_mw=gen_val,
-                        energy_mwh=energy_val,
-                        price_local=round(price_sgd, 2),
-                        price_dollar=None,
-                    )
+        # 2. If requested range covers recent days (e.g. today or past few days where MG is not yet published),
+        # fetch provisional real-time dataset (value=10 / RT48_EGO)
+        if end_d >= today or not all_records:
+            try:
+                rt_csv = self.client.download_realtime_csv(today)
+                rt_records = self.parser.parse_realtime(rt_csv)
+                # Filter to only add intervals not already present
+                existing_starts = {r.interval_start for r in all_records}
+                new_rt = [
+                    r for r in rt_records if r.interval_start not in existing_starts
+                ]
+                all_records.extend(new_rt)
+                logger.info(
+                    "Ingested %d real-time provisional records for Singapore.",
+                    len(new_rt),
                 )
+            except Exception as e:
+                logger.warning("Real-time EMC download error: %s", e)
 
-            curr += timedelta(minutes=interval_mins)
+        if not all_records:
+            logger.warning(
+                "No energy interval records found for Singapore in date range %s to %s.",
+                start_d,
+                end_d,
+            )
 
-        return records
+        return all_records

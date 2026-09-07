@@ -13,6 +13,8 @@ from pipeline.models import (
 from pipeline.schema import validate_database_schema, SchemaMismatchError
 from pipeline.generator_registry import GeneratorRegistry
 from pipeline.parsers.iemop import IEMOPParser
+from pipeline.parsers.emc import EMCParser
+from pipeline.parsers.singlebuyer import SingleBuyerParser
 from pipeline.providers.sg_emc import SingaporeEMCProvider
 from pipeline.providers.my_singlebuyer import MalaysiaSingleBuyerProvider
 from pipeline.db import Database
@@ -128,6 +130,208 @@ def test_iemop_parser():
     assert solar_records[0].price_local == 2500.0
 
 
+def test_emc_parser():
+    parser = EMCParser()
+
+    # 1. Registered facilities CSV
+    fac_csv = (
+        '"Facility Name","Facility Code","Registered Capacity (MW)","Generation Type","Effective Date"\n'
+        '"Tuas Power Station Unit 1","TUAS1",600.0,"CCGT","2002-01-01"\n'
+        '"Sembcorp Floating Solar","SOLAR1",60.0,"IGS","2021-06-01"\n'
+        '"Tuas South Incineration","WTE1",40.0,"ST","2010-01-01"\n'
+        '"Lao-SG Interconnector","IMPORT1",100.0,"IMPORT","2022-01-01"\n'
+        '"Jurong ESS","ESS1",200.0,"ESS","2023-01-01"\n'
+    )
+    facs = parser.parse_registered_facilities(fac_csv)
+    assert len(facs) == 5
+    fuel_by_id = {f.resource_id: f.fuel_tech for f in facs}
+    assert fuel_by_id["SG_TUAS1"] == "gas"
+    assert fuel_by_id["SG_SOLAR1"] == "solar"
+    assert fuel_by_id["SG_WTE1"] == "biomass"
+    assert fuel_by_id["SG_IMPORT1"] == "hydro"
+    assert fuel_by_id["SG_ESS1"] == "battery"
+    assert facs[0].country_code == "SG"
+    assert facs[0].region == "SINGAPORE"
+
+    # 2. USEP & Demand CSV
+    usep_csv = (
+        '"INFORMATION TYPE","DATE","PERIOD","USEP ($/MWh)","DEMAND (MW)"\n'
+        '"USEP","01 Mar 2026",1,125.50,6200.0\n'
+        '"USEP","01 Mar 2026",2,118.20,6100.0\n'
+    )
+    usep_data = parser.parse_usep_demand(usep_csv)
+    assert len(usep_data) == 2
+    dt1 = datetime(2026, 3, 1, 0, 0, tzinfo=timezone(timedelta(hours=8)))
+    assert dt1 in usep_data
+    assert usep_data[dt1]["usep"] == 125.50
+    assert usep_data[dt1]["demand"] == 6200.0
+
+    # 3. Metered Generation CSV
+    mg_csv = (
+        '"INFORMATION TYPE","DATE","PERIOD","CCGT/COGEN/TRIGEN","GT","ST","IMPORT","IGS","ESS"\n'
+        '"MG","01 Mar 2026",1,5800.0,0.0,120.0,90.0,0.0,10.0\n'
+    )
+    price_map = {dt1: 125.50}
+    mg_records = parser.parse_metered_generation(mg_csv, price_map=price_map)
+    assert len(mg_records) > 0
+    fuels = {r.fuel_tech: r.generation_mw for r in mg_records}
+    assert fuels["gas"] == 5800.0
+    assert fuels["biomass"] == 120.0
+    assert fuels["hydro"] == 90.0
+    assert fuels["battery"] == 10.0
+    assert mg_records[0].price_local == 125.50
+    assert mg_records[0].energy_mwh == round(mg_records[0].generation_mw * 0.5, 4)
+
+    # 4. Real-time 48-period CSV
+    rt_csv = (
+        '"PERIOD","PROGNOSTIC DEMAND (MW)","USEP ($/MWh)"\n'
+        "1,6000.0,130.0\n"
+        "2,5900.0,128.0\n"
+    )
+    rt_records = parser.parse_realtime(rt_csv)
+    assert len(rt_records) > 0
+    assert all(r.country_code == "SG" for r in rt_records)
+
+
+def test_singlebuyer_parser():
+    parser = SingleBuyerParser()
+
+    # 1. GSO Power Stations
+    gso_plants = [
+        {"Name": "Jimah East Power", "Fuel": "Coal", "Capacity (MW)": 2000.0},
+        {"Name": "Edra Melaka", "Fuel": "Gas", "Capacity (MW)": 2242.0},
+        {"Name": "Bakun Hydro", "Fuel": "Water", "Capacity (MW)": 2400.0},
+        {"Name": "Kuala Langat Solar", "Fuel": "Solar", "Capacity (MW)": 50.0},
+    ]
+    facs = parser.parse_power_stations(gso_plants)
+    assert len(facs) == 4
+    fuel_by_id = {f.resource_id: f.fuel_tech for f in facs}
+    assert fuel_by_id["MY_JIMAH_EAST_POWER"] == "coal"
+    assert fuel_by_id["MY_EDRA_MELAKA"] == "gas"
+    assert fuel_by_id["MY_BAKUN_HYDRO"] == "hydro"
+    assert fuel_by_id["MY_KUALA_LANGAT_SOLAR"] == "solar"
+    assert facs[0].country_code == "MY"
+    assert facs[0].region == "PENINSULAR"
+
+    # 2. Single Buyer SMP Prices
+    smp_json = {
+        "meta": {
+            "data": {
+                "forecast": [
+                    {"t": "2026-09-01 00:00", "v": 0.220},
+                    {"t": "2026-09-01 00:30", "v": 0.215},
+                ],
+                "actual": [
+                    {"t": "2026-09-01 00:00", "v": 0.245},
+                ],
+            }
+        }
+    }
+    smp_lookup = parser.parse_smp_prices(smp_json)
+    assert len(smp_lookup) == 2
+    dt1 = datetime(2026, 9, 1, 0, 0, tzinfo=timezone(timedelta(hours=8)))
+    dt2 = datetime(2026, 9, 1, 0, 30, tzinfo=timezone(timedelta(hours=8)))
+    # Settled actual overrides forecast: 0.245 * 1000 = 245.0 RM/MWh
+    assert smp_lookup[dt1] == 245.0
+    # Forecast used when actual missing: 0.215 * 1000 = 215.0 RM/MWh
+    assert smp_lookup[dt2] == 215.0
+
+    # 3. Single Buyer Day Generation Mix
+    gen_mix_json = {
+        "series": {
+            "coal": {"data": [{"t": "2026-09-01 00:00", "v": 8500.0}]},
+            "gas": {"data": [{"t": "2026-09-01 00:00", "v": 7200.0}]},
+            "solar": {"data": [{"t": "2026-09-01 00:00", "v": 0.0}]},
+            "hydro": {"data": [{"t": "2026-09-01 00:00", "v": 1500.0}]},
+            "others": {"data": [{"t": "2026-09-01 00:00", "v": 200.0}]},
+        }
+    }
+    records = parser.parse_day_generation_mix(gen_mix_json, smp_lookup=smp_lookup)
+    assert len(records) == 5
+    fuel_gen = {r.fuel_tech: r.generation_mw for r in records}
+    assert fuel_gen["coal"] == 8500.0
+    assert fuel_gen["gas"] == 7200.0
+    assert fuel_gen["hydro"] == 1500.0
+    assert fuel_gen["biomass"] == 200.0
+    assert records[0].price_local == 245.0
+    assert records[0].energy_mwh == round(records[0].generation_mw * 0.5, 4)
+
+    # 4. GSO Real-time 10-minute dispatch
+    gso_rows = [
+        {
+            "DT": "2026-09-01T00:10:00",
+            "Coal": 8200.0,
+            "Gas": 6900.0,
+            "Hydro": 1400.0,
+            "Solar": 0.0,
+            "CoGen": 150.0,
+            "Oil": 0.0,
+        }
+    ]
+    gso_records = parser.parse_gso_current_gen(gso_rows, smp_lookup=smp_lookup)
+    assert len(gso_records) == 6
+    gso_fuel_gen = {r.fuel_tech: r.generation_mw for r in gso_records}
+    assert gso_fuel_gen["coal"] == 8200.0
+    assert gso_fuel_gen["biomass"] == 150.0
+    # 10 minutes: MWh = MW * (10/60)
+    assert gso_records[0].energy_mwh == round(
+        gso_records[0].generation_mw * (10.0 / 60.0), 4
+    )
+
+
+def test_mocked_provider_clients():
+    from unittest.mock import MagicMock
+    from pipeline.emc_client import EMCClient
+    from pipeline.singlebuyer_client import SingleBuyerClient
+
+    mock_emc = MagicMock(spec=EMCClient)
+    mock_emc.download_facilities_csv.return_value = (
+        '"Facility Name","Facility Code","Registered Capacity (MW)","Generation Type","Effective Date"\n'
+        '"Tuas Power 1","TUAS1",600.0,"CCGT","2002-01-01"\n'
+    )
+    mock_emc.download_usep_demand_csv.return_value = (
+        '"INFORMATION TYPE","DATE","PERIOD","USEP ($/MWh)","DEMAND (MW)"\n'
+        '"USEP","01 Mar 2026",1,120.0,6000.0\n'
+    )
+    mock_emc.download_metered_generation_csv.return_value = (
+        '"INFORMATION TYPE","DATE","PERIOD","CCGT/COGEN/TRIGEN","GT","ST","IMPORT","IGS","ESS"\n'
+        '"MG","01 Mar 2026",1,5500.0,0.0,100.0,80.0,0.0,0.0\n'
+    )
+    sg_provider = SingaporeEMCProvider(client=mock_emc)
+    facs = sg_provider.fetch_facilities()
+    assert len(facs) == 1
+    assert facs[0].resource_id == "SG_TUAS1"
+    sg_intervals = sg_provider.fetch_energy_intervals(
+        start_date=datetime(2026, 3, 1).date(),
+        end_date=datetime(2026, 3, 1).date(),
+    )
+    assert len(sg_intervals) > 0
+    assert isinstance(sg_intervals[0], EnergyIntervalRecord)
+    assert sg_intervals[0].country_code == "SG"
+
+    mock_sb = MagicMock(spec=SingleBuyerClient)
+    mock_sb.get_power_stations.return_value = [
+        {"Name": "Manjung 4", "Fuel": "Coal", "Capacity (MW)": 1000.0}
+    ]
+    mock_sb.get_smp_prices.return_value = {
+        "meta": {"data": {"actual": [{"t": "2026-09-01 00:00", "v": 0.250}]}}
+    }
+    mock_sb.get_day_generation_mix.return_value = {
+        "series": {"coal": {"data": [{"t": "2026-09-01 00:00", "v": 8000.0}]}}
+    }
+    my_provider = MalaysiaSingleBuyerProvider(client=mock_sb)
+    my_facs = my_provider.fetch_facilities()
+    assert len(my_facs) == 1
+    assert my_facs[0].resource_id == "MY_MANJUNG_4"
+    intervals = my_provider.fetch_energy_intervals(
+        start_date=datetime(2026, 9, 1).date(),
+        end_date=datetime(2026, 9, 1).date(),
+    )
+    assert len(intervals) == 1
+    assert intervals[0].generation_mw == 8000.0
+    assert intervals[0].price_local == 250.0
+
+
 def test_providers_return_dataclasses():
     sg = SingaporeEMCProvider()
     sg_facs = sg.fetch_facilities()
@@ -135,19 +339,11 @@ def test_providers_return_dataclasses():
     assert isinstance(sg_facs[0], FacilityRecord)
     assert sg_facs[0].country_code == "SG"
 
-    sg_intervals = sg.fetch_energy_intervals(days=1)
-    assert len(sg_intervals) > 0
-    assert isinstance(sg_intervals[0], EnergyIntervalRecord)
-    assert sg_intervals[0].country_code == "SG"
-
     my = MalaysiaSingleBuyerProvider()
     my_facs = my.fetch_facilities()
     assert len(my_facs) > 0
     assert isinstance(my_facs[0], FacilityRecord)
-
-    my_intervals = my.fetch_energy_intervals(days=1)
-    assert len(my_intervals) > 0
-    assert isinstance(my_intervals[0], EnergyIntervalRecord)
+    assert my_facs[0].country_code == "MY"
 
 
 def test_database_tiered_upsert_and_populate_energy_daily(tmp_path: Path):
