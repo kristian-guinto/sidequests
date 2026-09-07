@@ -1,8 +1,13 @@
+"""Malaysia Single Buyer / Grid System Operator (GSO) Provider."""
+
 import math
 import random
-from typing import List, Dict, Any, Optional
-from datetime import datetime, timedelta, timezone
+from typing import List, Optional, Any
+from datetime import datetime, date, timedelta, timezone
 from pipeline.providers.base import BaseProvider
+from pipeline.models import FacilityRecord, EnergyIntervalRecord
+
+MYT = timezone(timedelta(hours=8))
 
 
 class MalaysiaSingleBuyerProvider(BaseProvider):
@@ -117,45 +122,49 @@ class MalaysiaSingleBuyerProvider(BaseProvider):
     def __init__(self):
         super().__init__("MY")
 
-    def fetch_facilities(self) -> List[Dict[str, Any]]:
-        facilities = []
-        for f in self.MAJOR_FACILITIES:
-            f_copy = dict(f)
-            f_copy["country_code"] = "MY"
-            facilities.append(f_copy)
-        return facilities
+    def fetch_facilities(self, conn: Optional[Any] = None) -> List[FacilityRecord]:
+        """Returns registered facilities for Malaysia."""
+        return [
+            FacilityRecord(
+                country_code="MY",
+                resource_id=str(f["resource_id"]),
+                facility_name=str(f["facility_name"]),
+                region=str(f["region"]),
+                fuel_tech=str(f["fuel_tech"]),
+                capacity_mw=float(f["capacity_mw"]),
+                is_renewable=bool(f["is_renewable"]),
+                emissions_factor=float(f["emissions_factor"]),
+                status=str(f["status"]),
+            )
+            for f in self.MAJOR_FACILITIES
+        ]
 
-    def fetch_dispatch(
+    def fetch_energy_intervals(
         self,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
         days: int = 2,
-    ) -> List[Dict[str, Any]]:
-        """Generates/fetches 30-minute interval dispatch records for Malaysia."""
-        end_dt = datetime.now(timezone(timedelta(hours=8)))
+        conn: Optional[Any] = None,
+        max_files: Optional[int] = None,
+    ) -> List[EnergyIntervalRecord]:
+        """Generates/fetches 30-minute interval generation records for Malaysia."""
+        end_dt = datetime.now(MYT)
         start_dt = end_dt - timedelta(days=days)
 
         if start_date:
-            try:
-                start_dt = datetime.strptime(start_date, "%Y-%m-%d").replace(
-                    tzinfo=timezone(timedelta(hours=8))
-                )
-            except ValueError:
-                pass
+            start_dt = datetime(
+                start_date.year, start_date.month, start_date.day, tzinfo=MYT
+            )
         if end_date:
-            try:
-                end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(
-                    hour=23, minute=59, tzinfo=timezone(timedelta(hours=8))
-                )
-            except ValueError:
-                pass
+            end_dt = datetime(
+                end_date.year, end_date.month, end_date.day, 23, 59, tzinfo=MYT
+            )
 
-        records = []
+        records: List[EnergyIntervalRecord] = []
         curr = start_dt
         interval_mins = 30
 
         while curr <= end_dt:
-            ts_str = curr.strftime("%Y-%m-%dT%H:%M:00+08:00")
             hour = curr.hour + curr.minute / 60.0
 
             # Demand curve
@@ -199,91 +208,21 @@ class MalaysiaSingleBuyerProvider(BaseProvider):
             ]
 
             for fuel, gen in fuel_outputs:
+                gen_val = round(gen, 2)
+                energy_val = round(gen_val * (interval_mins / 60.0), 4)
                 records.append(
-                    {
-                        "country_code": "MY",
-                        "timestamp": ts_str,
-                        "interval_duration_mins": 30,
-                        "region": "PENINSULAR",
-                        "fuel_tech": fuel,
-                        "generation_mw": round(gen, 2),
-                        "price_local": round(price_myr, 2),
-                        "currency": "MYR",
-                    }
+                    EnergyIntervalRecord(
+                        country_code="MY",
+                        interval_start=curr,
+                        region="PENINSULAR",
+                        fuel_tech=fuel,
+                        generation_mw=gen_val,
+                        energy_mwh=energy_val,
+                        price_local=round(price_myr, 2),
+                        price_dollar=None,
+                    )
                 )
 
             curr += timedelta(minutes=interval_mins)
 
         return records
-
-    def fetch_regional_summaries(
-        self,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
-        days: int = 2,
-    ) -> List[Dict[str, Any]]:
-        end_dt = datetime.now(timezone(timedelta(hours=8)))
-        start_dt = end_dt - timedelta(days=days)
-
-        if start_date:
-            try:
-                start_dt = datetime.strptime(start_date, "%Y-%m-%d").replace(
-                    tzinfo=timezone(timedelta(hours=8))
-                )
-            except ValueError:
-                pass
-        if end_date:
-            try:
-                end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(
-                    hour=23, minute=59, tzinfo=timezone(timedelta(hours=8))
-                )
-            except ValueError:
-                pass
-
-        summaries = []
-        curr = start_dt
-        interval_mins = 30
-
-        while curr <= end_dt:
-            ts_str = curr.strftime("%Y-%m-%dT%H:%M:00+08:00")
-            hour = curr.hour + curr.minute / 60.0
-
-            demand_shape = (
-                0.72
-                + 0.20 * math.sin(((hour - 5) / 24) * 2 * math.pi)
-                + 0.12 * math.exp(-((hour - 15) ** 2) / 10)
-            )
-            demand_mw = 18500 * demand_shape * (0.98 + 0.04 * random.random())
-            losses_mw = demand_mw * 0.035
-            gen_mw = demand_mw + losses_mw
-
-            solar_mw = (
-                1200.0 * (math.sin(((hour - 6.5) / 12) * math.pi) ** 1.7)
-                if 6.5 <= hour <= 18.5
-                else 0.0
-            )
-            re_pct = ((solar_mw + 2600.0 + 320.0) / gen_mw) * 100.0
-
-            price_myr = max(180.0, 240.0 + (demand_shape - 0.75) * 160.0)
-
-            summaries.append(
-                {
-                    "country_code": "MY",
-                    "timestamp": ts_str,
-                    "interval_duration_mins": 30,
-                    "region": "PENINSULAR",
-                    "demand_mw": round(demand_mw, 1),
-                    "generation_mw": round(gen_mw, 1),
-                    "losses_mw": round(losses_mw, 1),
-                    "import_mw": 0.0,
-                    "export_mw": 85.0,  # export to SG
-                    "net_interconnector_mw": 85.0,
-                    "price_local": round(price_myr, 2),
-                    "currency": "MYR",
-                    "renewables_pct": round(re_pct, 1),
-                }
-            )
-
-            curr += timedelta(minutes=interval_mins)
-
-        return summaries

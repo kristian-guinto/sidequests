@@ -1,76 +1,55 @@
-from typing import List, Dict, Any, Optional
-from datetime import datetime, date, timedelta
+"""Philippines Wholesale Electricity Spot Market (WESM) / IEMOP provider."""
+
+from typing import List, Optional, Any
+from datetime import date, timedelta
 from pipeline.providers.base import BaseProvider
 from pipeline.generator_registry import GeneratorRegistry
 from pipeline.iemop_client import IEMOPClient
-from pipeline.data_processor import DataProcessor
+from pipeline.parsers.iemop import IEMOPParser
+from pipeline.models import FacilityRecord, EnergyIntervalRecord
 
 
 class PhilippinesIEMOPProvider(BaseProvider):
-    def __init__(self):
+    """Data provider for Philippines IEMOP / WESM."""
+
+    def __init__(self, conn: Optional[Any] = None):
         super().__init__("PH")
-        self.registry = GeneratorRegistry()
         self.client = IEMOPClient()
-        self.processor = DataProcessor(self.registry)
+        self.registry = GeneratorRegistry(conn=conn, country_code="PH")
+        self.parser = IEMOPParser(self.registry)
 
-    def fetch_facilities(self) -> List[Dict[str, Any]]:
-        facilities = self.registry.get_all_facilities()
-        for f in facilities:
-            f["country_code"] = "PH"
-        return facilities
+    def fetch_facilities(self, conn: Optional[Any] = None) -> List[FacilityRecord]:
+        """Fetches registered power plant catalog from database or current registry cache."""
+        if conn is not None:
+            self.registry.load_from_database(conn)
+        return self.registry.get_all_facilities()
 
-    def fetch_dispatch(
+    def fetch_energy_intervals(
         self,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
         days: int = 2,
-    ) -> List[Dict[str, Any]]:
-        s_date = (
-            datetime.strptime(start_date, "%Y-%m-%d").date()
-            if start_date
-            else date.today() - timedelta(days=days)
-        )
-        e_date = (
-            datetime.strptime(end_date, "%Y-%m-%d").date() if end_date else date.today()
-        )
+        conn: Optional[Any] = None,
+        max_files: Optional[int] = None,
+    ) -> List[EnergyIntervalRecord]:
+        """Downloads RTD dispatch archives from IEMOP and parses into EnergyIntervalRecord objects."""
+        if conn is not None:
+            self.registry.load_from_database(conn)
+
+        s_date = start_date or (date.today() - timedelta(days=days))
+        e_date = end_date or date.today()
 
         disp_files = self.client.get_rtd_dispatch_files(s_date, e_date)
-        all_records = []
+        if max_files:
+            disp_files = disp_files[:max_files]
+
+        all_records: List[EnergyIntervalRecord] = []
         for f_info in disp_files:
             try:
                 csv_lines = self.client.download_rtd_dispatch_csv(f_info["file_id"])
-                records = self.processor.process_rtd_dispatch(csv_lines)
-                for r in records:
-                    r["country_code"] = "PH"
+                records = self.parser.parse_rtd_dispatch(csv_lines)
                 all_records.extend(records)
             except Exception as e:
-                print(f"    ⚠️ Failed to process {f_info['filename']}: {e}")
-        return all_records
+                print(f"    ⚠️ Failed to process {f_info.get('filename', '')}: {e}")
 
-    def fetch_regional_summaries(
-        self,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
-        days: int = 2,
-    ) -> List[Dict[str, Any]]:
-        s_date = (
-            datetime.strptime(start_date, "%Y-%m-%d").date()
-            if start_date
-            else date.today() - timedelta(days=days)
-        )
-        e_date = (
-            datetime.strptime(end_date, "%Y-%m-%d").date() if end_date else date.today()
-        )
-
-        reg_files = self.client.get_rtd_regional_summary_files(s_date, e_date)
-        all_records = []
-        for f_info in reg_files:
-            try:
-                csv_lines = self.client.download_regional_summary_csv(f_info["file_id"])
-                records = self.processor.process_regional_summary(csv_lines)
-                for r in records:
-                    r["country_code"] = "PH"
-                all_records.extend(records)
-            except Exception as e:
-                print(f"    ⚠️ Failed to process {f_info['filename']}: {e}")
         return all_records
