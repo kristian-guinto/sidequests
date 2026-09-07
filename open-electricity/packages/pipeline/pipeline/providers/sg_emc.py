@@ -1,7 +1,7 @@
 """Singapore Energy Market Company (EMC) & Energy Market Authority (EMA) Provider."""
 
 import logging
-from typing import List, Optional, Any, Dict
+from typing import List, Optional, Any, Dict, Callable
 from datetime import datetime, date, timedelta, timezone
 from pipeline.providers.base import BaseProvider
 from pipeline.models import FacilityRecord, EnergyIntervalRecord
@@ -165,6 +165,8 @@ class SingaporeEMCProvider(BaseProvider):
         days: int = 2,
         conn: Optional[Any] = None,
         max_files: Optional[int] = None,
+        on_batch: Optional[Callable[[List[EnergyIntervalRecord]], None]] = None,
+        **kwargs: Any,
     ) -> List[EnergyIntervalRecord]:
         """
         Fetches 30-minute interval generation and USEP price records for Singapore.
@@ -174,7 +176,6 @@ class SingaporeEMCProvider(BaseProvider):
         start_d = start_date or (end_d - timedelta(days=days))
 
         all_records: List[EnergyIntervalRecord] = []
-        today = datetime.now(SGT).date()
 
         # 1. Try fetching historical USEP and metered generation for dates <= today - 6 days
         # (or for the requested range if finalized)
@@ -200,24 +201,25 @@ class SingaporeEMCProvider(BaseProvider):
         except Exception as e:
             logger.debug("Metered generation download error: %s", e)
 
-        # 2. If requested range covers recent days (e.g. today or past few days where MG is not yet published),
-        # fetch provisional real-time dataset (value=10 / RT48_EGO)
-        if end_d >= today or not all_records:
-            try:
-                rt_csv = self.client.download_realtime_csv(today)
-                rt_records = self.parser.parse_realtime(rt_csv)
-                # Filter to only add intervals not already present
-                existing_starts = {r.interval_start for r in all_records}
-                new_rt = [
-                    r for r in rt_records if r.interval_start not in existing_starts
-                ]
-                all_records.extend(new_rt)
-                logger.info(
-                    "Ingested %d real-time provisional records for Singapore.",
-                    len(new_rt),
-                )
-            except Exception as e:
-                logger.warning("Real-time EMC download error: %s", e)
+        # 2. For dates where finalized metered generation is not yet published by EMC,
+        # fetch the daily 48-period dataset (value=10 / RT48_EGO) per day
+        dates_with_data = {r.interval_start.date() for r in all_records}
+        curr_d = start_d
+        now_sgt = datetime.now(SGT)
+        while curr_d <= end_d:
+            if curr_d not in dates_with_data:
+                try:
+                    rt_csv = self.client.download_realtime_csv(curr_d)
+                    rt_records = self.parser.parse_realtime(rt_csv)
+                    valid_recs = [r for r in rt_records if r.interval_start <= now_sgt]
+                    if valid_recs:
+                        all_records.extend(valid_recs)
+                        print(
+                            f"  -> [{curr_d}] Synced {len(valid_recs)} provisional intervals for Singapore."
+                        )
+                except Exception as e:
+                    logger.warning("Real-time EMC download error for %s: %s", curr_d, e)
+            curr_d += timedelta(days=1)
 
         if not all_records:
             logger.warning(

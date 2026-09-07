@@ -1,7 +1,7 @@
 """Malaysia Single Buyer / Grid System Operator (GSO) Provider."""
 
 import logging
-from typing import List, Optional, Any, Dict
+from typing import List, Optional, Any, Dict, Callable
 from datetime import datetime, date, timedelta, timezone
 from pipeline.providers.base import BaseProvider
 from pipeline.models import FacilityRecord, EnergyIntervalRecord
@@ -168,6 +168,8 @@ class MalaysiaSingleBuyerProvider(BaseProvider):
         days: int = 2,
         conn: Optional[Any] = None,
         max_files: Optional[int] = None,
+        on_batch: Optional[Callable[[List[EnergyIntervalRecord]], None]] = None,
+        **kwargs: Any,
     ) -> List[EnergyIntervalRecord]:
         """
         Fetches 30-minute interval generation and SMP price records for Malaysia.
@@ -191,42 +193,42 @@ class MalaysiaSingleBuyerProvider(BaseProvider):
         except Exception as e:
             logger.warning("Failed to fetch Single Buyer SMP prices: %s", e)
 
-        # 2. Fetch Single Buyer 30-minute Day Generation Mix per day
+        # 2. Fetch Single Buyer 30-minute Day Generation Mix per day (with per-day GSO fallback)
         curr_d = start_d
+        now_myt = datetime.now(MYT)
         while curr_d <= end_d:
+            day_records = []
             try:
                 mix_json = self.client.get_day_generation_mix(curr_d)
                 day_records = self.parser.parse_day_generation_mix(
                     mix_json, smp_lookup=smp_lookup
                 )
-                if day_records:
-                    all_records.extend(day_records)
             except Exception as e:
                 logger.warning(
                     "Failed to fetch Single Buyer generation mix for %s: %s",
                     curr_d,
                     e,
                 )
+
+            # Fallback to GSO 10-minute dispatch if Single Buyer had no records for this date (e.g. holidays / weekends)
+            if not day_records:
+                try:
+                    gso_rows = self.client.get_gso_current_gen(curr_d, curr_d)
+                    day_records = self.parser.parse_gso_current_gen(
+                        gso_rows, smp_lookup=smp_lookup
+                    )
+                except Exception as e:
+                    logger.warning("Failed GSO fallback for %s: %s", curr_d, e)
+
+            if day_records:
+                valid_recs = [r for r in day_records if r.interval_start <= now_myt]
+                if valid_recs:
+                    all_records.extend(valid_recs)
+                    print(
+                        f"  -> [{curr_d}] Ingested {len(valid_recs)} intervals for Malaysia."
+                    )
+
             curr_d += timedelta(days=1)
-
-        if all_records:
-            logger.info(
-                "Ingested %d 30-minute generation records from Single Buyer.",
-                len(all_records),
-            )
-            return all_records
-
-        # 3. If Single Buyer day mix returned no records, try GSO 10-minute real-time dispatch
-        try:
-            gso_rows = self.client.get_gso_current_gen(start_d, end_d)
-            all_records = self.parser.parse_gso_current_gen(
-                gso_rows, smp_lookup=smp_lookup
-            )
-            if all_records:
-                logger.info("Ingested %d dispatch records from GSO.", len(all_records))
-                return all_records
-        except Exception as e:
-            logger.warning("Failed to fetch GSO real-time generation: %s", e)
 
         if not all_records:
             logger.warning(

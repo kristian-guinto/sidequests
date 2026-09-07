@@ -2,7 +2,7 @@
 
 import time
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Union, Sequence
+from typing import List, Dict, Any, Optional, Union, Sequence, Tuple
 from enum import Enum
 import duckdb
 from ducklembic import DuckDB as DucklembicDB
@@ -193,6 +193,7 @@ class Database:
         default_dur = 5 if country_code.upper() == "PH" else 30
 
         data = []
+        fx_cache: Dict[Tuple[str, str], float] = {}
         for r in records:
             if isinstance(r, EnergyIntervalRecord):
                 c_code = r.country_code.upper()
@@ -209,7 +210,10 @@ class Database:
                         if hasattr(start_dt, "date")
                         else str(start_dt)[:10]
                     )
-                    fx = get_fx_rate(d_val, curr, conn=self.conn)
+                    cache_key = (str(d_val)[:10], curr)
+                    if cache_key not in fx_cache:
+                        fx_cache[cache_key] = get_fx_rate(d_val, curr, conn=self.conn)
+                    fx = fx_cache[cache_key]
                     p_dollar = round(p_local / fx, 2) if fx > 0 else None
                 data.append((c_code, start_dt, reg, fuel, mw, mwh, p_local, p_dollar))
             else:
@@ -236,7 +240,13 @@ class Database:
                 p_dollar = r.get("price_dollar")
                 if p_local is not None and p_dollar is None:
                     d_val = str(start_raw)[:10]
-                    fx = get_fx_rate(d_val, r.get("currency", curr), conn=self.conn)
+                    target_curr = r.get("currency", curr)
+                    cache_key = (d_val, target_curr)
+                    if cache_key not in fx_cache:
+                        fx_cache[cache_key] = get_fx_rate(
+                            d_val, target_curr, conn=self.conn
+                        )
+                    fx = fx_cache[cache_key]
                     p_dollar = round(p_local / fx, 2) if fx > 0 else None
                 data.append((c_code, start_raw, reg, fuel, mw, mwh, p_local, p_dollar))
 
@@ -277,6 +287,8 @@ class Database:
         calculating VWAP, TWAP, and USD price conversions.
         """
         country = country_code.upper()
+        tz = COUNTRIES_CONFIG.get(country, {}).get("timezone", "UTC")
+        self.conn.execute(f"SET TimeZone = '{tz}'")
         date_cond = ""
         params: List[Any] = [country]
 

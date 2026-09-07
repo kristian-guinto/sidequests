@@ -5,7 +5,7 @@ from datetime import datetime, date, timedelta
 from typing import Optional, List, Dict
 from pipeline.config import DUCKDB_PATH
 from pipeline.db import Database
-from pipeline.models import IngestRunReport
+from pipeline.models import IngestRunReport, EnergyIntervalRecord
 from pipeline.fx import sync_exchange_rates, COUNTRY_TO_CURRENCY
 from pipeline.providers.base import BaseProvider
 from pipeline.providers.ph_iemop import PhilippinesIEMOPProvider
@@ -62,21 +62,27 @@ def run_country_pipeline(
         print(f"  ✓ Verified {existing_cnt} existing FX rate records for {curr}.")
 
     print(f"\n[3/4] Ingesting Energy Intervals & Spot Prices ({country})...")
-    # For PH provider, pass max_files if provided
-    if country == "PH" and hasattr(provider, "fetch_energy_intervals") and max_files:
-        intervals = provider.fetch_energy_intervals(
-            start_date=start_date,
-            end_date=end_date,
-            days=days,
-            conn=db.conn,
-            max_files=max_files,
-        )
-    else:
-        intervals = provider.fetch_energy_intervals(
-            start_date=start_date, end_date=end_date, days=days, conn=db.conn
-        )
+    batched_intervals_count = 0
 
-    synced_intervals = db.upsert_energy_interval(intervals, country_code=country)
+    def on_batch_handler(batch: List[EnergyIntervalRecord]) -> None:
+        nonlocal batched_intervals_count
+        count = db.upsert_energy_interval(batch, country_code=country)
+        batched_intervals_count += count
+
+    intervals = provider.fetch_energy_intervals(
+        start_date=start_date,
+        end_date=end_date,
+        days=days,
+        conn=db.conn,
+        max_files=max_files,
+        on_batch=on_batch_handler,
+    )
+
+    if batched_intervals_count > 0:
+        synced_intervals = batched_intervals_count
+    else:
+        synced_intervals = db.upsert_energy_interval(intervals, country_code=country)
+
     print(f"  ✓ Synced {synced_intervals} interval records into energy_interval.")
 
     print(f"\n[4/4] Populating energy_daily Rollups ({country})...")

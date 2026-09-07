@@ -1,7 +1,7 @@
 """Abstract base provider for national electricity market data ingestion."""
 
 from abc import ABC, abstractmethod
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Callable
 from datetime import date
 from pipeline.models import FacilityRecord, EnergyIntervalRecord
 
@@ -28,6 +28,8 @@ class BaseProvider(ABC):
         days: int = 2,
         conn: Optional[Any] = None,
         max_files: Optional[int] = None,
+        on_batch: Optional[Callable[[List[EnergyIntervalRecord]], None]] = None,
+        **kwargs: Any,
     ) -> List[EnergyIntervalRecord]:
         """Fetches interval electricity generation by fuel technology and market spot prices."""
         pass

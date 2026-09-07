@@ -451,3 +451,84 @@ def test_fx_rates_no_fallback():
     # When date/currency is present, returns the exact stored rate
     conn.execute("INSERT INTO exchange_rates VALUES ('2026-03-01', 'PHP', 58.25)")
     assert get_fx_rate("2026-03-01", "PHP", conn=conn) == 58.25
+
+
+def test_iemop_client_extract_csv_from_bytes():
+    import zipfile
+    import io
+    from pipeline.iemop_client import IEMOPClient
+
+    # 1. Test zip file extraction
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("test.csv", "COL1,COL2\nVAL1,VAL2\n")
+    zip_bytes = buf.getvalue()
+
+    lines = IEMOPClient.extract_csv_from_bytes(zip_bytes)
+    assert len(lines) == 2
+    assert lines[0] == "COL1,COL2"
+    assert lines[1] == "VAL1,VAL2"
+
+    # 2. Test raw CSV fallback (BadZipFile)
+    raw_csv = b"COL1,COL2\nRAW1,RAW2\n"
+    raw_lines = IEMOPClient.extract_csv_from_bytes(raw_csv)
+    assert len(raw_lines) == 2
+    assert raw_lines[0] == "COL1,COL2"
+    assert raw_lines[1] == "RAW1,RAW2"
+
+
+def test_ph_iemop_provider_batch_streaming():
+    from unittest.mock import MagicMock
+    from pipeline.providers.ph_iemop import PhilippinesIEMOPProvider
+    from pipeline.iemop_client import IEMOPClient
+
+    mock_client = MagicMock(spec=IEMOPClient)
+    mock_client.get_rtd_dispatch_files.return_value = [
+        {"file_id": "id1", "filename": "RTD_1.zip"},
+        {"file_id": "id2", "filename": "RTD_2.zip"},
+    ]
+    sample_csv = [
+        "TIME_INTERVAL,RESOURCE_NAME,RESOURCE_TYPE,REGION_NAME,SCHED_MW,LMP",
+        "03/01/2026 00:05:00 AM,01ARAYSOL_G01,G,CLUZ,50.0,2500.0",
+    ]
+    mock_client.download_rtd_dispatch_csv.return_value = sample_csv
+
+    provider = PhilippinesIEMOPProvider()
+    provider.client = mock_client
+
+    batches = []
+
+    def on_batch(records):
+        batches.append(records)
+
+    result = provider.fetch_energy_intervals(
+        start_date=datetime(2026, 3, 1).date(),
+        end_date=datetime(2026, 3, 1).date(),
+        batch_size=1,
+        on_batch=on_batch,
+    )
+
+    # 2 files with batch_size=1 -> 2 on_batch calls
+    assert len(batches) == 2
+    assert len(result) == 4  # 2 regional + 2 ALL records per file -> 4 total
+
+
+def test_ph_iemop_provider_empty_files_warning(capsys):
+    from unittest.mock import MagicMock
+    from pipeline.providers.ph_iemop import PhilippinesIEMOPProvider
+    from pipeline.iemop_client import IEMOPClient
+
+    mock_client = MagicMock(spec=IEMOPClient)
+    mock_client.get_rtd_dispatch_files.return_value = []
+
+    provider = PhilippinesIEMOPProvider()
+    provider.client = mock_client
+
+    result = provider.fetch_energy_intervals(
+        start_date=datetime(2024, 1, 1).date(),
+        end_date=datetime(2024, 1, 31).date(),
+    )
+    assert result == []
+    captured = capsys.readouterr()
+    assert "No dispatch archive files found" in captured.out
+    assert "90 rolling days" in captured.out

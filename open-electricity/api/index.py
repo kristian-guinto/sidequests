@@ -57,6 +57,8 @@ COUNTRIES_METADATA = {
         "currencyCode": "PHP",
         "defaultRegion": "ALL",
         "minInterval": "5m",
+        "timezone": "Asia/Manila",
+        "tzOffset": "+08:00",
     },
     "SG": {
         "name": "Singapore",
@@ -64,6 +66,8 @@ COUNTRIES_METADATA = {
         "currencyCode": "SGD",
         "defaultRegion": "SINGAPORE",
         "minInterval": "30m",
+        "timezone": "Asia/Singapore",
+        "tzOffset": "+08:00",
     },
     "MY": {
         "name": "Malaysia",
@@ -71,6 +75,8 @@ COUNTRIES_METADATA = {
         "currencyCode": "MYR",
         "defaultRegion": "PENINSULAR",
         "minInterval": "30m",
+        "timezone": "Asia/Kuala_Lumpur",
+        "tzOffset": "+08:00",
     },
     "TH": {
         "name": "Thailand",
@@ -78,6 +84,8 @@ COUNTRIES_METADATA = {
         "currencyCode": "THB",
         "defaultRegion": "THAILAND",
         "minInterval": "30m",
+        "timezone": "Asia/Bangkok",
+        "tzOffset": "+07:00",
     },
     "VN": {
         "name": "Vietnam",
@@ -85,6 +93,8 @@ COUNTRIES_METADATA = {
         "currencyCode": "VND",
         "defaultRegion": "VIETNAM",
         "minInterval": "30m",
+        "timezone": "Asia/Ho_Chi_Minh",
+        "tzOffset": "+07:00",
     },
 }
 
@@ -420,12 +430,13 @@ def build_energy_query(params: EnergyQueryParams) -> tuple[str, List[Any]]:
             ORDER BY {group_time} ASC
         """
     else:
+        tz_offset = params.country_meta.get("tzOffset", "+08:00")
         if params.active_interval == "5m":
-            time_expr = "strftime(interval_start, '%Y-%m-%dT%H:%M:00+08:00')"
+            time_expr = f"strftime(interval_start, '%Y-%m-%dT%H:%M:00{tz_offset}')"
             group_time = "interval_start"
         elif params.active_interval in ("30m", "1h"):
             dur = "30 minutes" if params.active_interval == "30m" else "1 hour"
-            time_expr = f"strftime(time_bucket(INTERVAL '{dur}', interval_start), '%Y-%m-%dT%H:%M:00+08:00')"
+            time_expr = f"strftime(time_bucket(INTERVAL '{dur}', interval_start), '%Y-%m-%dT%H:%M:00{tz_offset}')"
             group_time = f"time_bucket(INTERVAL '{dur}', interval_start)"
         else:
             time_expr = (
@@ -641,6 +652,8 @@ def get_energy(
         )
 
     try:
+        c_tz = query_params.country_meta.get("timezone", "Asia/Manila")
+        conn.execute(f"SET TimeZone = '{c_tz}'")
         dispatch_sql, sql_params = build_energy_query(query_params)
         dispatch_rows = fetch_energy_data(
             conn,
