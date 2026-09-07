@@ -70,9 +70,14 @@ export function DataSidebar({
       try {
         const s = parseISO(timeSpan.start);
         const e = parseISO(timeSpan.end);
-        return `${format(s, "d MMM yyyy")} – ${format(e, "d MMM yyyy")}`;
+        const sFormatted = format(s, "d MMM yyyy");
+        const eFormatted = format(e, "d MMM yyyy");
+        if (sFormatted === eFormatted) {
+          return sFormatted;
+        }
+        return `${sFormatted} – ${eFormatted}`;
       } catch {
-        return "Live Selected Range";
+        return "Selected Range";
       }
     }
     return "Summary (Total Range)";
@@ -82,6 +87,33 @@ export function DataSidebar({
   const tableData = useMemo(() => {
     if (isHovered && hoveredPoint) {
       const pt = hoveredPoint;
+      if (pt.hasData === false) {
+        const rows = FUEL_DISPLAY_ORDER.map((fKey) => {
+          const meta = getFuelMeta(fKey, isDark, paletteMode);
+          return {
+            fuelTech: fKey,
+            label: meta.label,
+            color: meta.color,
+            valueDisplay: "—",
+            rawVal: 0,
+            pct: 0,
+            priceDisplay: "—",
+            isRenewable: meta.isRenewable,
+          };
+        });
+        return {
+          rows,
+          totalDisplay: "—",
+          renValDisplay: "—",
+          renPctDisplay: "—",
+          priceDisplay: "—",
+          emissionsDisplay: "—",
+          peakDisplay: null,
+          columnUnit: "Power",
+          unitSub: "MW",
+        };
+      }
+
       const totalGen = pt.totalGeneration || 1;
       const ptPrice = pt.price || summary?.avgPriceLocal || 0;
 

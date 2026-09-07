@@ -3,7 +3,7 @@
 import React, { useMemo, useCallback } from "react";
 import ReactECharts from "echarts-for-react";
 import * as echarts from "echarts";
-import { FuelGenerationPoint } from "@/lib/types";
+import { FuelGenerationPoint, TimeRange } from "@/lib/types";
 import { computeXAxisConfig, createShadcnGradient, getShadcnTooltipConfig } from "@/lib/chartUtils";
 import {
   ChartCard,
@@ -18,6 +18,7 @@ import { useTheme } from "@/components/ThemeProvider";
 
 interface PriceChartProps {
   data: FuelGenerationPoint[];
+  range?: TimeRange;
   currencySymbol?: string;
   currencyCode?: string;
   height?: string;
@@ -26,23 +27,27 @@ interface PriceChartProps {
 
 export function PriceChart({
   data,
+  range = "7d",
   currencySymbol = "₱",
   currencyCode = "PHP",
   height = "180px",
   onHoverPoint,
 }: PriceChartProps) {
   const { isDark } = useTheme();
-  const xAxisConfig = useMemo(() => computeXAxisConfig(data, isDark), [data, isDark]);
+  const isBarView = range === "30d" || range === "1y";
+  const xAxisConfig = useMemo(() => computeXAxisConfig(data, isDark, range), [data, isDark, range]);
   const tooltipConfig = useMemo(() => getShadcnTooltipConfig(isDark), [isDark]);
 
   const prices = useMemo(() => {
-    return data.map((d) => d.price || 0);
+    return data.map((d) => (d.price != null && d.hasData !== false ? d.price : null));
   }, [data]);
 
   const avgPrice = useMemo(() => {
     if (!prices || prices.length === 0) return 0;
-    const total = prices.reduce((acc, p) => acc + p, 0);
-    return Math.round(total / prices.length);
+    const validPrices = prices.filter((p): p is number => p != null);
+    if (validPrices.length === 0) return 0;
+    const total = validPrices.reduce((acc, p) => acc + p, 0);
+    return Math.round(total / validPrices.length);
   }, [prices]);
 
   const option = useMemo(() => {
@@ -64,10 +69,24 @@ export function PriceChart({
             } catch { }
           }
 
-          const val = Number(params[0].value) || 0;
           const borderCls = isDark ? "border-[#27272A]" : "border-neutral-100";
           const textMuted = isDark ? "text-neutral-400" : "text-neutral-500";
           const textPrimary = isDark ? "text-neutral-100" : "text-neutral-900";
+
+          if (rawPt?.hasData === false || rawPt?.price == null) {
+            return `<div class="font-sans min-w-[180px]">
+              <div class="${textMuted} font-medium text-xs mb-1.5">${formattedTime}</div>
+              <div class="flex items-center justify-between space-x-3 text-xs border-t ${borderCls} pt-1.5">
+                <span class="font-semibold text-rose-500 flex items-center">
+                  <span class="w-2 h-2 rounded-full mr-1.5 bg-rose-500"></span>
+                  Spot Price:
+                </span>
+                <span class="font-mono text-neutral-400">No data</span>
+              </div>
+            </div>`;
+          }
+
+          const val = Number(params[0].value) || 0;
 
           return `<div class="font-sans min-w-[180px]">
             <div class="${textMuted} font-medium text-xs mb-1.5">${formattedTime}</div>
@@ -82,11 +101,22 @@ export function PriceChart({
             </div>
           </div>`;
         },
+        axisPointer: {
+          type: isBarView ? "shadow" : "line",
+          shadowStyle: {
+            color: isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)",
+          },
+          lineStyle: {
+            color: isDark ? "#71717A" : "#94A3B8",
+            width: 1.5,
+            type: "dashed",
+          },
+        },
       },
       grid: xAxisConfig.grid,
       xAxis: {
         type: "category",
-        boundaryGap: false,
+        boundaryGap: isBarView ? true : false,
         data: xAxisConfig.timestamps,
         axisLine: { show: false },
         axisTick: { show: false },
@@ -128,7 +158,7 @@ export function PriceChart({
         },
       ],
     };
-  }, [data, prices, currencySymbol, xAxisConfig, tooltipConfig, isDark]);
+  }, [data, prices, range, isBarView, currencySymbol, xAxisConfig, tooltipConfig, isDark]);
 
   const onEvents = useMemo(() => {
     return {

@@ -77,8 +77,7 @@ export default function DashboardPage() {
       );
       if (res.ok) {
         const json = await res.json();
-        setPoints(json.points || []);
-        setSummary(json.summary || null);
+        const alignedPoints = alignPointsToTimeGrid(json.points || [], range, interval);
         setBreakdown(json.breakdown || []);
         setDataSource(json.source || "simulation");
       } else {
@@ -87,9 +86,8 @@ export default function DashboardPage() {
     } catch (e) {
       console.warn("Using fallback dataset:", e);
       const fallback = generateMockEnergyData(country, region, range, interval);
-      setPoints(fallback.points);
-      setSummary(fallback.summary);
-      setBreakdown(fallback.breakdown);
+      const alignedPoints = alignPointsToTimeGrid(fallback.points, range, interval);
+      setPoints(alignedPoints);
       setDataSource("simulation");
     } finally {
       setIsLoading(false);
@@ -147,6 +145,7 @@ export default function DashboardPage() {
             {/* Chart 1: Generation by Fuel Tech (MW / GWh) */}
             <GenerationChart
               data={points}
+              range={range}
               viewMode={viewMode}
               paletteMode={paletteMode}
               unit={unit}
@@ -158,6 +157,7 @@ export default function DashboardPage() {
             {/* Chart 2: Emissions Volume (tCO2e/interval) */}
             <EmissionsChart
               data={points}
+              range={range}
               viewMode={viewMode}
               height="170px"
               hoveredFuel={hoveredFuel}
@@ -167,6 +167,7 @@ export default function DashboardPage() {
             {/* Chart 3: Spot Market Price */}
             <PriceChart
               data={points}
+              range={range}
               currencySymbol={countryInfo.currencySymbol}
               currencyCode={countryInfo.currencyCode}
               height="150px"

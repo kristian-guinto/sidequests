@@ -3,7 +3,7 @@
 import React, { useMemo, useCallback } from "react";
 import ReactECharts from "echarts-for-react";
 import * as echarts from "echarts";
-import { FuelGenerationPoint, ViewMode, FuelTech } from "@/lib/types";
+import { FuelGenerationPoint, ViewMode, FuelTech, TimeRange } from "@/lib/types";
 import { getFuelMeta } from "@/lib/colors";
 import { computeXAxisConfig, getShadcnTooltipConfig } from "@/lib/chartUtils";
 import {
@@ -19,6 +19,7 @@ import { useTheme } from "@/components/ThemeProvider";
 
 interface EmissionsChartProps {
   data: FuelGenerationPoint[];
+  range?: TimeRange;
   viewMode?: ViewMode;
   height?: string;
   hoveredFuel?: FuelTech | null;
@@ -27,6 +28,7 @@ interface EmissionsChartProps {
 
 export function EmissionsChart({
   data,
+  range = "7d",
   viewMode = "stacked",
   height = "180px",
   hoveredFuel,
@@ -34,11 +36,24 @@ export function EmissionsChart({
 }: EmissionsChartProps) {
   const { isDark } = useTheme();
   const isPercentage = viewMode === "percentage";
-  const xAxisConfig = useMemo(() => computeXAxisConfig(data, isDark), [data, isDark]);
+  const isBarView = range === "30d" || range === "1y";
+  const xAxisConfig = useMemo(() => computeXAxisConfig(data, isDark, range), [data, isDark, range]);
   const tooltipConfig = useMemo(() => getShadcnTooltipConfig(isDark), [isDark]);
 
   const emissionsData = useMemo(() => {
     return data.map((d) => {
+      if (d.hasData === false) {
+        return {
+          coal: null,
+          gas: null,
+          oil: null,
+          rawCoal: 0,
+          rawGas: 0,
+          rawOil: 0,
+          total: 0,
+          rawTotal: 0,
+        };
+      }
       const coalT = (d.coal || 0) * (5.0 / 60.0) * 0.9;
       const gasT = (d.gas || 0) * (5.0 / 60.0) * 0.38;
       const oilT = (d.oil || 0) * (5.0 / 60.0) * 0.75;
@@ -49,9 +64,9 @@ export function EmissionsChart({
         const gPct = total > 0 ? (gasT / total) * 100 : 0;
         const oPct = total > 0 ? (oilT / total) * 100 : 0;
         return {
-          coal: Math.round(cPct * 10) / 10,
-          gas: Math.round(gPct * 10) / 10,
-          oil: Math.round(oPct * 10) / 10,
+          coal: total > 0 ? Math.round(cPct * 10) / 10 : null,
+          gas: total > 0 ? Math.round(gPct * 10) / 10 : null,
+          oil: total > 0 ? Math.round(oPct * 10) / 10 : null,
           rawCoal: Math.round(coalT * 10) / 10,
           rawGas: Math.round(gasT * 10) / 10,
           rawOil: Math.round(oilT * 10) / 10,
@@ -75,8 +90,10 @@ export function EmissionsChart({
 
   const avgEmissions = useMemo(() => {
     if (!emissionsData || emissionsData.length === 0) return 0;
-    const total = emissionsData.reduce((acc, d) => acc + d.rawTotal, 0);
-    return Math.round(total / emissionsData.length);
+    const validData = emissionsData.filter((d) => d.rawTotal > 0);
+    if (validData.length === 0) return 0;
+    const total = validData.reduce((acc, d) => acc + d.rawTotal, 0);
+    return Math.round(total / validData.length);
   }, [emissionsData]);
 
   const option = useMemo(() => {
@@ -125,6 +142,17 @@ export function EmissionsChart({
       animation: false,
       tooltip: {
         ...tooltipConfig,
+        axisPointer: {
+          type: isBarView ? "shadow" : "line",
+          shadowStyle: {
+            color: isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)",
+          },
+          lineStyle: {
+            color: isDark ? "#71717A" : "#94A3B8",
+            width: 1.5,
+            type: "dashed",
+          },
+        },
         formatter: (params: any[]) => {
           if (!params || params.length === 0) return "";
           const idx = params[0].dataIndex;
@@ -149,6 +177,16 @@ export function EmissionsChart({
             : "bg-neutral-100 text-neutral-900";
           const textPrimary = isDark ? "text-neutral-100" : "text-neutral-900";
           const textSecondary = isDark ? "text-neutral-300" : "text-neutral-600";
+
+          if (rawPt?.hasData === false || item?.rawTotal === 0) {
+            return `<div class="font-sans min-w-[180px]">
+              <div class="border-b ${borderCls} pb-1.5 mb-2 flex justify-between items-center text-xs">
+                <span class="${textMuted} font-medium">${formattedTime}</span>
+                <span class="inline-flex items-center px-1.5 py-0.5 rounded ${pillBg} font-mono text-[11px] text-neutral-400">No data</span>
+              </div>
+              <div class="text-xs text-neutral-400 py-1 text-center">No emissions data for this period</div>
+            </div>`;
+          }
 
           let html = `<div class="font-sans min-w-[190px]">
             <div class="border-b ${borderCls} pb-1.5 mb-2 flex justify-between items-center text-xs">
@@ -176,7 +214,7 @@ export function EmissionsChart({
       grid: xAxisConfig.grid,
       xAxis: {
         type: "category",
-        boundaryGap: false,
+        boundaryGap: isBarView ? true : false,
         data: xAxisConfig.timestamps,
         axisLine: { show: false },
         axisTick: { show: false },
@@ -205,40 +243,79 @@ export function EmissionsChart({
       series: [
         {
           name: "Coal",
-          type: "line",
+          type: isBarView ? "bar" : "line",
           stack: "Emissions",
+          barCategoryGap: "0%",
+          barWidth: "100%",
           z: coalStyle.z,
-          areaStyle: { color: coalStyle.color, opacity: coalStyle.opacity },
-          lineStyle: { width: coalStyle.lineWidth, color: coalStyle.lineColor },
-          itemStyle: { color: coalMeta.color },
+          ...(isBarView
+            ? {
+              itemStyle: {
+                color: coalStyle.color,
+                opacity: coalStyle.opacity,
+                borderColor: isDark ? "rgba(0, 0, 0, 0.35)" : "rgba(255, 255, 255, 0.45)",
+                borderWidth: 0.4,
+              },
+            }
+            : {
+              areaStyle: { color: coalStyle.color, opacity: coalStyle.opacity },
+              lineStyle: { width: coalStyle.lineWidth, color: coalStyle.lineColor },
+              itemStyle: { color: coalMeta.color },
+            }),
           showSymbol: false,
           data: emissionsData.map((d) => d.coal),
         },
         {
           name: "Distillate",
-          type: "line",
+          type: isBarView ? "bar" : "line",
           stack: "Emissions",
+          barCategoryGap: "0%",
+          barWidth: "100%",
           z: oilStyle.z,
-          areaStyle: { color: oilStyle.color, opacity: oilStyle.opacity },
-          lineStyle: { width: oilStyle.lineWidth, color: oilStyle.lineColor },
-          itemStyle: { color: oilMeta.color },
+          ...(isBarView
+            ? {
+              itemStyle: {
+                color: oilStyle.color,
+                opacity: oilStyle.opacity,
+                borderColor: isDark ? "rgba(0, 0, 0, 0.35)" : "rgba(255, 255, 255, 0.45)",
+                borderWidth: 0.4,
+              },
+            }
+            : {
+              areaStyle: { color: oilStyle.color, opacity: oilStyle.opacity },
+              lineStyle: { width: oilStyle.lineWidth, color: oilStyle.lineColor },
+              itemStyle: { color: oilMeta.color },
+            }),
           showSymbol: false,
           data: emissionsData.map((d) => d.oil),
         },
         {
           name: "Gas",
-          type: "line",
+          type: isBarView ? "bar" : "line",
           stack: "Emissions",
+          barCategoryGap: "0%",
+          barWidth: "100%",
           z: gasStyle.z,
-          areaStyle: { color: gasStyle.color, opacity: gasStyle.opacity },
-          lineStyle: { width: gasStyle.lineWidth, color: gasStyle.lineColor },
-          itemStyle: { color: gasMeta.color },
+          ...(isBarView
+            ? {
+              itemStyle: {
+                color: gasStyle.color,
+                opacity: gasStyle.opacity,
+                borderColor: isDark ? "rgba(0, 0, 0, 0.35)" : "rgba(255, 255, 255, 0.45)",
+                borderWidth: 0.4,
+              },
+            }
+            : {
+              areaStyle: { color: gasStyle.color, opacity: gasStyle.opacity },
+              lineStyle: { width: gasStyle.lineWidth, color: gasStyle.lineColor },
+              itemStyle: { color: gasMeta.color },
+            }),
           showSymbol: false,
           data: emissionsData.map((d) => d.gas),
         },
       ],
     };
-  }, [data, emissionsData, isPercentage, xAxisConfig, tooltipConfig, isDark, hoveredFuel]);
+  }, [data, emissionsData, range, isPercentage, isBarView, xAxisConfig, tooltipConfig, isDark, hoveredFuel]);
 
   const onEvents = useMemo(() => {
     return {

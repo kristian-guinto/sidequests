@@ -3,7 +3,7 @@
 import React, { useMemo, useCallback } from "react";
 import ReactECharts from "echarts-for-react";
 import * as echarts from "echarts";
-import { FuelGenerationPoint, ViewMode, FuelTech, PaletteMode } from "@/lib/types";
+import { FuelGenerationPoint, ViewMode, FuelTech, PaletteMode, TimeRange } from "@/lib/types";
 import { getFuelMeta } from "@/lib/colors";
 import { computeXAxisConfig, getShadcnTooltipConfig } from "@/lib/chartUtils";
 import {
@@ -19,6 +19,7 @@ import { useTheme } from "@/components/ThemeProvider";
 
 interface GenerationChartProps {
   data: FuelGenerationPoint[];
+  range?: TimeRange;
   viewMode: ViewMode;
   paletteMode?: PaletteMode;
   unit?: "MW" | "GWh";
@@ -42,6 +43,7 @@ const FUEL_ORDER = [
 
 export function GenerationChart({
   data,
+  range = "7d",
   viewMode,
   paletteMode = "clean-fossil",
   unit = "MW",
@@ -52,11 +54,16 @@ export function GenerationChart({
   const { isDark } = useTheme();
   const isPercentage = viewMode === "percentage";
   const isEnergy = unit === "GWh";
+  const isBarView = range === "30d" || range === "1y";
 
   const avgGeneration = useMemo(() => {
     if (!data || data.length === 0) return 0;
-    const totalSum = data.reduce((acc, d) => acc + (d.totalGeneration || 0), 0);
-    return Math.round(totalSum / data.length);
+    const validData = data.filter(
+      (d) => d.hasData !== false && d.totalGeneration != null && d.totalGeneration > 0
+    );
+    if (validData.length === 0) return 0;
+    const totalSum = validData.reduce((acc, d) => acc + (d.totalGeneration || 0), 0);
+    return Math.round(totalSum / validData.length);
   }, [data]);
 
   const avgRenewablesPct = useMemo(() => {
@@ -64,6 +71,7 @@ export function GenerationChart({
     let renSum = 0;
     let totSum = 0;
     for (const d of data) {
+      if (d.hasData === false) continue;
       const tot = d.totalGeneration || 0;
       totSum += tot;
       const ren =
@@ -78,7 +86,7 @@ export function GenerationChart({
     return totSum > 0 ? Math.round((renSum / totSum) * 1000) / 10 : 0;
   }, [data]);
 
-  const xAxisConfig = useMemo(() => computeXAxisConfig(data, isDark), [data, isDark]);
+  const xAxisConfig = useMemo(() => computeXAxisConfig(data, isDark, range), [data, isDark, range]);
   const tooltipConfig = useMemo(() => getShadcnTooltipConfig(isDark), [isDark]);
 
   const option = useMemo(() => {
@@ -89,10 +97,14 @@ export function GenerationChart({
       const isFocused = hoveredFuel === fuel;
 
       const seriesData = data.map((d) => {
+        if (d.hasData === false) {
+          return null;
+        }
         const rawVal = Number(d[fuel] || 0);
         if (isPercentage) {
-          const tot = d.totalGeneration || 1;
-          return tot > 0 ? Math.round((rawVal / tot) * 1000) / 10 : 0;
+          const tot = d.totalGeneration;
+          if (!tot || tot <= 0) return null;
+          return Math.round((rawVal / tot) * 1000) / 10;
         }
         return rawVal;
       });
@@ -131,6 +143,31 @@ export function GenerationChart({
         }
       }
 
+      if (isBarView) {
+        return {
+          name: meta.label,
+          type: "bar",
+          stack: "TotalGeneration",
+          barCategoryGap: "0%",
+          barWidth: "100%",
+          z: zLevel,
+          itemStyle: {
+            color: areaColor,
+            opacity: areaOpacity,
+            borderColor: isFocused
+              ? isDark
+                ? "#FFFFFF"
+                : "#0F172A"
+              : isDark
+                ? "rgba(0, 0, 0, 0.35)"
+                : "rgba(255, 255, 255, 0.45)",
+            borderWidth: isFocused ? 1.5 : 0.4,
+          },
+          showSymbol: false,
+          data: seriesData,
+        };
+      }
+
       return {
         name: meta.label,
         type: "line",
@@ -160,6 +197,17 @@ export function GenerationChart({
       animation: false,
       tooltip: {
         ...tooltipConfig,
+        axisPointer: {
+          type: isBarView ? "shadow" : "line",
+          shadowStyle: {
+            color: isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)",
+          },
+          lineStyle: {
+            color: isDark ? "#71717A" : "#94A3B8",
+            width: 1.5,
+            type: "dashed",
+          },
+        },
         formatter: (params: any[]) => {
           if (!params || params.length === 0) return "";
           const idx = params[0].dataIndex;
@@ -203,6 +251,16 @@ export function GenerationChart({
           const textSecondary = isDark ? "text-neutral-300" : "text-neutral-600";
           const textSubPct = isDark ? "text-neutral-500" : "text-neutral-400";
 
+          if (rawPt?.hasData === false) {
+            return `<div class="font-sans min-w-[180px]">
+              <div class="border-b ${borderCls} pb-1.5 mb-2 flex justify-between items-center text-xs">
+                <span class="${textMuted} font-medium">${formattedTime}</span>
+                <span class="inline-flex items-center px-1.5 py-0.5 rounded ${pillBg} font-mono text-[11px] text-neutral-400">No data</span>
+              </div>
+              <div class="text-xs text-neutral-400 py-1 text-center">No data for this time period</div>
+            </div>`;
+          }
+
           let html = `<div class="font-sans min-w-[210px]">
             <div class="border-b ${borderCls} pb-1.5 mb-2 flex justify-between items-center text-xs">
               <span class="${textMuted} font-medium">${formattedTime}</span>
@@ -243,7 +301,7 @@ export function GenerationChart({
       grid: xAxisConfig.grid,
       xAxis: {
         type: "category",
-        boundaryGap: false,
+        boundaryGap: isBarView ? true : false,
         data: xAxisConfig.timestamps,
         axisLine: { show: false },
         axisTick: { show: false },
@@ -272,7 +330,7 @@ export function GenerationChart({
       },
       series,
     };
-  }, [data, isPercentage, isEnergy, xAxisConfig, tooltipConfig, isDark, hoveredFuel, paletteMode]);
+  }, [data, range, isPercentage, isEnergy, isBarView, xAxisConfig, tooltipConfig, isDark, hoveredFuel, paletteMode]);
 
   const onEvents = useMemo(() => {
     return {

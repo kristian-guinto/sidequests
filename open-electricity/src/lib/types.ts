@@ -41,11 +41,7 @@ export const COUNTRIES_METADATA: Record<CountryCode, CountryInfo> = {
     currencyCode: "MYR",
     currencySymbol: "RM",
     defaultRegion: "PENINSULAR",
-    regions: [
-      { id: "PENINSULAR", label: "Peninsular" },
-      { id: "SARAWAK", label: "Sarawak" },
-      { id: "SABAH", label: "Sabah" },
-    ],
+    regions: [{ id: "PENINSULAR", label: "Peninsular" }],
   },
   TH: {
     code: "TH",
@@ -171,6 +167,7 @@ export interface FuelGenerationPoint {
   priceDollar?: number;
   totalGeneration?: number;
   renewablesPct?: number;
+  hasData?: boolean;
 }
 
 export interface SummaryMetrics {

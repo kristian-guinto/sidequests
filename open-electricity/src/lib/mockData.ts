@@ -1,3 +1,4 @@
+import { format } from "date-fns";
 import {
   FuelGenerationPoint,
   Region,
@@ -47,7 +48,36 @@ export function generateMockEnergyData(
   }
 
   const now = new Date();
-  const startTime = new Date(now.getTime() - pointsCount * intervalMinutes * 60 * 1000);
+  // Ensure we always show data from past up to current day minus 1 (yesterday) for complete data
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0, 0);
+
+  let startTime: Date;
+  if (range === "1d") {
+    // Exactly yesterday: 00:00 to 23:55 (5m) or 23:30 (30m)
+    startTime = yesterday;
+  } else if (range === "3d") {
+    // Past 3 days to yesterday: (yesterday - 2 days) to yesterday
+    startTime = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate() - 2, 0, 0, 0, 0);
+  } else if (range === "7d") {
+    // Past 7 days to yesterday: (yesterday - 6 days) to yesterday
+    startTime = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate() - 6, 0, 0, 0, 0);
+  } else if (range === "30d") {
+    // Past 30 days to yesterday
+    if (activeInterval === "1w") {
+      startTime = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate() - (pointsCount - 1) * 7, 0, 0, 0, 0);
+    } else {
+      startTime = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate() - (pointsCount - 1), 0, 0, 0, 0);
+    }
+  } else if (range === "1y") {
+    // Past 1 year to yesterday
+    if (activeInterval === "1M") {
+      startTime = new Date(yesterday.getFullYear() - 1, yesterday.getMonth() + 1, 1, 0, 0, 0, 0);
+    } else {
+      startTime = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate() - (pointsCount - 1) * 7, 0, 0, 0, 0);
+    }
+  } else {
+    startTime = new Date(yesterday.getTime() - (pointsCount - 1) * intervalMinutes * 60 * 1000);
+  }
 
   // Country-specific baseload and peaks
   let baseDemand = 13500;
@@ -130,7 +160,10 @@ export function generateMockEnergyData(
   const isDailyOrLonger = intervalMinutes >= 1440;
 
   for (let i = 0; i < pointsCount; i++) {
-    const pointTime = new Date(startTime.getTime() + i * intervalMinutes * 60 * 1000);
+    const pointTime =
+      range === "1y" && activeInterval === "1M"
+        ? new Date(startTime.getFullYear(), startTime.getMonth() + i, 1, 12, 0, 0, 0)
+        : new Date(startTime.getTime() + i * intervalMinutes * 60 * 1000);
     const hour = isDailyOrLonger ? 12 : pointTime.getHours() + pointTime.getMinutes() / 60;
 
     let solarMW = 0;
@@ -192,7 +225,9 @@ export function generateMockEnergyData(
     const pointMultiplier = unit === "GWh" ? intervalHours / 1000 : 1;
 
     points.push({
-      timestamp: pointTime.toISOString(),
+      timestamp: isDailyOrLonger
+        ? format(pointTime, "yyyy-MM-dd")
+        : format(pointTime, "yyyy-MM-dd'T'HH:mm:ssXXX"),
       solar: Math.round(solarMW * pointMultiplier * 10) / 10,
       wind: Math.round(windMW * pointMultiplier * 10) / 10,
       hydro: Math.round(hydroMW * pointMultiplier * 10) / 10,
