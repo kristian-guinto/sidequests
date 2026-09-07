@@ -469,6 +469,51 @@ def test_fx_rates_no_fallback():
     assert get_fx_rate("2026-03-01", "PHP", conn=conn) == 58.25
 
 
+def test_sync_exchange_rates():
+    from pipeline.fx import sync_exchange_rates
+    from unittest.mock import patch, MagicMock
+
+    mock_db = MagicMock()
+    mock_db.upsert_exchange_rates.side_effect = lambda records: len(records)
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {
+        "rates": {
+            "2026-01-01": {
+                "PHP": 58.5,
+                "SGD": 1.34,
+                "MYR": 4.45,
+                "THB": 34.2,
+                "IDR": 15500.0,
+            }
+        }
+    }
+
+    with patch("httpx.Client.get", return_value=mock_resp):
+        # Default all registered currencies
+        count = sync_exchange_rates(
+            mock_db, start_date="2026-01-01", end_date="2026-01-01"
+        )
+        assert count == 5
+        records = mock_db.upsert_exchange_rates.call_args[0][0]
+        currs = {r.currency for r in records}
+        assert currs == {"PHP", "SGD", "MYR", "THB", "IDR"}
+
+        # Specific filtered currency
+        mock_db.reset_mock()
+        count = sync_exchange_rates(
+            mock_db,
+            start_date="2026-01-01",
+            end_date="2026-01-01",
+            currencies=["PHP", "SGD"],
+        )
+        assert count == 2
+        records = mock_db.upsert_exchange_rates.call_args[0][0]
+        currs = {r.currency for r in records}
+        assert currs == {"PHP", "SGD"}
+
+
 def test_iemop_client_extract_csv_from_bytes():
     import zipfile
     import io

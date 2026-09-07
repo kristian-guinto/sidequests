@@ -10,6 +10,11 @@ from pipeline.config import DUCKDB_PATH
 from pipeline.db import Database
 from pipeline.models import IngestRunReport
 from pipeline.ingest import PROVIDERS, resolve_countries, run_country_pipeline
+from pipeline.fx import (
+    sync_exchange_rates,
+    REGISTERED_CURRENCIES,
+    ExchangeRateSyncError,
+)
 
 app = typer.Typer(
     name="ingest",
@@ -188,6 +193,94 @@ def sync_facilities(
         console.print(
             "\n[bold green]✓ Facilities catalog sync complete.[/bold green]\n"
         )
+    finally:
+        db.close()
+
+
+@app.command("sync-exchange-rates")
+@app.command("sync-fx")
+def sync_exchange_rates_command(
+    start_arg: Optional[str] = typer.Argument(
+        None, help="Start date (YYYY-MM-DD)", metavar="[START_DATE]"
+    ),
+    end_arg: Optional[str] = typer.Argument(
+        None, help="End date (YYYY-MM-DD)", metavar="[END_DATE]"
+    ),
+    start_date: Optional[str] = typer.Option(
+        None,
+        "--start-date",
+        "-s",
+        help="Start date (YYYY-MM-DD). Defaults to 30 days ago.",
+    ),
+    end_date: Optional[str] = typer.Option(
+        None, "--end-date", "-e", help="End date (YYYY-MM-DD). Defaults to today."
+    ),
+    currency: str = typer.Option(
+        "ALL",
+        "--currency",
+        "-c",
+        help="Target currency or ALL registered currencies (PHP, SGD, MYR, THB, IDR, VND). Default: ALL",
+    ),
+    target: str = typer.Option(
+        "local", "--target", "-t", help="Target database ('local' or 'motherduck')"
+    ),
+    db_path: Optional[str] = typer.Option(
+        None, "--db-path", help="Path to local DuckDB file"
+    ),
+) -> None:
+    """Synchronize foreign exchange rates for registered currencies against USD between dates."""
+    s_input = start_date or start_arg
+    e_input = end_date or end_arg
+
+    try:
+        start_d = (
+            datetime.strptime(s_input, "%Y-%m-%d").date()
+            if s_input
+            else date.today() - timedelta(days=30)
+        )
+        end_d = (
+            datetime.strptime(e_input, "%Y-%m-%d").date() if e_input else date.today()
+        )
+    except ValueError as e:
+        console.print(
+            f"[bold red]Error parsing date:[/bold red] {e}. Format must be YYYY-MM-DD."
+        )
+        raise typer.BadParameter("Dates must be in YYYY-MM-DD format") from e
+
+    if start_d > end_d:
+        msg = f"start-date ({start_d}) must be on or before end-date ({end_d})"
+        console.print(f"[bold red]Error:[/bold red] {msg}")
+        raise typer.BadParameter(msg)
+
+    curr_choice = currency.strip().upper()
+    if curr_choice == "ALL":
+        target_currs = REGISTERED_CURRENCIES
+    else:
+        specified = [c.strip() for c in curr_choice.split(",") if c.strip()]
+        for c in specified:
+            if c not in REGISTERED_CURRENCIES:
+                msg = f"Unsupported currency '{c}'. Registered currencies: {', '.join(REGISTERED_CURRENCIES)}"
+                console.print(f"[bold red]Error:[/bold red] {msg}")
+                raise typer.BadParameter(msg)
+        target_currs = specified
+
+    local_path = db_path or DUCKDB_PATH
+    db = Database(target=target, local_path=local_path)
+    try:
+        console.print(
+            f"Syncing FX rates ({start_d} -> {end_d}) for currencies: [cyan]{', '.join(target_currs)}[/cyan]..."
+        )
+        count = sync_exchange_rates(
+            db=db,
+            start_date=start_d,
+            end_date=end_d,
+            currencies=target_currs,
+        )
+        console.print(f"  [green]✓[/green] Synced {count} exchange rate records.")
+        console.print("\n[bold green]✓ Exchange rates sync complete.[/bold green]\n")
+    except ExchangeRateSyncError as e:
+        console.print(f"[bold red]Sync Error:[/bold red] {e}")
+        raise typer.Exit(code=1) from e
     finally:
         db.close()
 

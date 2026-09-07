@@ -1,7 +1,7 @@
 """Foreign Exchange (FX) rate management for USD price normalization."""
 
 from datetime import date, datetime, timedelta
-from typing import Dict, Any, Optional, Union, List
+from typing import Dict, Any, Optional, Union, List, Sequence
 import httpx
 from pipeline.models import ExchangeRateRecord
 
@@ -13,6 +13,8 @@ COUNTRY_TO_CURRENCY: Dict[str, str] = {
     "VN": "VND",
     "ID": "IDR",
 }
+
+REGISTERED_CURRENCIES: List[str] = sorted(list(set(COUNTRY_TO_CURRENCY.values())))
 
 
 class ExchangeRateNotFoundError(Exception):
@@ -76,6 +78,7 @@ def sync_exchange_rates(
     db: Any,
     start_date: Optional[Union[date, str]] = None,
     end_date: Optional[Union[date, str]] = None,
+    currencies: Optional[Sequence[str]] = None,
 ) -> int:
     """
     Syncs daily exchange rates from Frankfurter API into the exchange_rates table.
@@ -95,7 +98,13 @@ def sync_exchange_rates(
         else date.today()
     )
 
-    url = f"https://api.frankfurter.dev/v1/{start.isoformat()}..{end.isoformat()}?from=USD&to=PHP,SGD,MYR,THB,IDR"
+    target_currs = (
+        [c.strip().upper() for c in currencies if c.strip()]
+        if currencies
+        else REGISTERED_CURRENCIES
+    )
+    to_param = ",".join(sorted(set(target_currs)))
+    url = f"https://api.frankfurter.dev/v1/{start.isoformat()}..{end.isoformat()}?from=USD&to={to_param}"
     try:
         with httpx.Client(timeout=10.0) as client:
             resp = client.get(url)
@@ -116,16 +125,19 @@ def sync_exchange_rates(
             f"No exchange rate data returned from {url} for range {start}..{end}"
         )
 
+    target_currs_set = set(target_currs) if target_currs else None
     records: List[ExchangeRateRecord] = []
     for d_str, r_map in data.items():
         d_parsed = datetime.strptime(d_str, "%Y-%m-%d").date()
         for curr, rate in r_map.items():
-            records.append(
-                ExchangeRateRecord(
-                    date=d_parsed,
-                    currency=curr.upper(),
-                    rate_to_usd=float(rate),
+            c_upper = curr.upper()
+            if target_currs_set is None or c_upper in target_currs_set:
+                records.append(
+                    ExchangeRateRecord(
+                        date=d_parsed,
+                        currency=c_upper,
+                        rate_to_usd=float(rate),
+                    )
                 )
-            )
 
     return db.upsert_exchange_rates(records)

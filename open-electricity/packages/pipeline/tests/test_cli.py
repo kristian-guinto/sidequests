@@ -23,6 +23,7 @@ def test_cli_help():
     assert "latest" in result.stdout
     assert "backfill" in result.stdout
     assert "sync-facilities" in result.stdout
+    assert "sync-exchange-rates" in result.stdout
     assert "inspect" in result.stdout
 
 
@@ -36,7 +37,13 @@ def test_cli_no_args_shows_help():
 
 def test_cli_subcommand_helps():
     """Verify help messages for each subcommand."""
-    for cmd in ["latest", "backfill", "sync-facilities", "inspect"]:
+    for cmd in [
+        "latest",
+        "backfill",
+        "sync-facilities",
+        "sync-exchange-rates",
+        "inspect",
+    ]:
         res = runner.invoke(app, [cmd, "--help"])
         assert res.exit_code == 0, f"Failed on {cmd} --help: {res.stdout}"
         assert "--target" in res.stdout
@@ -134,3 +141,138 @@ def test_inspect_command_dispatch():
             limit=5,
         )
         mock_db.close.assert_called_once()
+
+
+def test_sync_exchange_rates_command():
+    """Verify sync-exchange-rates executes and calls sync_exchange_rates."""
+    from datetime import date
+    from pipeline.fx import REGISTERED_CURRENCIES
+
+    with (
+        patch("pipeline.cli.Database") as mock_db_cls,
+        patch("pipeline.cli.sync_exchange_rates", return_value=30) as mock_sync,
+    ):
+        mock_db = MagicMock()
+        mock_db_cls.return_value = mock_db
+
+        result = runner.invoke(
+            app,
+            [
+                "sync-exchange-rates",
+                "--start-date",
+                "2026-01-01",
+                "--end-date",
+                "2026-01-05",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "Synced 30 exchange rate records" in result.stdout
+        assert "Exchange rates sync complete" in result.stdout
+        mock_sync.assert_called_once_with(
+            db=mock_db,
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 1, 5),
+            currencies=REGISTERED_CURRENCIES,
+        )
+        mock_db.close.assert_called_once()
+
+
+def test_sync_exchange_rates_positional_args():
+    """Verify sync-exchange-rates accepts positional date arguments."""
+    from datetime import date
+    from pipeline.fx import REGISTERED_CURRENCIES
+
+    with (
+        patch("pipeline.cli.Database") as mock_db_cls,
+        patch("pipeline.cli.sync_exchange_rates", return_value=12) as mock_sync,
+    ):
+        mock_db = MagicMock()
+        mock_db_cls.return_value = mock_db
+
+        result = runner.invoke(
+            app,
+            ["sync-exchange-rates", "2026-01-01", "2026-01-02"],
+        )
+        assert result.exit_code == 0
+        mock_sync.assert_called_once_with(
+            db=mock_db,
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 1, 2),
+            currencies=REGISTERED_CURRENCIES,
+        )
+
+
+def test_sync_exchange_rates_currency_filter():
+    """Verify sync-exchange-rates filters by specified currency."""
+    from datetime import date
+
+    with (
+        patch("pipeline.cli.Database") as mock_db_cls,
+        patch("pipeline.cli.sync_exchange_rates", return_value=5) as mock_sync,
+    ):
+        mock_db = MagicMock()
+        mock_db_cls.return_value = mock_db
+
+        result = runner.invoke(
+            app,
+            [
+                "sync-exchange-rates",
+                "-s",
+                "2026-01-01",
+                "-e",
+                "2026-01-05",
+                "-c",
+                "PHP",
+            ],
+        )
+        assert result.exit_code == 0
+        mock_sync.assert_called_once_with(
+            db=mock_db,
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 1, 5),
+            currencies=["PHP"],
+        )
+
+
+def test_sync_exchange_rates_invalid_dates():
+    """Verify error handling on invalid date formats and start > end."""
+    # Invalid format
+    res1 = runner.invoke(app, ["sync-exchange-rates", "-s", "invalid"])
+    assert res1.exit_code != 0
+    assert "YYYY-MM-DD" in res1.output
+
+    # Start date after end date
+    res2 = runner.invoke(
+        app,
+        [
+            "sync-exchange-rates",
+            "-s",
+            "2026-02-01",
+            "-e",
+            "2026-01-01",
+        ],
+    )
+    assert res2.exit_code != 0
+    assert "must be on or before" in res2.output
+
+
+def test_sync_exchange_rates_unsupported_currency():
+    """Verify error when unsupported currency is provided."""
+    res = runner.invoke(
+        app,
+        ["sync-exchange-rates", "-s", "2026-01-01", "-e", "2026-01-05", "-c", "XYZ"],
+    )
+    assert res.exit_code != 0
+    assert "Unsupported currency 'XYZ'" in res.output
+
+
+def test_sync_fx_alias():
+    """Verify sync-fx alias works identically."""
+    with (
+        patch("pipeline.cli.Database") as mock_db_cls,
+        patch("pipeline.cli.sync_exchange_rates", return_value=10),
+    ):
+        mock_db_cls.return_value = MagicMock()
+        res = runner.invoke(app, ["sync-fx", "-s", "2026-01-01", "-e", "2026-01-02"])
+        assert res.exit_code == 0
+        assert "Exchange rates sync complete" in res.stdout
