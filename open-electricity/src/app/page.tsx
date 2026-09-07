@@ -21,6 +21,7 @@ import { EmissionsChart } from "@/components/EmissionsChart";
 import { PriceChart } from "@/components/PriceChart";
 import { DataSidebar } from "@/components/DataSidebar";
 import { generateMockEnergyData } from "@/lib/mockData";
+import { alignPointsToTimeGrid } from "@/lib/chartUtils";
 
 export default function DashboardPage() {
   const [country, setCountry] = useState<CountryCode>("PH");
@@ -78,7 +79,11 @@ export default function DashboardPage() {
       if (res.ok) {
         const json = await res.json();
         const alignedPoints = alignPointsToTimeGrid(json.points || [], range, interval);
+        setPoints(alignedPoints);
         setBreakdown(json.breakdown || []);
+        if (json.summary) {
+          setSummary(json.summary);
+        }
         setDataSource(json.source || "simulation");
       } else {
         throw new Error("Failed to fetch API data");
@@ -88,6 +93,8 @@ export default function DashboardPage() {
       const fallback = generateMockEnergyData(country, region, range, interval);
       const alignedPoints = alignPointsToTimeGrid(fallback.points, range, interval);
       setPoints(alignedPoints);
+      setBreakdown(fallback.breakdown || []);
+      setSummary(fallback.summary || null);
       setDataSource("simulation");
     } finally {
       setIsLoading(false);
