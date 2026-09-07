@@ -1,18 +1,9 @@
 """Foreign Exchange (FX) rate management for USD price normalization."""
 
 from datetime import date, datetime, timedelta
-from typing import Dict, Any, Optional, Union
+from typing import Dict, Any, Optional, Union, List
 import httpx
-
-# Baseline reference rates (units per 1 USD) used as fallbacks
-DEFAULT_FX_RATES: Dict[str, float] = {
-    "PHP": 57.0,
-    "SGD": 1.34,
-    "MYR": 4.45,
-    "THB": 35.0,
-    "VND": 24500.0,
-    "USD": 1.0,
-}
+from pipeline.models import ExchangeRateRecord
 
 COUNTRY_TO_CURRENCY: Dict[str, str] = {
     "PH": "PHP",
@@ -23,29 +14,52 @@ COUNTRY_TO_CURRENCY: Dict[str, str] = {
 }
 
 
+class ExchangeRateNotFoundError(Exception):
+    """Raised when an exchange rate is not available in the database for a given date and currency."""
+
+    pass
+
+
+class ExchangeRateSyncError(Exception):
+    """Raised when fetching exchange rates from an external API fails."""
+
+    pass
+
+
 def get_fx_rate(
     date_val: Union[date, str],
     currency: str,
     conn: Optional[Any] = None,
 ) -> float:
-    """Gets the exchange rate (units per 1 USD) for a given date and currency."""
+    """
+    Gets the exchange rate (units per 1 USD) for a given date and currency from the database.
+    Strict Domain Safety: Does not use default fallbacks. Fails explicitly if rate is missing.
+
+    Raises:
+        ValueError: If conn is None.
+        ExchangeRateNotFoundError: If the exchange rate is missing in the database.
+    """
     curr = currency.upper()
     if curr == "USD":
         return 1.0
 
-    if conn is not None:
-        try:
-            d_str = str(date_val)[:10]
-            row = conn.execute(
-                "SELECT rate_to_usd FROM exchange_rates WHERE date = ?::DATE AND currency = ?",
-                [d_str, curr],
-            ).fetchone()
-            if row and row[0] and row[0] > 0:
-                return float(row[0])
-        except Exception:
-            pass
+    if conn is None:
+        raise ValueError("A database connection is required to look up exchange rates.")
 
-    return DEFAULT_FX_RATES.get(curr, 1.0)
+    d_str = str(date_val)[:10]
+    row = conn.execute(
+        "SELECT rate_to_usd FROM exchange_rates WHERE date = ?::DATE AND currency = ?",
+        [d_str, curr],
+    ).fetchone()
+
+    if row and row[0] is not None and row[0] > 0:
+        return float(row[0])
+
+    raise ExchangeRateNotFoundError(
+        f"Exchange rate to USD not found for currency '{curr}' on date '{d_str}'. "
+        "No default fallback rates are configured to prevent silent errors. "
+        "Please ensure exchange rates are populated for this date."
+    )
 
 
 def sync_exchange_rates(
@@ -53,7 +67,13 @@ def sync_exchange_rates(
     start_date: Optional[Union[date, str]] = None,
     end_date: Optional[Union[date, str]] = None,
 ) -> int:
-    """Syncs daily exchange rates into the exchange_rates table."""
+    """
+    Syncs daily exchange rates from Frankfurter API into the exchange_rates table.
+    Fails explicitly if the external API request fails or returns no data.
+
+    Raises:
+        ExchangeRateSyncError: If fetching exchange rates from the API fails.
+    """
     start = (
         datetime.strptime(str(start_date)[:10], "%Y-%m-%d").date()
         if start_date
@@ -65,38 +85,37 @@ def sync_exchange_rates(
         else date.today()
     )
 
-    rates_to_insert = []
-    curr_d = start
-    while curr_d <= end:
-        d_str = curr_d.strftime("%Y-%m-%d")
-        for curr, default_rate in DEFAULT_FX_RATES.items():
-            if curr == "USD":
-                continue
-            rates_to_insert.append((d_str, curr, default_rate))
-        curr_d += timedelta(days=1)
-
-    # Try fetching online if network allows
+    url = f"https://api.frankfurter.dev/v1/{start.isoformat()}..{end.isoformat()}?from=USD&to=PHP,SGD,MYR,THB"
     try:
-        url = f"https://api.frankfurter.dev/v1/{start.isoformat()}..{end.isoformat()}?from=USD&to=PHP,SGD,MYR,THB"
-        with httpx.Client(timeout=4.0) as client:
+        with httpx.Client(timeout=10.0) as client:
             resp = client.get(url)
-            if resp.status_code == 200:
-                data = resp.json().get("rates", {})
-                updated_rates = []
-                for d_str, r_map in data.items():
-                    for curr, rate in r_map.items():
-                        updated_rates.append((d_str, curr.upper(), float(rate)))
-                if updated_rates:
-                    rates_to_insert = updated_rates
-    except Exception:
-        pass
+            if resp.status_code != 200:
+                raise ExchangeRateSyncError(
+                    f"Failed to fetch exchange rates from {url}: HTTP {resp.status_code} - {resp.text}"
+                )
+            data = resp.json().get("rates", {})
+    except Exception as e:
+        if isinstance(e, ExchangeRateSyncError):
+            raise
+        raise ExchangeRateSyncError(
+            f"Network error fetching exchange rates from {url}: {e}"
+        ) from e
 
-    db.conn.executemany(
-        """
-        INSERT INTO exchange_rates (date, currency, rate_to_usd)
-        VALUES (?::DATE, ?, ?)
-        ON CONFLICT (date, currency) DO UPDATE SET rate_to_usd = EXCLUDED.rate_to_usd;
-        """,
-        rates_to_insert,
-    )
-    return len(rates_to_insert)
+    if not data:
+        raise ExchangeRateSyncError(
+            f"No exchange rate data returned from {url} for range {start}..{end}"
+        )
+
+    records: List[ExchangeRateRecord] = []
+    for d_str, r_map in data.items():
+        d_parsed = datetime.strptime(d_str, "%Y-%m-%d").date()
+        for curr, rate in r_map.items():
+            records.append(
+                ExchangeRateRecord(
+                    date=d_parsed,
+                    currency=curr.upper(),
+                    rate_to_usd=float(rate),
+                )
+            )
+
+    return db.upsert_exchange_rates(records)
