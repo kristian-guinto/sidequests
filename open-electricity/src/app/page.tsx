@@ -1,236 +1,259 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import {
   CountryCode,
-  Region,
   TimeRange,
-  TimeInterval,
-  ViewMode,
   PaletteMode,
-  FuelGenerationPoint,
-  FuelTech,
-  SummaryMetrics,
   FuelBreakdownRow,
-  RANGE_CONFIG,
+  SummaryMetrics,
   COUNTRIES_METADATA,
 } from "@/lib/types";
-import { Header } from "@/components/Header";
-import { GenerationChart } from "@/components/GenerationChart";
-import { EmissionsChart } from "@/components/EmissionsChart";
-import { PriceChart } from "@/components/PriceChart";
-import { DataSidebar } from "@/components/DataSidebar";
+import { CountryWaffleCard } from "@/components/CountryWaffleCard";
 import { generateMockEnergyData } from "@/lib/mockData";
-import { alignPointsToTimeGrid } from "@/lib/chartUtils";
+import { useTheme } from "@/components/ThemeProvider";
+import {
+  Palette,
+  Leaf,
+  Sun,
+  Moon,
+  RotateCw,
+} from "lucide-react";
 
-export default function DashboardPage() {
-  const [country, setCountry] = useState<CountryCode>("PH");
-  const [region, setRegion] = useState<Region>("ALL");
-  const [range, setRange] = useState<TimeRange>("7d");
-  const [interval, setInterval] = useState<TimeInterval>("30m");
-  const [viewMode, setViewMode] = useState<ViewMode>("percentage");
+const COUNTRY_CODES: CountryCode[] = ["PH", "SG", "MY", "TH", "VN"];
+
+const TIME_RANGES: { id: TimeRange; label: string; sub: string }[] = [
+  { id: "1d", label: "24 Hours", sub: "Daily dispatch" },
+  { id: "7d", label: "7 Days", sub: "Weekly average" },
+  { id: "30d", label: "30 Days", sub: "Monthly mix" },
+];
+
+export default function SoutheastAsiaOverviewPage() {
+  const { isDark, toggleTheme } = useTheme();
   const [paletteMode, setPaletteMode] = useState<PaletteMode>("clean-fossil");
+  const [range, setRange] = useState<TimeRange>("7d");
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  const [points, setPoints] = useState<FuelGenerationPoint[]>([]);
-  const [summary, setSummary] = useState<SummaryMetrics | null>(null);
-  const [breakdown, setBreakdown] = useState<FuelBreakdownRow[]>([]);
-  const [dataSource, setDataSource] = useState<string>("motherduck_cloud");
-
-  // Real-time hover cursor interaction state
-  const [hoveredPoint, setHoveredPoint] = useState<FuelGenerationPoint | null>(null);
-  const [hoveredFuel, setHoveredFuel] = useState<FuelTech | null>(null);
-
-  const countryInfo = COUNTRIES_METADATA[country] || COUNTRIES_METADATA["PH"];
-  const unit = RANGE_CONFIG[range]?.unit || "MW";
-
-  const timeSpan = useMemo(() => {
-    if (!points || points.length === 0) return undefined;
-    return {
-      start: points[0].timestamp,
-      end: points[points.length - 1].timestamp,
-    };
-  }, [points]);
-
-  const handleCountryChange = (newCountry: CountryCode) => {
-    setCountry(newCountry);
-    const info = COUNTRIES_METADATA[newCountry];
-    if (info) {
-      setRegion(info.defaultRegion);
-    }
-    setHoveredPoint(null);
-  };
-
-  const handleRangeChange = (newRange: TimeRange) => {
-    setRange(newRange);
-    const cfg = RANGE_CONFIG[newRange];
-    if (cfg) {
-      setInterval(cfg.defaultInterval);
-    }
-    setHoveredPoint(null);
-  };
-
-  const fetchData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const res = await fetch(
-        `/api/energy?country=${country}&region=${region}&range=${range}&interval=${interval}`
-      );
-      if (res.ok) {
-        const json = await res.json();
-        const alignedPoints = alignPointsToTimeGrid(json.points || [], range, interval);
-        setPoints(alignedPoints);
-        setBreakdown(json.breakdown || []);
-        if (json.summary) {
-          setSummary(json.summary);
-        }
-        setDataSource(json.source || "simulation");
-      } else {
-        throw new Error("Failed to fetch API data");
+  // Initialize with simulated datasets to guarantee instant visual hydration
+  const [countryData, setCountryData] = useState<
+    Record<
+      CountryCode,
+      {
+        breakdown: FuelBreakdownRow[];
+        summary: SummaryMetrics | null;
+        isSimulated: boolean;
       }
-    } catch (e) {
-      console.warn("Using fallback dataset:", e);
-      const fallback = generateMockEnergyData(country, region, range, interval);
-      const alignedPoints = alignPointsToTimeGrid(fallback.points, range, interval);
-      setPoints(alignedPoints);
-      setBreakdown(fallback.breakdown || []);
-      setSummary(fallback.summary || null);
-      setDataSource("simulation");
-    } finally {
-      setIsLoading(false);
+    >
+  >(() => {
+    const initial: Record<
+      CountryCode,
+      {
+        breakdown: FuelBreakdownRow[];
+        summary: SummaryMetrics | null;
+        isSimulated: boolean;
+      }
+    > = {} as any;
+
+    for (const code of COUNTRY_CODES) {
+      const mock = generateMockEnergyData(code, "ALL", "7d");
+      initial[code] = {
+        breakdown: mock.breakdown,
+        summary: mock.summary,
+        isSimulated: true,
+      };
     }
-  }, [country, region, range, interval]);
+    return initial;
+  });
+
+  // Fetch or update data whenever time range changes
+  const fetchAllCountriesData = useCallback(async () => {
+    setIsLoading(true);
+
+    const promises = COUNTRY_CODES.map(async (code) => {
+      try {
+        const interval = range === "1d" ? "30m" : range === "7d" ? "1h" : "1d";
+        const res = await fetch(
+          `/api/energy?country=${code}&region=ALL&range=${range}&interval=${interval}`
+        );
+        if (res.ok) {
+          const json = await res.json();
+          return {
+            code,
+            breakdown: json.breakdown || [],
+            summary: json.summary || null,
+            isSimulated: false,
+          };
+        }
+        throw new Error("API not ok");
+      } catch {
+        const fallback = generateMockEnergyData(code, "ALL", range);
+        return {
+          code,
+          breakdown: fallback.breakdown,
+          summary: fallback.summary,
+          isSimulated: true,
+        };
+      }
+    });
+
+    const results = await Promise.all(promises);
+    setCountryData((prev) => {
+      const updated = { ...prev };
+      for (const res of results) {
+        updated[res.code] = {
+          breakdown: res.breakdown,
+          summary: res.summary,
+          isSimulated: res.isSimulated,
+        };
+      }
+      return updated;
+    });
+
+    setIsLoading(false);
+  }, [range]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchAllCountriesData();
+  }, [fetchAllCountriesData]);
 
   return (
     <div className="flex flex-col min-h-screen bg-[#FAFAFA] dark:bg-[#000000] text-neutral-900 dark:text-neutral-100 font-sans transition-colors duration-150">
-      {/* OpenNEM Two-Tier Header */}
-      <Header
-        country={country}
-        onCountryChange={handleCountryChange}
-        region={region}
-        onRegionChange={setRegion}
-        range={range}
-        onRangeChange={handleRangeChange}
-        interval={interval}
-        onIntervalChange={setInterval}
-        viewMode={viewMode}
-        onViewModeChange={setViewMode}
-        paletteMode={paletteMode}
-        onPaletteModeChange={setPaletteMode}
-        onRefresh={fetchData}
-        isLoading={isLoading}
-        dataSource={dataSource}
-      />
+      {/* Top Global Navigation Bar */}
+      <header className="bg-white dark:bg-[#000000] border-b border-neutral-200 dark:border-[#27272A] sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-14">
+            {/* Logo */}
+            <Link href="/" className="flex items-center space-x-2.5 group">
+              <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-emerald-600 via-emerald-500 to-teal-400 flex items-center justify-center shadow-xs shadow-emerald-500/20 group-hover:scale-105 transition-transform">
+                <svg
+                  className="h-4.5 w-4.5 text-white fill-white"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth="1"
+                >
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                </svg>
+              </div>
+              <div className="flex items-baseline">
+                <span className="font-sans font-extrabold text-xl tracking-tight text-neutral-950 dark:text-white">
+                  Open<span className="text-emerald-600 dark:text-emerald-400 font-black">Electricity</span>
+                </span>
+                <span className="ml-2 text-xs font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 hidden sm:inline-block">
+                  Southeast Asia
+                </span>
+              </div>
+            </Link>
 
-      {/* API Fallback Warning Banner */}
-      {(dataSource === "simulation" || dataSource === "simulation_dataset") && (
-        <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-1.5 text-xs text-amber-800 dark:text-amber-300 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
-            <span className="font-medium">
-              Database connection unavailable. Displaying simulated fallback dataset.
-            </span>
+            {/* Controls Bar */}
+            <div className="flex items-center space-x-2 sm:space-x-3">
+              {/* Palette Mode Toggle */}
+              <div className="flex items-center border border-neutral-200 dark:border-[#27272A] rounded p-0.5 bg-neutral-50/50 dark:bg-[#121215]">
+                <button
+                  onClick={() => setPaletteMode("clean-fossil")}
+                  className={`flex items-center space-x-1 px-2 sm:px-2.5 py-0.5 rounded text-xs font-medium transition ${paletteMode === "clean-fossil"
+                    ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold shadow-sm"
+                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white"
+                    }`}
+                  title="Clean (Green) vs. Fossil (Slate)"
+                >
+                  <Leaf className="h-3.5 w-3.5 text-emerald-500 dark:text-emerald-400" />
+                  <span className="hidden sm:inline">Clean / Fossil</span>
+                </button>
+                <button
+                  onClick={() => setPaletteMode("detailed")}
+                  className={`flex items-center space-x-1 px-2 sm:px-2.5 py-0.5 rounded text-xs font-medium transition ${paletteMode === "detailed"
+                    ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold shadow-sm"
+                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white"
+                    }`}
+                  title="Full Multi-Color Palette"
+                >
+                  <Palette className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400" />
+                  <span className="hidden sm:inline">Detailed</span>
+                </button>
+              </div>
+
+              {/* Time Range Selector */}
+              <div className="flex border border-neutral-200 dark:border-[#27272A] rounded p-0.5 text-xs font-medium bg-neutral-50/50 dark:bg-[#121215]">
+                {TIME_RANGES.map((rng) => (
+                  <button
+                    key={rng.id}
+                    onClick={() => setRange(rng.id)}
+                    className={`px-2 sm:px-2.5 py-0.5 rounded transition ${range === rng.id
+                      ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold border border-neutral-300 dark:border-neutral-700 shadow-sm"
+                      : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                      }`}
+                  >
+                    {rng.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Refresh Button */}
+              <button
+                onClick={fetchAllCountriesData}
+                disabled={isLoading}
+                className="p-1.5 rounded border border-neutral-200 dark:border-[#27272A] hover:bg-neutral-50 dark:hover:bg-[#121215] text-neutral-700 dark:text-neutral-300 text-xs transition disabled:opacity-50"
+                title="Refresh datasets"
+              >
+                <RotateCw
+                  className={`h-3.5 w-3.5 ${isLoading ? "animate-spin text-emerald-500" : ""}`}
+                />
+              </button>
+
+              {/* Theme Toggle */}
+              <button
+                onClick={toggleTheme}
+                className="p-1.5 rounded border border-neutral-200 dark:border-[#27272A] hover:bg-neutral-50 dark:hover:bg-[#121215] text-neutral-700 dark:text-neutral-300 text-xs transition"
+                title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                aria-label="Toggle Theme"
+              >
+                {isDark ? (
+                  <Sun className="h-3.5 w-3.5 text-amber-400" />
+                ) : (
+                  <Moon className="h-3.5 w-3.5 text-neutral-600" />
+                )}
+              </button>
+            </div>
           </div>
-          <button
-            onClick={fetchData}
-            className="underline hover:text-amber-950 dark:hover:text-amber-100 cursor-pointer font-medium text-[11px]"
-          >
-            Retry Connection
-          </button>
         </div>
-      )}
+      </header>
 
-      {/* Main Full-Width Two-Column Workspace */}
-      <main className="flex-1 w-full px-3 sm:px-4 lg:px-6 py-3">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-start">
-          {/* Left Column (8 cols ~ 67% width): Synchronized Chart Stack */}
-          <div className="lg:col-span-8 space-y-2.5">
-            {/* Chart 1: Generation by Fuel Tech (MW / GWh) */}
-            <GenerationChart
-              data={points}
-              range={range}
-              viewMode={viewMode}
-              paletteMode={paletteMode}
-              unit={unit}
-              height="310px"
-              hoveredFuel={hoveredFuel}
-              onHoverPoint={setHoveredPoint}
-            />
-
-            {/* Chart 2: Emissions Volume (tCO2e/interval) */}
-            <EmissionsChart
-              data={points}
-              range={range}
-              viewMode={viewMode}
-              height="170px"
-              hoveredFuel={hoveredFuel}
-              onHoverPoint={setHoveredPoint}
-            />
-
-            {/* Chart 3: Spot Market Price */}
-            <PriceChart
-              data={points}
-              range={range}
-              currencySymbol={countryInfo.currencySymbol}
-              currencyCode={countryInfo.currencyCode}
-              height="150px"
-              onHoverPoint={setHoveredPoint}
-            />
-          </div>
-
-          {/* Right Column (4 cols ~ 33% width): Sticky Fuel & Emissions Sidebar */}
-          <div className="lg:col-span-4 lg:sticky lg:top-[105px]">
-            <DataSidebar
-              breakdown={breakdown}
-              summary={summary}
-              hoveredPoint={hoveredPoint}
-              hoveredFuel={hoveredFuel}
-              onHoverFuel={setHoveredFuel}
-              timeSpan={timeSpan}
-              currencySymbol={countryInfo.currencySymbol}
-              currencyCode={countryInfo.currencyCode}
-              unit={unit}
-              paletteMode={paletteMode}
-            />
-          </div>
+      {/* Main Container */}
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
+        {/* Minimal page heading */}
+        <div className="mb-6">
+          <h1 className="text-lg sm:text-xl font-bold text-neutral-950 dark:text-white tracking-tight">
+            Southeast Asia Electricity Mix
+          </h1>
+          <p className="text-xs text-neutral-400 dark:text-neutral-500 mt-0.5">
+            Generation by fuel source &bull; Click to explore
+          </p>
         </div>
-      </main>
 
-      {/* Sleek Bottom OpenNEM Status Bar */}
-      <footer className="border-t border-neutral-200 dark:border-[#27272A] bg-neutral-900 dark:bg-[#09090B] text-neutral-300 py-1 px-4 text-[11px] font-mono select-none">
-        <div className="w-full flex items-center justify-between">
+        {/* 5-Country Grid — 3 cols, bottom row centered */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+          {COUNTRY_CODES.map((code) => {
+            const data = countryData[code];
+            return (
+              <CountryWaffleCard
+                key={code}
+                country={code}
+                breakdown={data?.breakdown || []}
+                summary={data?.summary || null}
+      <footer className="border-t border-neutral-200 dark:border-[#27272A] bg-neutral-900 dark:bg-[#09090B] text-neutral-300 py-2.5 px-4 sm:px-8 text-[11px] font-mono select-none mt-auto">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
           <div className="flex items-center space-x-3 text-neutral-400">
             <span className="text-neutral-200 font-semibold">v4.54.10</span>
             <span>&bull;</span>
-            <span className="flex items-center space-x-1.5">
-              {dataSource === "duckdb_local" || dataSource === "local" ? (
-                <>
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                  <span className="text-blue-400">Engine: DuckDB (local)</span>
-                </>
-              ) : dataSource === "motherduck" || dataSource === "motherduck_cloud" ? (
-                <>
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-emerald-400">Engine: MotherDuck Cloud</span>
-                </>
-              ) : (
-                <>
-                </>
-              )}
-            </span>
-            <span>&bull;</span>
-            <span>API: 4.5.11</span>
+            <span>5 Grids Tracked</span>
           </div>
 
           <div className="flex items-center space-x-4 text-neutral-400">
-            <span>Sources: IEMOP (PH), EMA (SG), Single Buyer (MY), EGAT (TH)</span>
+            <span>Sources: IEMOP (PH), EMA (SG), Single Buyer (MY), EGAT (TH), EVN (VN)</span>
           </div>
         </div>
       </footer>
     </div>
-  );
+        );
 }

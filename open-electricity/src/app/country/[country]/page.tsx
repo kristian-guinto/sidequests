@@ -1,0 +1,261 @@
+"use client";
+
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import {
+  CountryCode,
+  Region,
+  TimeRange,
+  TimeInterval,
+  ViewMode,
+  PaletteMode,
+  FuelGenerationPoint,
+  FuelTech,
+  SummaryMetrics,
+  FuelBreakdownRow,
+  RANGE_CONFIG,
+  COUNTRIES_METADATA,
+} from "@/lib/types";
+import { Header } from "@/components/Header";
+import { GenerationChart } from "@/components/GenerationChart";
+import { EmissionsChart } from "@/components/EmissionsChart";
+import { PriceChart } from "@/components/PriceChart";
+import { DataSidebar } from "@/components/DataSidebar";
+import { generateMockEnergyData } from "@/lib/mockData";
+import { alignPointsToTimeGrid } from "@/lib/chartUtils";
+
+interface CountryPageProps {
+  params: {
+    country: string;
+  };
+}
+
+export default function CountryDetailPage({ params }: CountryPageProps) {
+  const router = useRouter();
+
+  // Validate initial country from URL params
+  const rawCountry = (params?.country || "PH").toUpperCase() as CountryCode;
+  const initialCountry: CountryCode = COUNTRIES_METADATA[rawCountry] ? rawCountry : "PH";
+
+  const [country, setCountry] = useState<CountryCode>(initialCountry);
+  const [region, setRegion] = useState<Region>(
+    COUNTRIES_METADATA[initialCountry]?.defaultRegion || "ALL"
+  );
+  const [range, setRange] = useState<TimeRange>("7d");
+  const [interval, setInterval] = useState<TimeInterval>("30m");
+  const [viewMode, setViewMode] = useState<ViewMode>("percentage");
+  const [paletteMode, setPaletteMode] = useState<PaletteMode>("clean-fossil");
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  const [points, setPoints] = useState<FuelGenerationPoint[]>([]);
+  const [summary, setSummary] = useState<SummaryMetrics | null>(null);
+  const [breakdown, setBreakdown] = useState<FuelBreakdownRow[]>([]);
+  const [dataSource, setDataSource] = useState<string>("motherduck_cloud");
+
+  // Real-time hover cursor interaction state
+  const [hoveredPoint, setHoveredPoint] = useState<FuelGenerationPoint | null>(null);
+  const [hoveredFuel, setHoveredFuel] = useState<FuelTech | null>(null);
+
+  // Sync if URL param updates
+  useEffect(() => {
+    const updated = (params?.country || "PH").toUpperCase() as CountryCode;
+    if (COUNTRIES_METADATA[updated]) {
+      setCountry(updated);
+      setRegion(COUNTRIES_METADATA[updated].defaultRegion);
+    }
+  }, [params?.country]);
+
+  const countryInfo = COUNTRIES_METADATA[country] || COUNTRIES_METADATA["PH"];
+  const unit = RANGE_CONFIG[range]?.unit || "MW";
+
+  const timeSpan = useMemo(() => {
+    if (!points || points.length === 0) return undefined;
+    return {
+      start: points[0].timestamp,
+      end: points[points.length - 1].timestamp,
+    };
+  }, [points]);
+
+  const handleCountryChange = (newCountry: CountryCode) => {
+    setCountry(newCountry);
+    const info = COUNTRIES_METADATA[newCountry];
+    if (info) {
+      setRegion(info.defaultRegion);
+    }
+    setHoveredPoint(null);
+    router.push(`/country/${newCountry}`);
+  };
+
+  const handleRangeChange = (newRange: TimeRange) => {
+    setRange(newRange);
+    const cfg = RANGE_CONFIG[newRange];
+    if (cfg) {
+      setInterval(cfg.defaultInterval);
+    }
+    setHoveredPoint(null);
+  };
+
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch(
+        `/api/energy?country=${country}&region=${region}&range=${range}&interval=${interval}`
+      );
+      if (res.ok) {
+        const json = await res.json();
+        const alignedPoints = alignPointsToTimeGrid(json.points || [], range, interval);
+        setPoints(alignedPoints);
+        setBreakdown(json.breakdown || []);
+        if (json.summary) {
+          setSummary(json.summary);
+        }
+        setDataSource(json.source || "simulation");
+      } else {
+        throw new Error("Failed to fetch API data");
+      }
+    } catch (e) {
+      console.warn("Using fallback dataset:", e);
+      const fallback = generateMockEnergyData(country, region, range, interval);
+      const alignedPoints = alignPointsToTimeGrid(fallback.points, range, interval);
+      setPoints(alignedPoints);
+      setBreakdown(fallback.breakdown || []);
+      setSummary(fallback.summary || null);
+      setDataSource("simulation");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [country, region, range, interval]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  return (
+    <div className="flex flex-col min-h-screen bg-[#FAFAFA] dark:bg-[#000000] text-neutral-900 dark:text-neutral-100 font-sans transition-colors duration-150">
+      {/* OpenNEM Two-Tier Header */}
+      <Header
+        country={country}
+        onCountryChange={handleCountryChange}
+        region={region}
+        onRegionChange={setRegion}
+        range={range}
+        onRangeChange={handleRangeChange}
+        interval={interval}
+        onIntervalChange={setInterval}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        paletteMode={paletteMode}
+        onPaletteModeChange={setPaletteMode}
+        onRefresh={fetchData}
+        isLoading={isLoading}
+        dataSource={dataSource}
+      />
+
+      {/* API Fallback Warning Banner */}
+      {(dataSource === "simulation" || dataSource === "simulation_dataset") && (
+        <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-1.5 text-xs text-amber-800 dark:text-amber-300 flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+            <span className="font-medium">
+              Database connection unavailable. Displaying simulated fallback dataset.
+            </span>
+          </div>
+          <button
+            onClick={fetchData}
+            className="underline hover:text-amber-950 dark:hover:text-amber-100 cursor-pointer font-medium text-[11px]"
+          >
+            Retry Connection
+          </button>
+        </div>
+      )}
+
+      {/* Main Full-Width Two-Column Workspace */}
+      <main className="flex-1 w-full px-3 sm:px-4 lg:px-6 py-3">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-start">
+          {/* Left Column (8 cols ~ 67% width): Synchronized Chart Stack */}
+          <div className="lg:col-span-8 space-y-2.5">
+            {/* Chart 1: Generation by Fuel Tech (MW / GWh) */}
+            <GenerationChart
+              data={points}
+              range={range}
+              viewMode={viewMode}
+              paletteMode={paletteMode}
+              unit={unit}
+              height="310px"
+              hoveredFuel={hoveredFuel}
+              onHoverPoint={setHoveredPoint}
+            />
+
+            {/* Chart 2: Emissions Volume (tCO2e/interval) */}
+            <EmissionsChart
+              data={points}
+              range={range}
+              viewMode={viewMode}
+              height="170px"
+              hoveredFuel={hoveredFuel}
+              onHoverPoint={setHoveredPoint}
+            />
+
+            {/* Chart 3: Spot Market Price */}
+            <PriceChart
+              data={points}
+              range={range}
+              currencySymbol={countryInfo.currencySymbol}
+              currencyCode={countryInfo.currencyCode}
+              height="150px"
+              onHoverPoint={setHoveredPoint}
+            />
+          </div>
+
+          {/* Right Column (4 cols ~ 33% width): Sticky Fuel & Emissions Sidebar */}
+          <div className="lg:col-span-4 lg:sticky lg:top-[105px]">
+            <DataSidebar
+              breakdown={breakdown}
+              summary={summary}
+              hoveredPoint={hoveredPoint}
+              hoveredFuel={hoveredFuel}
+              onHoverFuel={setHoveredFuel}
+              timeSpan={timeSpan}
+              currencySymbol={countryInfo.currencySymbol}
+              currencyCode={countryInfo.currencyCode}
+              unit={unit}
+              paletteMode={paletteMode}
+            />
+          </div>
+        </div>
+      </main>
+
+      {/* Sleek Bottom OpenNEM Status Bar */}
+      <footer className="border-t border-neutral-200 dark:border-[#27272A] bg-neutral-900 dark:bg-[#09090B] text-neutral-300 py-1 px-4 text-[11px] font-mono select-none">
+        <div className="w-full flex items-center justify-between">
+          <div className="flex items-center space-x-3 text-neutral-400">
+            <span className="text-neutral-200 font-semibold">v4.54.10</span>
+            <span>&bull;</span>
+            <span className="flex items-center space-x-1.5">
+              {dataSource === "duckdb_local" || dataSource === "local" ? (
+                <>
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                  <span className="text-blue-400">Engine: DuckDB (local)</span>
+                </>
+              ) : dataSource === "motherduck" || dataSource === "motherduck_cloud" ? (
+                <>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-emerald-400">Engine: MotherDuck Cloud</span>
+                </>
+              ) : (
+                <>
+                </>
+              )}
+            </span>
+            <span>&bull;</span>
+            <span>API: 4.5.11</span>
+          </div>
+
+          <div className="flex items-center space-x-4 text-neutral-400">
+            <span>Sources: IEMOP (PH), EMA (SG), Single Buyer (MY), EGAT (TH)</span>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}

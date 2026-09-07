@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import {
   CountryCode,
   Region,
@@ -22,6 +23,7 @@ import {
   Leaf,
   Sun,
   Moon,
+  LayoutGrid,
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 
@@ -117,7 +119,7 @@ export function Header({
       <div className="w-full px-4 sm:px-6 lg:px-8 border-b border-neutral-100 dark:border-[#27272A]/80">
         <div className="flex items-center justify-between h-13 py-2.5">
           {/* Logo Mark & Name */}
-          <div className="flex items-center space-x-2.5 cursor-pointer group">
+          <Link href="/" className="flex items-center space-x-2.5 cursor-pointer group">
             <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-emerald-600 via-emerald-500 to-teal-400 flex items-center justify-center shadow-xs shadow-emerald-500/20 group-hover:scale-105 transition-transform">
               <svg
                 className="h-4.5 w-4.5 text-white fill-white"
@@ -133,7 +135,7 @@ export function Header({
                 Open<span className="text-emerald-600 dark:text-emerald-400 font-black">Electricity</span>
               </span>
             </div>
-          </div>
+          </Link>
 
           {/* Right Status Pill */}
           <div className="flex items-center space-x-2 text-xs text-neutral-600 dark:text-neutral-400">
@@ -167,8 +169,18 @@ export function Header({
 
       {/* Main Toolbar: Controls */}
       <div className="w-full px-4 sm:px-6 lg:px-8 py-2 flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-[#000000]">
-        {/* Left: Country / Region Dropdown */}
+        {/* Left: All Countries & Country / Region Dropdown */}
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          {/* Back to Overview */}
+          <Link
+            href="/"
+            className="flex items-center space-x-1.5 px-2.5 py-1 bg-neutral-50 dark:bg-[#121215] hover:bg-neutral-100 dark:hover:bg-[#18181B] border border-neutral-200 dark:border-[#27272A] rounded text-xs font-semibold text-neutral-700 dark:text-neutral-300 transition shadow-xs group"
+            title="Return to Southeast Asia Overview"
+          >
+            <LayoutGrid className="h-3.5 w-3.5 text-neutral-500 group-hover:text-emerald-500 dark:group-hover:text-emerald-400 transition-colors" />
+            <span>All Countries</span>
+          </Link>
+
           {/* Country & Region Menu */}
           <div className="relative">
             <button
