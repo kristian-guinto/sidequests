@@ -6,6 +6,7 @@ from typing import Dict, List, Optional, Any, TypedDict
 from zoneinfo import ZoneInfo
 
 import duckdb
+import pytz  # noqa: F401 - Required for DuckDB TIMESTAMPTZ support and Vercel bundling
 from fastapi import FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -587,9 +588,12 @@ def build_energy_query(params: EnergyQueryParams) -> tuple[str, List[Any]]:
             time_expr = "time_bucket(INTERVAL '1 day', interval_start)"
             group_time = "time_bucket(INTERVAL '1 day', interval_start)"
 
+        tz_name = params.country_meta.get("timezone", "Asia/Manila")
+        formatted_time = f"strftime({time_expr} AT TIME ZONE '{tz_name}', '%Y-%m-%dT%H:%M:00{params.tz_offset}')"
+
         dispatch_sql = f"""
             SELECT
-                {time_expr} AS b_time,
+                {formatted_time} AS b_time,
                 fuel_tech,
                 round(avg(generation_mw), 1) AS mw,
                 round(sum(energy_mwh), 2) AS mwh
@@ -698,11 +702,13 @@ def build_price_query(params: EnergyQueryParams) -> tuple[str, List[Any]]:
         )
     else:
         # Query prices_interval
+        tz_name = params.country_meta.get("timezone", "Asia/Manila")
         if not is_aggregated:
             # Base dispatch resolution: raw spot price, no distribution bands
+            formatted_time = f"strftime(interval_start AT TIME ZONE '{tz_name}', '%Y-%m-%dT%H:%M:00{params.tz_offset}')"
             price_sql = f"""
                 SELECT
-                    interval_start AS b_time,
+                    {formatted_time} AS b_time,
                     price_local AS price,
                     price_dollar AS price_dollar,
                     NULL AS price_min,
@@ -732,9 +738,10 @@ def build_price_query(params: EnergyQueryParams) -> tuple[str, List[Any]]:
                 time_expr = "time_bucket(INTERVAL '1 day', interval_start)"
                 group_time = "time_bucket(INTERVAL '1 day', interval_start)"
 
+            formatted_time = f"strftime({time_expr} AT TIME ZONE '{tz_name}', '%Y-%m-%dT%H:%M:00{params.tz_offset}')"
             price_sql = f"""
                 SELECT
-                    {time_expr} AS b_time,
+                    {formatted_time} AS b_time,
                     round(median(price_local), 2) AS price,
                     round(median(price_dollar), 2) AS price_dollar,
                     round(min(price_local), 2) AS price_min,
