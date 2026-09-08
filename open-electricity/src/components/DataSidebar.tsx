@@ -9,7 +9,7 @@ import {
   PaletteMode,
 } from "@/lib/types";
 import { getFuelMeta } from "@/lib/colors";
-import { ChevronDown, PieChart as PieIcon, List, Zap, CloudFog, TrendingUp } from "lucide-react";
+import { ChevronDown, Zap, CloudFog, TrendingUp } from "lucide-react";
 import ReactECharts from "echarts-for-react";
 import { format, parseISO } from "date-fns";
 import { formatMarketDate } from "@/lib/chartUtils";
@@ -50,12 +50,11 @@ export function DataSidebar({
   currencySymbol = "₱",
   currencyCode = "PHP",
   unit = "MW",
-  paletteMode = "detailed",
+  paletteMode = "clean-fossil",
 }: DataSidebarProps) {
   const { isDark } = useTheme();
-  const [activeView, setActiveView] = useState<"table" | "donut">("table");
-
-  const isHovered = hoveredPoint !== null;
+  const isHovered = Boolean(hoveredPoint);
+  const isEnergy = unit === "GWh";
 
   // Format header time text
   const formattedTimeHeader = useMemo(() => {
@@ -207,43 +206,122 @@ export function DataSidebar({
 
   // Donut chart option
   const donutOption = useMemo(() => {
-    const dataItems = tableData.rows
+    const isAnyHovered = hoveredFuel != null;
+    let dataItems = tableData.rows
       .filter((r) => r.rawVal > 0)
-      .map((r) => ({
-        name: r.label,
-        value: Math.round(r.rawVal * 10) / 10,
-        itemStyle: { color: r.color },
-      }));
+      .map((r) => {
+        const isHovered = hoveredFuel === r.fuelTech;
+        return {
+          name: r.label,
+          fuelTech: r.fuelTech,
+          value: Math.round(r.rawVal * 10) / 10,
+          itemStyle: {
+            color: r.color,
+            opacity: isAnyHovered ? (isHovered ? 1.0 : 0.35) : 0.92,
+            borderColor: isDark ? "#09090B" : "#FFFFFF",
+            borderWidth: isHovered ? 2.0 : 1.0,
+          },
+        };
+      });
+
+    const hasData = dataItems.length > 0;
+    if (!hasData) {
+      dataItems = [
+        {
+          name: "No Data",
+          fuelTech: "solar" as FuelTech,
+          value: 1,
+          itemStyle: {
+            color: isDark ? "#27272A" : "#E2E8F0",
+            opacity: 0.5,
+            borderColor: "transparent",
+            borderWidth: 0,
+          },
+        },
+      ];
+    }
 
     return {
       backgroundColor: "transparent",
-      tooltip: {
-        trigger: "item",
-        backgroundColor: isDark ? "rgba(15, 15, 18, 0.96)" : "rgba(255, 255, 255, 0.96)",
-        borderColor: isDark ? "#27272A" : "rgba(226, 232, 240, 0.8)",
-        textStyle: { color: isDark ? "#F8FAFC" : "#0F172A", fontSize: 11 },
-        formatter: "{b}: {c} ({d}%)",
-      },
+      animation: false,
+      tooltip: hasData
+        ? {
+          trigger: "item",
+          backgroundColor: isDark
+            ? "rgba(15, 15, 18, 0.96)"
+            : "rgba(255, 255, 255, 0.96)",
+          borderColor: isDark ? "#27272A" : "rgba(226, 232, 240, 0.8)",
+          textStyle: { color: isDark ? "#F8FAFC" : "#0F172A", fontSize: 11 },
+          formatter: (params: any) => {
+            const val =
+              params.value != null
+                ? Number(params.value).toLocaleString()
+                : "0";
+            return `<div class="font-sans font-medium text-xs">
+                <span class="inline-block w-2 h-2 rounded-xs mr-1.5" style="background-color: ${params.color};"></span>
+                <strong>${params.name}</strong>: ${val} ${tableData.unitSub} (${params.percent}%)
+              </div>`;
+          },
+        }
+        : { show: false },
+      graphic: [
+        {
+          type: "text",
+          left: "center",
+          top: "40%",
+          style: {
+            text: hasData ? tableData.renPctDisplay || "0%" : "—",
+            textAlign: "center",
+            fill: isDark ? "#34D399" : "#059669",
+            fontSize: 16,
+            fontWeight: "bold",
+            fontFamily: "ui-monospace, SFMono-Regular, monospace",
+          },
+        },
+        {
+          type: "text",
+          left: "center",
+          top: "55%",
+          style: {
+            text: "Renewables",
+            textAlign: "center",
+            fill: isDark ? "#A1A1AA" : "#71717A",
+            fontSize: 10,
+            fontWeight: "500",
+            fontFamily: "ui-sans-serif, system-ui, sans-serif",
+          },
+        },
+      ],
       series: [
         {
           type: "pie",
-          radius: ["48%", "72%"],
+          radius: ["55%", "78%"],
           center: ["50%", "50%"],
-          avoidLabelOverlap: true,
+          avoidLabelOverlap: false,
           label: { show: false },
           emphasis: {
-            label: {
-              show: true,
-              fontSize: 12,
-              fontWeight: "bold",
-              color: isDark ? "#F8FAFC" : "#0F172A",
-            },
+            scale: hasData,
+            scaleSize: 4,
+            label: { show: false },
           },
           data: dataItems,
         },
       ],
     };
-  }, [tableData, isDark]);
+  }, [tableData, hoveredFuel, isDark]);
+
+  const onDonutEvents = useMemo(() => {
+    return {
+      mouseover: (params: any) => {
+        if (params.data?.fuelTech) {
+          onHoverFuel?.(params.data.fuelTech);
+        }
+      },
+      mouseout: () => {
+        onHoverFuel?.(null);
+      },
+    };
+  }, [onHoverFuel]);
 
   return (
     <aside className="bg-white dark:bg-[#09090B] border border-neutral-200 dark:border-[#27272A] rounded-xl flex flex-col h-full text-neutral-800 dark:text-neutral-200 text-xs shadow-sm transition-all overflow-hidden">
@@ -255,189 +333,193 @@ export function DataSidebar({
           </span>
         </div>
 
-        {/* Toggle between Table & Donut */}
-        <div className="flex items-center border border-neutral-200 dark:border-[#27272A] rounded p-0.5 bg-white dark:bg-[#121215]">
-          <button
-            onClick={() => setActiveView("table")}
-            className={`p-1 rounded transition ${activeView === "table"
-              ? "bg-neutral-100 dark:bg-[#27272A] text-neutral-900 dark:text-white font-bold"
-              : "text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
-              }`}
-            title="Table View"
-          >
-            <List className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={() => setActiveView("donut")}
-            className={`p-1 rounded transition ${activeView === "donut"
-              ? "bg-neutral-100 dark:bg-[#27272A] text-neutral-900 dark:text-white font-bold"
-              : "text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
-              }`}
-            title="Donut Chart View"
-          >
-            <PieIcon className="h-3.5 w-3.5" />
-          </button>
-        </div>
+        {isHovered ? (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50">
+            Interval
+          </span>
+        ) : (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-neutral-100 dark:bg-[#27272A] text-neutral-600 dark:text-neutral-400">
+            Period Total
+          </span>
+        )}
       </div>
 
-      {activeView === "table" ? (
-        <div className="flex-1 overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-neutral-200 dark:border-[#27272A] text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 bg-neutral-50/50 dark:bg-[#121215]/50">
-                <th className="py-2 px-3">
-                  <div className="flex items-center space-x-1 cursor-pointer">
-                    <span>Detailed</span>
-                    <ChevronDown className="h-3 w-3" />
-                  </div>
-                </th>
-                <th className="py-2 px-2 text-right font-mono">
-                  {tableData.columnUnit}
-                  <br />
-                  <span className="font-normal text-[10px] text-neutral-400 dark:text-neutral-500">
-                    {tableData.unitSub}
-                  </span>
-                </th>
-                <th className="py-2 px-2 text-right font-mono">
-                  Contrib.
-                  <br />
-                  <span className="font-normal text-[10px] text-neutral-400 dark:text-neutral-500">%</span>
-                </th>
-                <th className="py-2 px-3 text-right font-mono">
-                  {isHovered ? "Spot Price" : "Av. Value"}
-                  <br />
-                  <span className="font-normal text-[10px] text-neutral-400 dark:text-neutral-500">
-                    {currencySymbol}/MWh
-                  </span>
-                </th>
-              </tr>
-            </thead>
+      {/* Top: Donut Chart */}
+      <div className="pt-2 pb-1 px-3 flex flex-col items-center bg-white dark:bg-[#09090B]">
+        <ReactECharts
+          option={donutOption}
+          onEvents={onDonutEvents}
+          style={{ height: "165px", width: "100%" }}
+          notMerge={true}
+          lazyUpdate={false}
+        />
+      </div>
 
-            <tbody className="divide-y divide-neutral-100 dark:divide-[#27272A]/70 text-neutral-800 dark:text-neutral-200">
-              {/* Sources Section Header */}
-              <tr className="bg-neutral-50/80 dark:bg-[#18181B]/80 text-[10px] font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
-                <td colSpan={4} className="py-1 px-3">
-                  Sources
-                </td>
-              </tr>
+      {/* Summary Metrics Strip */}
+      <div className="flex items-center justify-between px-3 py-1.5 bg-neutral-50/70 dark:bg-[#121215]/60 border-t border-b border-neutral-100 dark:border-[#27272A] text-[11px] font-mono">
+        <span className="text-neutral-500 dark:text-neutral-400">
+          Total:{" "}
+          <strong className="text-neutral-900 dark:text-white font-semibold">
+            {tableData.totalDisplay}
+          </strong>
+        </span>
+        <span className="text-neutral-500 dark:text-neutral-400">
+          Renewables:{" "}
+          <strong className="text-emerald-600 dark:text-emerald-400 font-semibold">
+            {tableData.renValDisplay} ({tableData.renPctDisplay})
+          </strong>
+        </span>
+      </div>
 
-              {tableData.rows.map((row) => {
-                const isThisRowHovered = hoveredFuel === row.fuelTech;
-                const isAnyRowHovered = hoveredFuel !== null && hoveredFuel !== undefined;
-                return (
-                  <tr
-                    key={row.fuelTech}
-                    onMouseEnter={() => onHoverFuel?.(row.fuelTech)}
-                    onMouseLeave={() => onHoverFuel?.(null)}
-                    className={`transition-all duration-150 cursor-pointer ${isThisRowHovered
-                      ? "bg-neutral-100 dark:bg-[#27272A] font-bold shadow-xs scale-[1.005]"
-                      : isAnyRowHovered
-                        ? "opacity-40 hover:opacity-100 hover:bg-neutral-50/90 dark:hover:bg-[#18181B]/70"
-                        : row.rawVal === 0
-                          ? "opacity-40 hover:bg-neutral-50/90 dark:hover:bg-[#18181B]/70"
-                          : "hover:bg-neutral-50/90 dark:hover:bg-[#18181B]/70"
-                      }`}
-                  >
-                    <td className="py-1.5 px-3 flex items-center space-x-2">
-                      <span
-                        className={`w-2.5 h-2.5 rounded-sm flex-shrink-0 transition-transform ${isThisRowHovered ? "scale-125 ring-1 ring-neutral-400" : ""
-                          }`}
-                        style={{ backgroundColor: row.color }}
-                      />
-                      <span
-                        className={`text-[11px] ${isThisRowHovered
-                          ? "text-neutral-950 dark:text-white font-bold"
-                          : "font-medium text-neutral-800 dark:text-neutral-200"
-                          }`}
-                      >
-                        {row.label}
-                      </span>
-                    </td>
-                    <td className="py-1.5 px-2 text-right font-mono font-medium text-[11px] text-neutral-900 dark:text-neutral-100">
-                      {row.valueDisplay}
-                    </td>
-                    <td className="py-1.5 px-2 text-right font-mono text-[11px] text-neutral-600 dark:text-neutral-400">
-                      {row.pct.toFixed(1)}%
-                    </td>
-                    <td className="py-1.5 px-3 text-right font-mono text-[11px] text-neutral-500 dark:text-neutral-400">
-                      {row.priceDisplay}
-                    </td>
-                  </tr>
-                );
-              })}
+      {/* Bottom: Breakdown Table */}
+      <div className="flex-1 overflow-x-auto">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="border-b border-neutral-200 dark:border-[#27272A] text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 bg-neutral-50/50 dark:bg-[#121215]/50">
+              <th className="py-2 px-3">
+                <div className="flex items-center space-x-1 cursor-pointer">
+                  <span>Detailed</span>
+                  <ChevronDown className="h-3 w-3" />
+                </div>
+              </th>
+              <th className="py-2 px-2 text-right font-mono">
+                {tableData.columnUnit}
+                <br />
+                <span className="font-normal text-[10px] text-neutral-400 dark:text-neutral-500">
+                  {tableData.unitSub}
+                </span>
+              </th>
+              <th className="py-2 px-2 text-right font-mono">
+                Contrib.
+                <br />
+                <span className="font-normal text-[10px] text-neutral-400 dark:text-neutral-500">%</span>
+              </th>
+              <th className="py-2 px-3 text-right font-mono">
+                {isHovered ? "Spot Price" : "Av. Value"}
+                <br />
+                <span className="font-normal text-[10px] text-neutral-400 dark:text-neutral-500">
+                  {currencySymbol}/MWh
+                </span>
+              </th>
+            </tr>
+          </thead>
 
-              {/* Summary Totals: Net Generation */}
-              <tr className="border-t-2 border-neutral-200 dark:border-[#27272A] bg-neutral-50/40 dark:bg-[#121215]/50 font-bold text-neutral-900 dark:text-white">
-                <td className="py-2 px-3 text-[11px] flex items-center space-x-1.5">
-                  <Zap className="h-3 w-3 text-amber-500" />
-                  <span>Net {isHovered ? "Power" : "Generation"}</span>
-                </td>
-                <td className="py-2 px-2 text-right font-mono text-[11px]">
-                  {tableData.totalDisplay}
-                </td>
-                <td className="py-2 px-2 text-right font-mono text-[11px]">100%</td>
-                <td className="py-2 px-3 text-right font-mono text-[11px]">
-                  {tableData.priceDisplay}
-                </td>
-              </tr>
+          <tbody className="divide-y divide-neutral-100 dark:divide-[#27272A]/70 text-neutral-800 dark:text-neutral-200">
+            {/* Sources Section Header */}
+            <tr className="bg-neutral-50/80 dark:bg-[#18181B]/80 text-[10px] font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+              <td colSpan={4} className="py-1 px-3">
+                Sources
+              </td>
+            </tr>
 
-              {/* Renewables Row */}
-              <tr className="bg-emerald-50/30 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-300 font-bold">
-                <td className="py-2 px-3 text-[11px] flex items-center space-x-1.5">
-                  <span className="text-emerald-500 font-normal">—</span>
-                  <span>Renewables</span>
-                </td>
-                <td className="py-2 px-2 text-right font-mono text-[11px] text-emerald-700 dark:text-emerald-400">
-                  {tableData.renValDisplay}
-                </td>
-                <td className="py-2 px-2 text-right font-mono text-[11px] text-emerald-700 dark:text-emerald-400">
-                  {tableData.renPctDisplay}
-                </td>
-                <td className="py-2 px-3 text-right font-mono text-[11px] text-emerald-700 dark:text-emerald-400">
-                  {tableData.priceDisplay}
-                </td>
-              </tr>
-
-              {/* Emissions Row */}
-              {tableData.emissionsDisplay && (
-                <tr className="bg-neutral-50/20 dark:bg-[#121215]/30 text-neutral-700 dark:text-neutral-300 font-medium">
-                  <td className="py-1.5 px-3 text-[11px] flex items-center space-x-1.5">
-                    <CloudFog className="h-3 w-3 text-neutral-400" />
-                    <span>Emissions</span>
+            {tableData.rows.map((row) => {
+              const isThisRowHovered = hoveredFuel === row.fuelTech;
+              const isAnyRowHovered = hoveredFuel !== null && hoveredFuel !== undefined;
+              return (
+                <tr
+                  key={row.fuelTech}
+                  onMouseEnter={() => onHoverFuel?.(row.fuelTech)}
+                  onMouseLeave={() => onHoverFuel?.(null)}
+                  className={`transition-all duration-150 cursor-pointer ${isThisRowHovered
+                    ? "bg-neutral-100 dark:bg-[#27272A] font-bold shadow-xs scale-[1.005]"
+                    : isAnyRowHovered
+                      ? "opacity-40 hover:opacity-100 hover:bg-neutral-50/90 dark:hover:bg-[#18181B]/70"
+                      : row.rawVal === 0
+                        ? "opacity-40 hover:bg-neutral-50/90 dark:hover:bg-[#18181B]/70"
+                        : "hover:bg-neutral-50/90 dark:hover:bg-[#18181B]/70"
+                    }`}
+                >
+                  <td className="py-1.5 px-3 flex items-center space-x-2">
+                    <span
+                      className={`w-2.5 h-2.5 rounded-sm flex-shrink-0 transition-transform ${isThisRowHovered ? "scale-125 ring-1 ring-neutral-400" : ""
+                        }`}
+                      style={{ backgroundColor: row.color }}
+                    />
+                    <span
+                      className={`text-[11px] ${isThisRowHovered
+                        ? "text-neutral-950 dark:text-white font-bold"
+                        : "font-medium text-neutral-800 dark:text-neutral-200"
+                        }`}
+                    >
+                      {row.label}
+                    </span>
                   </td>
-                  <td colSpan={2} className="py-1.5 px-2 text-right font-mono text-[11px] text-neutral-800 dark:text-neutral-200">
-                    {tableData.emissionsDisplay}
+                  <td className="py-1.5 px-2 text-right font-mono font-medium text-[11px] text-neutral-900 dark:text-neutral-100">
+                    {row.valueDisplay}
                   </td>
-                  <td className="py-1.5 px-3 text-right font-mono text-[10px] text-neutral-400 dark:text-neutral-500">
-                    {isHovered ? "Interval" : "Total Period"}
+                  <td className="py-1.5 px-2 text-right font-mono text-[11px] text-neutral-600 dark:text-neutral-400">
+                    {row.pct.toFixed(1)}%
+                  </td>
+                  <td className="py-1.5 px-3 text-right font-mono text-[11px] text-neutral-500 dark:text-neutral-400">
+                    {row.priceDisplay}
                   </td>
                 </tr>
-              )}
+              );
+            })}
 
-              {/* Peak Generation Row */}
-              {tableData.peakDisplay && (
-                <tr className="bg-neutral-50/20 dark:bg-[#121215]/30 text-neutral-700 dark:text-neutral-300 font-medium">
-                  <td className="py-1.5 px-3 text-[11px] flex items-center space-x-1.5">
-                    <TrendingUp className="h-3 w-3 text-neutral-400" />
-                    <span>Peak Generation</span>
-                  </td>
-                  <td colSpan={3} className="py-1.5 px-3 text-right font-mono text-[11px] text-neutral-800 dark:text-neutral-200">
-                    {tableData.peakDisplay}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div className="p-4 flex-1 flex flex-col justify-center items-center">
-          <ReactECharts option={donutOption} style={{ height: "250px", width: "100%" }} />
-          <div className="text-center text-[11px] text-neutral-500 dark:text-neutral-400 mt-2 font-mono">
-            Total: <strong className="text-neutral-900 dark:text-white">{tableData.totalDisplay}</strong> &bull;
-            Renewables: <strong className="text-emerald-600 dark:text-emerald-400">{tableData.renPctDisplay}</strong>
-          </div>
-        </div>
-      )}
+            {/* Summary Totals: Net Generation */}
+            <tr className="border-t-2 border-neutral-200 dark:border-[#27272A] bg-neutral-50/40 dark:bg-[#121215]/50 font-bold text-neutral-900 dark:text-white">
+              <td className="py-2 px-3 text-[11px] flex items-center space-x-1.5">
+                <Zap className="h-3 w-3 text-amber-500" />
+                <span>Net {isHovered ? "Power" : "Generation"}</span>
+              </td>
+              <td className="py-2 px-2 text-right font-mono text-[11px]">
+                {tableData.totalDisplay}
+              </td>
+              <td className="py-2 px-2 text-right font-mono text-[11px]">100%</td>
+              <td className="py-2 px-3 text-right font-mono text-[11px]">
+                {tableData.priceDisplay}
+              </td>
+            </tr>
+
+            {/* Renewables Row */}
+            <tr className="bg-emerald-50/30 dark:bg-emerald-950/20 text-emerald-950 dark:text-emerald-300 font-bold">
+              <td className="py-2 px-3 text-[11px] flex items-center space-x-1.5">
+                <span className="text-emerald-500 font-normal">—</span>
+                <span>Renewables</span>
+              </td>
+              <td className="py-2 px-2 text-right font-mono text-[11px] text-emerald-700 dark:text-emerald-400">
+                {tableData.renValDisplay}
+              </td>
+              <td className="py-2 px-2 text-right font-mono text-[11px] text-emerald-700 dark:text-emerald-400">
+                {tableData.renPctDisplay}
+              </td>
+              <td className="py-2 px-3 text-right font-mono text-[11px] text-emerald-700 dark:text-emerald-400">
+                {tableData.priceDisplay}
+              </td>
+            </tr>
+
+            {/* Emissions Row */}
+            {tableData.emissionsDisplay && (
+              <tr className="bg-neutral-50/20 dark:bg-[#121215]/30 text-neutral-700 dark:text-neutral-300 font-medium">
+                <td className="py-1.5 px-3 text-[11px] flex items-center space-x-1.5">
+                  <CloudFog className="h-3 w-3 text-neutral-400" />
+                  <span>Emissions</span>
+                </td>
+                <td colSpan={2} className="py-1.5 px-2 text-right font-mono text-[11px] text-neutral-800 dark:text-neutral-200">
+                  {tableData.emissionsDisplay}
+                </td>
+                <td className="py-1.5 px-3 text-right font-mono text-[10px] text-neutral-400 dark:text-neutral-500">
+                  {isHovered ? "Interval" : "Total Period"}
+                </td>
+              </tr>
+            )}
+
+            {/* Peak Generation Row */}
+            {tableData.peakDisplay && (
+              <tr className="bg-neutral-50/20 dark:bg-[#121215]/30 text-neutral-700 dark:text-neutral-300 font-medium">
+                <td className="py-1.5 px-3 text-[11px] flex items-center space-x-1.5">
+                  <TrendingUp className="h-3 w-3 text-neutral-400" />
+                  <span>Peak Generation</span>
+                </td>
+                <td colSpan={3} className="py-1.5 px-3 text-right font-mono text-[11px] text-neutral-800 dark:text-neutral-200">
+                  {tableData.peakDisplay}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </aside>
   );
 }
