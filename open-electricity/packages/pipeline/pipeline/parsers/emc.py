@@ -253,11 +253,9 @@ class EMCParser:
                             pass
 
         records: List[EnergyIntervalRecord] = []
-        p_map = price_map or {}
 
         for dt in sorted(aggregated.keys()):
             fuels_data = aggregated[dt]
-            price = p_map.get(dt)
 
             for fuel, energy_mwh in fuels_data.items():
                 gen_mw = round(energy_mwh * 2.0, 2)
@@ -269,8 +267,6 @@ class EMCParser:
                         fuel_tech=fuel,
                         generation_mw=gen_mw,
                         energy_mwh=round(energy_mwh, 4),
-                        price_local=price,
-                        price_dollar=None,
                     )
                 )
 
@@ -338,7 +334,6 @@ class EMCParser:
                     )
                     or 0.0
                 )
-                usep = float(row.get("USEP ($/MWH)", row.get("USEP", 0.0)) or 0.0)
 
                 biomass_mw = 95.0
                 hydro_mw = 85.0
@@ -361,8 +356,6 @@ class EMCParser:
                             fuel_tech=fuel,
                             generation_mw=gen_val,
                             energy_mwh=round(gen_val * 0.5, 4),
-                            price_local=round(usep, 2),
-                            price_dollar=None,
                         )
                     )
             except (ValueError, TypeError):

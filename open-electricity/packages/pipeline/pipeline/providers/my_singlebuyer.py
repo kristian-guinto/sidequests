@@ -230,6 +230,23 @@ class MalaysiaSingleBuyerProvider(BaseProvider):
 
             curr_d += timedelta(days=1)
 
+        if smp_lookup and conn is not None:
+            from pipeline.db import Database
+            from pipeline.models import PriceIntervalRecord
+
+            db = Database(conn=conn)
+            p_recs = [
+                PriceIntervalRecord(
+                    country_code="MY",
+                    interval_start=dt,
+                    region="PENINSULAR",
+                    price_local=p,
+                    price_dollar=None,
+                )
+                for dt, p in smp_lookup.items()
+            ]
+            db.upsert_price_intervals(p_recs, country_code="MY")
+
         if not all_records:
             logger.warning(
                 "No energy interval records found for Malaysia in date range %s to %s.",

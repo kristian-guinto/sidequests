@@ -109,7 +109,7 @@ export function DataSidebar({
       }
 
       const totalGen = pt.totalGeneration || 1;
-      const ptPrice = pt.price || summary?.avgPriceLocal || 0;
+      const ptPrice = pt.price ?? pt.priceMedian ?? summary?.avgPriceLocal ?? 0;
 
       // Calculate emissions for point in time (5-minute interval)
       const coalT = (pt.coal || 0) * (5.0 / 60.0) * 0.9;

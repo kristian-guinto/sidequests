@@ -205,6 +205,16 @@ class FuelGenerationPoint(BaseModel):
     battery: Optional[float] = None
     price: Optional[float] = None
     priceDollar: Optional[float] = None
+    priceMin: Optional[float] = None
+    priceP5: Optional[float] = None
+    priceMedian: Optional[float] = None
+    priceP95: Optional[float] = None
+    priceMax: Optional[float] = None
+    priceDollarMin: Optional[float] = None
+    priceDollarP5: Optional[float] = None
+    priceDollarMedian: Optional[float] = None
+    priceDollarP95: Optional[float] = None
+    priceDollarMax: Optional[float] = None
     totalGeneration: Optional[float] = None
     renewablesPct: Optional[float] = None
     hasData: Optional[bool] = True
@@ -313,7 +323,9 @@ def get_health(response: Response):
             for tbl in [
                 "facilities",
                 "energy_interval",
+                "prices_interval",
                 "energy_daily",
+                "prices_daily",
                 "exchange_rates",
             ]:
                 try:
@@ -550,9 +562,7 @@ def build_energy_query(params: EnergyQueryParams) -> tuple[str, List[Any]]:
                 {time_expr} AS b_time,
                 fuel_tech,
                 round(avg(avg_generation_mw), 1) AS mw,
-                round(sum(energy_mwh), 2) AS mwh,
-                round(avg(vwap_price_local), 2) AS price,
-                round(avg(vwap_price_dollar), 2) AS price_dollar
+                round(sum(energy_mwh), 2) AS mwh
             FROM energy_daily
             WHERE country_code = ? {reg_clause}
               AND date >= ?
@@ -582,9 +592,7 @@ def build_energy_query(params: EnergyQueryParams) -> tuple[str, List[Any]]:
                 {time_expr} AS b_time,
                 fuel_tech,
                 round(avg(generation_mw), 1) AS mw,
-                round(sum(energy_mwh), 2) AS mwh,
-                round(avg(price_local), 2) AS price,
-                round(avg(price_dollar), 2) AS price_dollar
+                round(sum(energy_mwh), 2) AS mwh
             FROM energy_interval
             WHERE country_code = ? {reg_clause}
               AND interval_start >= ?
@@ -597,6 +605,160 @@ def build_energy_query(params: EnergyQueryParams) -> tuple[str, List[Any]]:
         )
 
     return dispatch_sql, query_params
+
+
+def build_price_query(params: EnergyQueryParams) -> tuple[str, List[Any]]:
+    reg_clause = ""
+    reg_params: List[Any] = []
+    if params.region != "ALL" and params.region != params.country_meta["defaultRegion"]:
+        reg_clause = " AND region = ?"
+        reg_params.append(params.region)
+    elif params.region == "ALL" and params.country == "PH":
+        reg_clause = " AND region = 'ALL'"
+
+    min_interval = params.country_meta.get("minInterval", "30m")
+    is_aggregated = params.active_interval != min_interval
+
+    if params.use_daily:
+        if params.active_interval in ("7d", "1w"):
+            time_expr = "time_bucket(INTERVAL '1 week', date)::VARCHAR"
+            group_time = "time_bucket(INTERVAL '1 week', date)"
+            price_sql = f"""
+                SELECT
+                    {time_expr} AS b_time,
+                    round(avg(vwap_price_local), 2) AS price,
+                    round(avg(vwap_price_dollar), 2) AS price_dollar,
+                    round(min(price_min_local), 2) AS price_min,
+                    round(quantile_cont(price_median_local, 0.05), 2) AS price_p5,
+                    round(median(price_median_local), 2) AS price_median,
+                    round(quantile_cont(price_median_local, 0.95), 2) AS price_p95,
+                    round(max(price_max_local), 2) AS price_max,
+                    round(min(price_min_dollar), 2) AS price_dollar_min,
+                    round(quantile_cont(price_median_dollar, 0.05), 2) AS price_dollar_p5,
+                    round(median(price_median_dollar), 2) AS price_dollar_median,
+                    round(quantile_cont(price_median_dollar, 0.95), 2) AS price_dollar_p95,
+                    round(max(price_max_dollar), 2) AS price_dollar_max
+                FROM prices_daily
+                WHERE country_code = ? {reg_clause}
+                  AND date >= ?
+                  AND date <= ?
+                GROUP BY {group_time}
+                ORDER BY {group_time} ASC
+            """
+        elif params.active_interval in ("1M", "1m"):
+            time_expr = "strftime(date, '%Y-%m')"
+            group_time = "strftime(date, '%Y-%m')"
+            price_sql = f"""
+                SELECT
+                    {time_expr} AS b_time,
+                    round(avg(vwap_price_local), 2) AS price,
+                    round(avg(vwap_price_dollar), 2) AS price_dollar,
+                    round(min(price_min_local), 2) AS price_min,
+                    round(quantile_cont(price_median_local, 0.05), 2) AS price_p5,
+                    round(median(price_median_local), 2) AS price_median,
+                    round(quantile_cont(price_median_local, 0.95), 2) AS price_p95,
+                    round(max(price_max_local), 2) AS price_max,
+                    round(min(price_min_dollar), 2) AS price_dollar_min,
+                    round(quantile_cont(price_median_dollar, 0.05), 2) AS price_dollar_p5,
+                    round(median(price_median_dollar), 2) AS price_dollar_median,
+                    round(quantile_cont(price_median_dollar, 0.95), 2) AS price_dollar_p95,
+                    round(max(price_max_dollar), 2) AS price_dollar_max
+                FROM prices_daily
+                WHERE country_code = ? {reg_clause}
+                  AND date >= ?
+                  AND date <= ?
+                GROUP BY {group_time}
+                ORDER BY {group_time} ASC
+            """
+        else:
+            # 1d resolution from prices_daily
+            price_sql = f"""
+                SELECT
+                    date::VARCHAR AS b_time,
+                    vwap_price_local AS price,
+                    vwap_price_dollar AS price_dollar,
+                    price_min_local AS price_min,
+                    price_p5_local AS price_p5,
+                    price_median_local AS price_median,
+                    price_p95_local AS price_p95,
+                    price_max_local AS price_max,
+                    price_min_dollar AS price_dollar_min,
+                    price_p5_dollar AS price_dollar_p5,
+                    price_median_dollar AS price_dollar_median,
+                    price_p95_dollar AS price_dollar_p95,
+                    price_max_dollar AS price_dollar_max
+                FROM prices_daily
+                WHERE country_code = ? {reg_clause}
+                  AND date >= ?
+                  AND date <= ?
+                ORDER BY date ASC
+            """
+        query_params = (
+            [params.country] + reg_params + [params.start_date, params.end_date]
+        )
+    else:
+        # Query prices_interval
+        if not is_aggregated:
+            # Base dispatch resolution: raw spot price, no distribution bands
+            price_sql = f"""
+                SELECT
+                    interval_start AS b_time,
+                    price_local AS price,
+                    price_dollar AS price_dollar,
+                    NULL AS price_min,
+                    NULL AS price_p5,
+                    NULL AS price_median,
+                    NULL AS price_p95,
+                    NULL AS price_max,
+                    NULL AS price_dollar_min,
+                    NULL AS price_dollar_p5,
+                    NULL AS price_dollar_median,
+                    NULL AS price_dollar_p95,
+                    NULL AS price_dollar_max
+                FROM prices_interval
+                WHERE country_code = ? {reg_clause}
+                  AND interval_start >= ?
+                  AND interval_start <= ?
+                ORDER BY interval_start ASC
+            """
+        else:
+            if params.active_interval == "30m":
+                time_expr = "time_bucket(INTERVAL '30 minutes', interval_start)"
+                group_time = "time_bucket(INTERVAL '30 minutes', interval_start)"
+            elif params.active_interval == "1h":
+                time_expr = "time_bucket(INTERVAL '1 hour', interval_start)"
+                group_time = "time_bucket(INTERVAL '1 hour', interval_start)"
+            else:
+                time_expr = "time_bucket(INTERVAL '1 day', interval_start)"
+                group_time = "time_bucket(INTERVAL '1 day', interval_start)"
+
+            price_sql = f"""
+                SELECT
+                    {time_expr} AS b_time,
+                    round(median(price_local), 2) AS price,
+                    round(median(price_dollar), 2) AS price_dollar,
+                    round(min(price_local), 2) AS price_min,
+                    round(quantile_cont(price_local, 0.05), 2) AS price_p5,
+                    round(median(price_local), 2) AS price_median,
+                    round(quantile_cont(price_local, 0.95), 2) AS price_p95,
+                    round(max(price_local), 2) AS price_max,
+                    round(min(price_dollar), 2) AS price_dollar_min,
+                    round(quantile_cont(price_dollar, 0.05), 2) AS price_dollar_p5,
+                    round(median(price_dollar), 2) AS price_dollar_median,
+                    round(quantile_cont(price_dollar, 0.95), 2) AS price_dollar_p95,
+                    round(max(price_dollar), 2) AS price_dollar_max
+                FROM prices_interval
+                WHERE country_code = ? {reg_clause}
+                  AND interval_start >= ?
+                  AND interval_start <= ?
+                GROUP BY {group_time}
+                ORDER BY {group_time} ASC
+            """
+        query_params = (
+            [params.country] + reg_params + [params.start_utc, params.end_utc]
+        )
+
+    return price_sql, query_params
 
 
 def fetch_energy_data(
@@ -617,7 +779,8 @@ def fetch_energy_data(
 
 
 def aggregate_energy_data(
-    rows: List[tuple[Any, ...]],
+    gen_rows: List[tuple[Any, ...]],
+    price_rows: List[tuple[Any, ...]],
     is_energy_unit: bool,
     params: EnergyQueryParams,
 ) -> AggregatedEnergyData:
@@ -628,7 +791,7 @@ def aggregate_energy_data(
     grand_usd_sum = 0.0
     grand_usd_cnt = 0
 
-    for b_time, fuel_raw, mw_val, mwh_val, p_val, p_usd in rows:
+    for b_time, fuel_raw, mw_val, mwh_val in gen_rows:
         if isinstance(b_time, datetime):
             local_dt = b_time.astimezone(params.tz)
             b_str = local_dt.strftime(f"%Y-%m-%dT%H:%M:00{params.tz_offset}")
@@ -638,8 +801,18 @@ def aggregate_energy_data(
         if b_str not in time_buckets:
             time_buckets[b_str] = {
                 "fuels_val": {f: 0.0 for f in FUEL_META.keys()},
-                "price": p_val,
-                "price_dollar": p_usd,
+                "price": None,
+                "price_dollar": None,
+                "price_min": None,
+                "price_p5": None,
+                "price_median": None,
+                "price_p95": None,
+                "price_max": None,
+                "price_dollar_min": None,
+                "price_dollar_p5": None,
+                "price_dollar_median": None,
+                "price_dollar_p95": None,
+                "price_dollar_max": None,
             }
         fuel = str(fuel_raw or "").lower()
         val = (mwh_val / 1000.0) if is_energy_unit else mw_val
@@ -650,6 +823,57 @@ def aggregate_energy_data(
 
         if fuel in fuel_totals_overall_mwh:
             fuel_totals_overall_mwh[fuel] += mwh_val
+
+    for (
+        b_time,
+        p_val,
+        p_usd,
+        p_min,
+        p_p5,
+        p_med,
+        p_p95,
+        p_max,
+        p_usd_min,
+        p_usd_p5,
+        p_usd_med,
+        p_usd_p95,
+        p_usd_max,
+    ) in price_rows:
+        if isinstance(b_time, datetime):
+            local_dt = b_time.astimezone(params.tz)
+            b_str = local_dt.strftime(f"%Y-%m-%dT%H:%M:00{params.tz_offset}")
+        else:
+            b_str = str(b_time)
+
+        if b_str not in time_buckets:
+            time_buckets[b_str] = {
+                "fuels_val": {f: 0.0 for f in FUEL_META.keys()},
+                "price": None,
+                "price_dollar": None,
+                "price_min": None,
+                "price_p5": None,
+                "price_median": None,
+                "price_p95": None,
+                "price_max": None,
+                "price_dollar_min": None,
+                "price_dollar_p5": None,
+                "price_dollar_median": None,
+                "price_dollar_p95": None,
+                "price_dollar_max": None,
+            }
+
+        time_buckets[b_str]["price"] = p_val
+        time_buckets[b_str]["price_dollar"] = p_usd
+        time_buckets[b_str]["price_min"] = p_min
+        time_buckets[b_str]["price_p5"] = p_p5
+        time_buckets[b_str]["price_median"] = p_med
+        time_buckets[b_str]["price_p95"] = p_p95
+        time_buckets[b_str]["price_max"] = p_max
+        time_buckets[b_str]["price_dollar_min"] = p_usd_min
+        time_buckets[b_str]["price_dollar_p5"] = p_usd_p5
+        time_buckets[b_str]["price_dollar_median"] = p_usd_med
+        time_buckets[b_str]["price_dollar_p95"] = p_usd_p95
+        time_buckets[b_str]["price_dollar_max"] = p_usd_max
 
         if p_val is not None:
             grand_price_sum += float(p_val)
@@ -739,6 +963,16 @@ def build_fuel_generation_points(
                     priceDollar=round(b["price_dollar"], 2)
                     if b["price_dollar"] is not None
                     else None,
+                    priceMin=b.get("price_min"),
+                    priceP5=b.get("price_p5"),
+                    priceMedian=b.get("price_median"),
+                    priceP95=b.get("price_p95"),
+                    priceMax=b.get("price_max"),
+                    priceDollarMin=b.get("price_dollar_min"),
+                    priceDollarP5=b.get("price_dollar_p5"),
+                    priceDollarMedian=b.get("price_dollar_median"),
+                    priceDollarP95=b.get("price_dollar_p95"),
+                    priceDollarMax=b.get("price_dollar_max"),
                     totalGeneration=round(b_tot_gen, 1 if not is_energy_unit else 2),
                     renewablesPct=round(ren_pct, 1),
                     hasData=True,
@@ -759,6 +993,16 @@ def build_fuel_generation_points(
                     battery=None,
                     price=None,
                     priceDollar=None,
+                    priceMin=None,
+                    priceP5=None,
+                    priceMedian=None,
+                    priceP95=None,
+                    priceMax=None,
+                    priceDollarMin=None,
+                    priceDollarP5=None,
+                    priceDollarMedian=None,
+                    priceDollarP95=None,
+                    priceDollarMax=None,
                     totalGeneration=None,
                     renewablesPct=None,
                     hasData=False,
@@ -884,9 +1128,15 @@ def get_energy(
             query_params.end_date,
         )
 
+        price_sql, price_params = build_price_query(query_params)
+        price_rows = conn.execute(price_sql, price_params).fetchall()
+
         is_energy_unit = query_params.unit == "GWh"
         agg_data = aggregate_energy_data(
-            dispatch_rows, is_energy_unit=is_energy_unit, params=query_params
+            dispatch_rows,
+            price_rows,
+            is_energy_unit=is_energy_unit,
+            params=query_params,
         )
         points, peak_gen = build_fuel_generation_points(
             agg_data.time_buckets,

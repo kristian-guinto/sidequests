@@ -9,6 +9,8 @@ from pipeline.config import BASE_DIR
 from pipeline.models import (
     FacilityRecord,
     EnergyIntervalRecord,
+    PriceIntervalRecord,
+    ExchangeRateRecord,
 )
 from pipeline.schema import validate_database_schema, SchemaMismatchError
 from pipeline.generator_registry import GeneratorRegistry
@@ -42,10 +44,17 @@ def test_models():
         fuel_tech="solar",
         generation_mw=50.0,
         energy_mwh=4.1667,
-        price_local=57.0,
     )
     assert interval.generation_mw == 50.0
-    assert interval.price_local == 57.0
+    assert interval.energy_mwh == 4.1667
+
+    price_rec = PriceIntervalRecord(
+        country_code="PH",
+        interval_start=datetime(2026, 3, 1, 0, 0, tzinfo=timezone(timedelta(hours=8))),
+        region="LUZON",
+        price_local=57.0,
+    )
+    assert price_rec.price_local == 57.0
 
 
 def test_schema_validation_failure_on_empty_db():
@@ -133,9 +142,11 @@ def test_iemop_parser():
         "03/01/2026 00:05:00 AM,01BURGOS_W01,G,CLUZ,30.0,2500.0",
         "03/01/2026 00:05:00 AM,LOAD_NODE_1,L,CLUZ,100.0,2500.0",  # Load should be skipped
     ]
-    records = parser.parse_rtd_dispatch(csv_data)
+    records, price_records = parser.parse_rtd_dispatch(csv_data)
     # Expect 2 regional records (solar, wind) + 2 'ALL' records (solar, wind) = 4 records
     assert len(records) == 4
+    assert len(price_records) == 2  # CLUZ and ALL
+    assert price_records[0].price_local == 2500.0
 
     solar_records = [
         r for r in records if r.fuel_tech == "solar" and r.region == "LUZON"
@@ -143,7 +154,6 @@ def test_iemop_parser():
     assert len(solar_records) == 1
     assert solar_records[0].generation_mw == 50.0
     assert solar_records[0].energy_mwh == round(50.0 * (5.0 / 60.0), 4)
-    assert solar_records[0].price_local == 2500.0
 
 
 def test_emc_parser():
@@ -195,7 +205,6 @@ def test_emc_parser():
     assert fuels["biomass"] == 120.0
     assert fuels["hydro"] == 90.0
     assert fuels["battery"] == 10.0
-    assert mg_records[0].price_local == 125.50
     assert mg_records[0].energy_mwh == round(mg_records[0].generation_mw * 0.5, 4)
 
     # 4. Real-time 48-period CSV
@@ -269,7 +278,6 @@ def test_singlebuyer_parser():
     assert fuel_gen["gas"] == 7200.0
     assert fuel_gen["hydro"] == 1500.0
     assert fuel_gen["biomass"] == 200.0
-    assert records[0].price_local == 245.0
     assert records[0].energy_mwh == round(records[0].generation_mw * 0.5, 4)
 
     # 4. GSO Real-time 10-minute dispatch
@@ -345,7 +353,6 @@ def test_mocked_provider_clients():
     )
     assert len(intervals) == 1
     assert intervals[0].generation_mw == 8000.0
-    assert intervals[0].price_local == 250.0
 
 
 def test_providers_return_dataclasses():
@@ -388,9 +395,15 @@ def test_database_tiered_upsert_and_populate_energy_daily(tmp_path: Path):
     upserted_fac = db.upsert_facilities([fac_record], country_code="PH")
     assert upserted_fac == 1
 
-    # 4. Upsert energy_interval records
+    # 4. Upsert energy_interval records and price records
     start_time_1 = datetime(2026, 3, 1, 0, 0, tzinfo=timezone(timedelta(hours=8)))
     start_time_2 = datetime(2026, 3, 1, 0, 5, tzinfo=timezone(timedelta(hours=8)))
+
+    # Set FX rate for 2026-03-01 PHP
+    db.upsert_exchange_rates(
+        [ExchangeRateRecord(date=date(2026, 3, 1), currency="PHP", rate_to_usd=57.0)]
+    )
+
     energy_records = [
         EnergyIntervalRecord(
             country_code="PH",
@@ -399,7 +412,6 @@ def test_database_tiered_upsert_and_populate_energy_daily(tmp_path: Path):
             fuel_tech="solar",
             generation_mw=100.0,
             energy_mwh=8.3333,
-            price_local=57.0,
         ),
         EnergyIntervalRecord(
             country_code="PH",
@@ -408,38 +420,65 @@ def test_database_tiered_upsert_and_populate_energy_daily(tmp_path: Path):
             fuel_tech="solar",
             generation_mw=200.0,
             energy_mwh=16.6667,
-            price_local=114.0,
         ),
     ]
     upserted_e = db.upsert_energy_interval(energy_records, country_code="PH")
     assert upserted_e == 2
 
-    # Verify price_dollar conversion in energy_interval (57 PHP / 57.0 = $1.00 USD)
-    e_row = db.conn.execute(
-        "SELECT price_local, price_dollar FROM energy_interval WHERE interval_start = ?::TIMESTAMPTZ",
+    price_records = [
+        PriceIntervalRecord(
+            country_code="PH",
+            interval_start=start_time_1,
+            region="LUZON",
+            price_local=57.0,
+        ),
+        PriceIntervalRecord(
+            country_code="PH",
+            interval_start=start_time_2,
+            region="LUZON",
+            price_local=114.0,
+        ),
+    ]
+    upserted_p = db.upsert_price_intervals(price_records, country_code="PH")
+    assert upserted_p == 2
+
+    # Verify price_dollar conversion in prices_interval (57 PHP / 57.0 = $1.00 USD)
+    p_row = db.conn.execute(
+        "SELECT price_local, price_dollar FROM prices_interval WHERE interval_start = ?::TIMESTAMPTZ",
         [start_time_1],
     ).fetchone()
-    assert e_row is not None
-    assert e_row[0] == 57.0
-    assert e_row[1] == 1.0
+    assert p_row is not None
+    assert p_row[0] == 57.0
+    assert p_row[1] == 1.0
 
-    # 5. Populate energy_daily rollups
+    # 5. Populate energy_daily and prices_daily rollups
     rollup_res = db.populate_energy_daily(
         country_code="PH", start_date="2026-03-01", end_date="2026-03-01"
     )
     assert rollup_res["status"] == "success"
 
-    # Verify energy_daily rollup calculations with VWAP and USD prices
+    # Verify energy_daily rollup calculations
     e_daily = db.conn.execute(
-        """SELECT energy_mwh, avg_generation_mw, peak_generation_mw,
-                  vwap_price_local, twap_price_local, vwap_price_dollar, twap_price_dollar
+        """SELECT energy_mwh, avg_generation_mw, peak_generation_mw
            FROM energy_daily WHERE date = '2026-03-01' AND region = 'LUZON'"""
     ).fetchone()
     assert e_daily is not None
     assert round(e_daily[0], 1) == 25.0
     assert e_daily[1] == 150.0  # avg generation
     assert e_daily[2] == 200.0  # peak generation
-    assert e_daily[3] > 0.0  # vwap local
+
+    # Verify prices_daily rollup calculations with VWAP, TWAP, and distributions
+    p_daily = db.conn.execute(
+        """SELECT vwap_price_local, twap_price_local, vwap_price_dollar,
+                  price_min_local, price_median_local, price_max_local
+           FROM prices_daily WHERE date = '2026-03-01' AND region = 'LUZON'"""
+    ).fetchone()
+    assert p_daily is not None
+    assert p_daily[0] > 0.0  # vwap local
+    assert p_daily[1] == 85.5  # twap local (57 + 114) / 2
+    assert p_daily[3] == 57.0  # min
+    assert p_daily[4] == 85.5  # median
+    assert p_daily[5] == 114.0  # max
     db.close()
 
 

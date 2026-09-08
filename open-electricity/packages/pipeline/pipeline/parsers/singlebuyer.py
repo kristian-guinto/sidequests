@@ -145,7 +145,6 @@ class SingleBuyerParser:
         """
         records: List[EnergyIntervalRecord] = []
         series_dict = gen_mix_json.get("series", {})
-        prices = smp_lookup or {}
 
         for raw_fuel_key, fuel_data in series_dict.items():
             fuel_tech = SB_SERIES_FUEL_MAP.get(raw_fuel_key.lower(), "unclassified")
@@ -170,7 +169,6 @@ class SingleBuyerParser:
                     gen_mw = round(float(v_val), 2)
                     # 30-minute interval
                     energy_mwh = round(gen_mw * 0.5, 4)
-                    price = prices.get(dt)
 
                     records.append(
                         EnergyIntervalRecord(
@@ -180,8 +178,6 @@ class SingleBuyerParser:
                             fuel_tech=fuel_tech,
                             generation_mw=gen_mw,
                             energy_mwh=energy_mwh,
-                            price_local=price,
-                            price_dollar=None,
                         )
                     )
                 except (ValueError, TypeError):
@@ -199,7 +195,6 @@ class SingleBuyerParser:
         Example row: {'DT': '2026-09-07T00:00:00', 'Coal': 9852, 'Gas': 8682, 'CoGen': 5, 'Oil': 0, 'Hydro': 663, 'Solar': 1}
         """
         records: List[EnergyIntervalRecord] = []
-        prices = smp_lookup or {}
 
         fuel_keys = [
             ("Coal", "coal"),
@@ -226,10 +221,6 @@ class SingleBuyerParser:
                     tzinfo=MYT,
                 )
 
-                # For 10-minute dispatch, match nearest half-hour SMP price
-                half_hour_dt = dt.replace(minute=(dt.minute // 30) * 30, second=0)
-                price = prices.get(dt, prices.get(half_hour_dt))
-
                 for gso_key, canonical_fuel in fuel_keys:
                     raw_mw = row.get(gso_key, 0.0)
                     gen_mw = round(max(0.0, float(raw_mw or 0.0)), 2)
@@ -244,8 +235,6 @@ class SingleBuyerParser:
                             fuel_tech=canonical_fuel,
                             generation_mw=gen_mw,
                             energy_mwh=energy_mwh,
-                            price_local=price,
-                            price_dollar=None,
                         )
                     )
             except (ValueError, TypeError):

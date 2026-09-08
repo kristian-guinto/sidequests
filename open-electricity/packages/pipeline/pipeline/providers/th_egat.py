@@ -4,7 +4,7 @@ import logging
 from datetime import datetime, date, timedelta, timezone
 from typing import List, Optional, Any, Callable
 from pipeline.providers.base import BaseProvider
-from pipeline.models import FacilityRecord, EnergyIntervalRecord
+from pipeline.models import FacilityRecord, EnergyIntervalRecord, PriceIntervalRecord
 from pipeline.egat_client import EGATClient
 from pipeline.facility_registry import FacilityRegistry
 
@@ -333,6 +333,23 @@ class ThailandEGATProvider(BaseProvider):
 
             curr_d += timedelta(days=1)
 
+        if all_records and conn is not None:
+            from pipeline.db import Database
+
+            db = Database(conn=conn)
+            unique_dts = {r.interval_start for r in all_records}
+            p_recs = [
+                PriceIntervalRecord(
+                    country_code="TH",
+                    interval_start=dt_val,
+                    region="THAILAND",
+                    price_local=DEFAULT_THB_PRICE_MWH,
+                    price_dollar=None,
+                )
+                for dt_val in unique_dts
+            ]
+            db.upsert_price_intervals(p_recs, country_code="TH")
+
         if not all_records:
             logger.warning(
                 "No energy interval records found for Thailand in date range %s to %s.",
@@ -405,8 +422,6 @@ class ThailandEGATProvider(BaseProvider):
                         fuel_tech=fuel_tech,
                         generation_mw=round(gen_mw, 2),
                         energy_mwh=mwh,
-                        price_local=DEFAULT_THB_PRICE_MWH,
-                        price_dollar=None,  # Computed via exchange_rates / db upsert
                     )
                 )
 

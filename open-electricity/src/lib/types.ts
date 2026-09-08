@@ -171,6 +171,16 @@ export interface FuelGenerationPoint {
   battery: number | null;
   price?: number | null;
   priceDollar?: number | null;
+  priceMin?: number | null;
+  priceP5?: number | null;
+  priceMedian?: number | null;
+  priceP95?: number | null;
+  priceMax?: number | null;
+  priceDollarMin?: number | null;
+  priceDollarP5?: number | null;
+  priceDollarMedian?: number | null;
+  priceDollarP95?: number | null;
+  priceDollarMax?: number | null;
   totalGeneration?: number | null;
   renewablesPct?: number | null;
   hasData?: boolean;

@@ -5,7 +5,7 @@ from datetime import date, timedelta
 from typing import Any, Callable, Dict, List, Optional
 from pipeline.generator_registry import GeneratorRegistry
 from pipeline.iemop_client import IEMOPClient
-from pipeline.models import EnergyIntervalRecord, FacilityRecord
+from pipeline.models import EnergyIntervalRecord, FacilityRecord, PriceIntervalRecord
 from pipeline.parsers.iemop import IEMOPParser
 from pipeline.providers.base import BaseProvider
 
@@ -37,7 +37,7 @@ class PhilippinesIEMOPProvider(BaseProvider):
         max_workers: int = 6,
         **kwargs: Any,
     ) -> List[EnergyIntervalRecord]:
-        """Downloads RTD dispatch archives from IEMOP and parses into EnergyIntervalRecord objects."""
+        """Downloads RTD dispatch archives from IEMOP and parses into EnergyIntervalRecord and PriceIntervalRecord objects."""
         if conn is not None:
             self.registry.load_from_database(conn)
 
@@ -74,6 +74,7 @@ class PhilippinesIEMOPProvider(BaseProvider):
         for chunk_start in range(0, total_files, batch_size):
             chunk = disp_files[chunk_start : chunk_start + batch_size]
             batch_records: List[EnergyIntervalRecord] = []
+            batch_prices: List[PriceIntervalRecord] = []
 
             with ThreadPoolExecutor(
                 max_workers=min(max_workers, len(chunk))
@@ -90,8 +91,11 @@ class PhilippinesIEMOPProvider(BaseProvider):
                     )
                     try:
                         csv_lines = future.result()
-                        records = self.parser.parse_rtd_dispatch(csv_lines)
+                        records, price_records = self.parser.parse_rtd_dispatch(
+                            csv_lines
+                        )
                         batch_records.extend(records)
+                        batch_prices.extend(price_records)
                     except Exception as e:
                         print(f"    ⚠️ Failed to process {filename}: {e}")
 
@@ -103,5 +107,11 @@ class PhilippinesIEMOPProvider(BaseProvider):
                 print(
                     f"     [Saved batch: +{len(batch_records)} interval records (Total: {total_synced})]"
                 )
+
+            if conn is not None and batch_prices:
+                from pipeline.db import Database
+
+                db = Database(conn=conn)
+                db.upsert_price_intervals(batch_prices, country_code=self.country_code)
 
         return all_records

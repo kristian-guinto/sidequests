@@ -16,7 +16,12 @@ from pipeline.config import (
     COUNTRIES_CONFIG,
 )
 from pipeline.schema import validate_database_schema
-from pipeline.models import FacilityRecord, EnergyIntervalRecord, ExchangeRateRecord
+from pipeline.models import (
+    FacilityRecord,
+    EnergyIntervalRecord,
+    PriceIntervalRecord,
+    ExchangeRateRecord,
+)
 from pipeline.fx import get_fx_rate, COUNTRY_TO_CURRENCY
 
 
@@ -45,6 +50,7 @@ class Database:
         motherduck_database: Optional[str] = None,
         validate_schema: bool = True,
         max_lock_retries: int = 3,
+        conn: Optional[duckdb.DuckDBPyConnection] = None,
     ):
         target_str = str(
             target.value if isinstance(target, DatabaseTarget) else (target or "local")
@@ -60,9 +66,13 @@ class Database:
         self.md_db = motherduck_database or MOTHERDUCK_DATABASE
 
         self._ducklembic_db: Optional[DucklembicDB] = None
-        self.conn: duckdb.DuckDBPyConnection
+        self.is_motherduck = False
+        self.conn_str = ""
 
-        self._connect(max_lock_retries=max_lock_retries)
+        if conn is not None:
+            self.conn = conn
+        else:
+            self._connect(max_lock_retries=max_lock_retries)
 
         if validate_schema:
             validate_database_schema(self.conn)
@@ -192,11 +202,9 @@ class Database:
         if not records:
             return 0
 
-        curr = COUNTRY_TO_CURRENCY.get(country_code.upper(), "PHP")
         default_dur = 5 if country_code.upper() == "PH" else 30
 
         data = []
-        fx_cache: Dict[Tuple[str, str], float] = {}
         for r in records:
             if isinstance(r, EnergyIntervalRecord):
                 c_code = r.country_code.upper()
@@ -205,20 +213,7 @@ class Database:
                 fuel = r.fuel_tech.lower()
                 mw = r.generation_mw
                 mwh = r.energy_mwh
-                p_local = r.price_local
-                p_dollar = r.price_dollar
-                if p_local is not None and p_dollar is None:
-                    d_val = (
-                        start_dt.date()
-                        if hasattr(start_dt, "date")
-                        else str(start_dt)[:10]
-                    )
-                    cache_key = (str(d_val)[:10], curr)
-                    if cache_key not in fx_cache:
-                        fx_cache[cache_key] = get_fx_rate(d_val, curr, conn=self.conn)
-                    fx = fx_cache[cache_key]
-                    p_dollar = round(p_local / fx, 2) if fx > 0 else None
-                data.append((c_code, start_dt, reg, fuel, mw, mwh, p_local, p_dollar))
+                data.append((c_code, start_dt, reg, fuel, mw, mwh))
             else:
                 c_code = r.get("country_code", country_code).upper()
                 start_raw = r["timestamp"]
@@ -232,26 +227,7 @@ class Database:
                     if raw_energy is not None
                     else round(mw * (dur / 60.0), 4)
                 )
-                p_local = (
-                    float(r.get("price_local", r.get("price_php_mwh")))
-                    if (
-                        r.get("price_local") is not None
-                        or r.get("price_php_mwh") is not None
-                    )
-                    else None
-                )
-                p_dollar = r.get("price_dollar")
-                if p_local is not None and p_dollar is None:
-                    d_val = str(start_raw)[:10]
-                    target_curr = r.get("currency", curr)
-                    cache_key = (d_val, target_curr)
-                    if cache_key not in fx_cache:
-                        fx_cache[cache_key] = get_fx_rate(
-                            d_val, target_curr, conn=self.conn
-                        )
-                    fx = fx_cache[cache_key]
-                    p_dollar = round(p_local / fx, 2) if fx > 0 else None
-                data.append((c_code, start_raw, reg, fuel, mw, mwh, p_local, p_dollar))
+                data.append((c_code, start_raw, reg, fuel, mw, mwh))
 
         self.conn.execute("BEGIN TRANSACTION")
         try:
@@ -259,14 +235,12 @@ class Database:
                 """
                 INSERT INTO energy_interval (
                     country_code, interval_start, region, fuel_tech,
-                    generation_mw, energy_mwh, price_local, price_dollar
+                    generation_mw, energy_mwh
                 )
-                VALUES (?, ?::TIMESTAMPTZ, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?::TIMESTAMPTZ, ?, ?, ?, ?)
                 ON CONFLICT (country_code, interval_start, region, fuel_tech) DO UPDATE SET
                     generation_mw = EXCLUDED.generation_mw,
-                    energy_mwh = EXCLUDED.energy_mwh,
-                    price_local = EXCLUDED.price_local,
-                    price_dollar = EXCLUDED.price_dollar;
+                    energy_mwh = EXCLUDED.energy_mwh;
                 """,
                 data,
             )
@@ -279,6 +253,75 @@ class Database:
 
     upsert_dispatch_5m = upsert_energy_interval
 
+    def upsert_price_intervals(
+        self,
+        records: Sequence[Union[PriceIntervalRecord, Dict[str, Any]]],
+        country_code: str = "PH",
+    ) -> int:
+        """Idempotently upserts spot price interval records into prices_interval table inside a transaction."""
+        if not records:
+            return 0
+
+        curr = COUNTRY_TO_CURRENCY.get(country_code.upper(), "PHP")
+        data = []
+        fx_cache: Dict[Tuple[str, str], float] = {}
+
+        for r in records:
+            if isinstance(r, PriceIntervalRecord):
+                c_code = r.country_code.upper()
+                start_dt = r.interval_start
+                reg = r.region
+                p_local = r.price_local
+                p_dollar = r.price_dollar
+            else:
+                c_code = r.get("country_code", country_code).upper()
+                start_dt = r.get("interval_start", r.get("timestamp"))
+                reg = r["region"]
+                p_local = (
+                    float(r.get("price_local", r.get("price_php_mwh")))
+                    if (
+                        r.get("price_local") is not None
+                        or r.get("price_php_mwh") is not None
+                    )
+                    else None
+                )
+                p_dollar = r.get("price_dollar")
+
+            if p_local is not None and p_dollar is None:
+                d_val = (
+                    start_dt.date() if hasattr(start_dt, "date") else str(start_dt)[:10]
+                )
+                cache_key = (str(d_val)[:10], curr)
+                if cache_key not in fx_cache:
+                    fx_cache[cache_key] = get_fx_rate(d_val, curr, conn=self.conn)
+                fx = fx_cache[cache_key]
+                p_dollar = round(p_local / fx, 2) if fx > 0 else None
+
+            data.append((c_code, start_dt, reg, p_local, p_dollar))
+
+        self.conn.execute("BEGIN TRANSACTION")
+        try:
+            self.conn.executemany(
+                """
+                INSERT INTO prices_interval (
+                    country_code, interval_start, region, price_local, price_dollar
+                )
+                VALUES (?, ?::TIMESTAMPTZ, ?, ?, ?)
+                ON CONFLICT (country_code, interval_start, region) DO UPDATE SET
+                    price_local = EXCLUDED.price_local,
+                    price_dollar = EXCLUDED.price_dollar;
+                """,
+                data,
+            )
+            self.conn.execute("COMMIT")
+        except Exception:
+            self.conn.execute("ROLLBACK")
+            raise
+
+        return len(records)
+
+    upsert_price_interval = upsert_price_intervals
+
     def populate_energy_daily(
         self,
         country_code: str = "PH",
@@ -287,7 +330,7 @@ class Database:
     ) -> Dict[str, Any]:
         """
         Executes in-database SQL aggregation from energy_interval into energy_daily table,
-        calculating VWAP, TWAP, and USD price conversions.
+        and triggers price rollup into prices_daily.
         """
         country = country_code.upper()
         tz = COUNTRIES_CONFIG.get(country, {}).get("timezone", "UTC")
@@ -308,9 +351,7 @@ class Database:
         energy_sql = f"""
             INSERT INTO energy_daily (
                 country_code, date, region, fuel_tech, energy_mwh,
-                avg_generation_mw, peak_generation_mw,
-                vwap_price_local, twap_price_local,
-                vwap_price_dollar, twap_price_dollar
+                avg_generation_mw, peak_generation_mw
             )
             SELECT
                 country_code,
@@ -319,34 +360,119 @@ class Database:
                 fuel_tech,
                 round(sum(energy_mwh), 2) AS energy_mwh,
                 round(avg(generation_mw), 2) AS avg_generation_mw,
-                round(max(generation_mw), 2) AS peak_generation_mw,
-                CASE
-                    WHEN sum(energy_mwh) > 0 AND count(price_local) > 0
-                    THEN round(sum(COALESCE(price_local, 0.0) * energy_mwh) / sum(energy_mwh), 2)
-                    ELSE round(avg(price_local), 2)
-                END AS vwap_price_local,
-                round(avg(price_local), 2) AS twap_price_local,
-                CASE
-                    WHEN sum(energy_mwh) > 0 AND count(price_dollar) > 0
-                    THEN round(sum(COALESCE(price_dollar, 0.0) * energy_mwh) / sum(energy_mwh), 2)
-                    ELSE round(avg(price_dollar), 2)
-                END AS vwap_price_dollar,
-                round(avg(price_dollar), 2) AS twap_price_dollar
+                round(max(generation_mw), 2) AS peak_generation_mw
             FROM energy_interval
             WHERE country_code = ? {date_cond}
             GROUP BY country_code, interval_start::DATE, region, fuel_tech
             ON CONFLICT (country_code, date, region, fuel_tech) DO UPDATE SET
                 energy_mwh = EXCLUDED.energy_mwh,
                 avg_generation_mw = EXCLUDED.avg_generation_mw,
-                peak_generation_mw = EXCLUDED.peak_generation_mw,
-                vwap_price_local = EXCLUDED.vwap_price_local,
-                twap_price_local = EXCLUDED.twap_price_local,
-                vwap_price_dollar = EXCLUDED.vwap_price_dollar,
-                twap_price_dollar = EXCLUDED.twap_price_dollar;
+                peak_generation_mw = EXCLUDED.peak_generation_mw;
         """
         self.conn.execute("BEGIN TRANSACTION")
         try:
             self.conn.execute(energy_sql, params)
+            self.conn.execute("COMMIT")
+        except Exception:
+            self.conn.execute("ROLLBACK")
+            raise
+
+        # Also populate prices_daily
+        self.populate_price_daily(
+            country_code=country_code, start_date=start_date, end_date=end_date
+        )
+
+        return {"status": "success"}
+
+    def populate_price_daily(
+        self,
+        country_code: str = "PH",
+        start_date: Optional[Any] = None,
+        end_date: Optional[Any] = None,
+    ) -> Dict[str, Any]:
+        """
+        Executes in-database SQL aggregation from prices_interval into prices_daily table,
+        calculating VWAP, TWAP, and price distribution metrics (min, p5, median, p95, max).
+        """
+        country = country_code.upper()
+        tz = COUNTRIES_CONFIG.get(country, {}).get("timezone", "UTC")
+        self.conn.execute(f"SET TimeZone = '{tz}'")
+        date_cond = ""
+        params: List[Any] = [country]
+
+        if start_date and end_date:
+            date_cond = " AND p.interval_start::DATE >= ?::DATE AND p.interval_start::DATE <= ?::DATE"
+            params.extend([str(start_date), str(end_date)])
+        elif start_date:
+            date_cond = " AND p.interval_start::DATE >= ?::DATE"
+            params.append(str(start_date))
+        else:
+            date_cond = " AND p.interval_start >= (SELECT COALESCE(MAX(interval_start) - INTERVAL '3 days', '2000-01-01'::TIMESTAMPTZ) FROM prices_interval WHERE country_code = ?)"
+            params.append(country)
+
+        price_sql = f"""
+            INSERT INTO prices_daily (
+                country_code, date, region,
+                vwap_price_local, twap_price_local,
+                vwap_price_dollar, twap_price_dollar,
+                price_min_local, price_p5_local, price_median_local, price_p95_local, price_max_local,
+                price_min_dollar, price_p5_dollar, price_median_dollar, price_p95_dollar, price_max_dollar
+            )
+            SELECT
+                p.country_code,
+                p.interval_start::DATE AS date,
+                p.region,
+                COALESCE(v.vwap_local, round(avg(p.price_local), 2)) AS vwap_price_local,
+                round(avg(p.price_local), 2) AS twap_price_local,
+                COALESCE(v.vwap_dollar, round(avg(p.price_dollar), 2)) AS vwap_price_dollar,
+                round(avg(p.price_dollar), 2) AS twap_price_dollar,
+                round(min(p.price_local), 2) AS price_min_local,
+                round(quantile_cont(p.price_local, 0.05), 2) AS price_p5_local,
+                round(median(p.price_local), 2) AS price_median_local,
+                round(quantile_cont(p.price_local, 0.95), 2) AS price_p95_local,
+                round(max(p.price_local), 2) AS price_max_local,
+                round(min(p.price_dollar), 2) AS price_min_dollar,
+                round(quantile_cont(p.price_dollar, 0.05), 2) AS price_p5_dollar,
+                round(median(p.price_dollar), 2) AS price_median_dollar,
+                round(quantile_cont(p.price_dollar, 0.95), 2) AS price_p95_dollar,
+                round(max(p.price_dollar), 2) AS price_max_dollar
+            FROM prices_interval p
+            LEFT JOIN (
+                SELECT
+                    e.country_code,
+                    e.interval_start::DATE AS date,
+                    e.region,
+                    round(sum(p2.price_local * e.energy_mwh) / NULLIF(sum(e.energy_mwh), 0), 2) AS vwap_local,
+                    round(sum(p2.price_dollar * e.energy_mwh) / NULLIF(sum(e.energy_mwh), 0), 2) AS vwap_dollar
+                FROM energy_interval e
+                JOIN prices_interval p2
+                  ON e.country_code = p2.country_code
+                 AND e.interval_start = p2.interval_start
+                 AND e.region = p2.region
+                WHERE p2.price_local IS NOT NULL
+                GROUP BY e.country_code, e.interval_start::DATE, e.region
+            ) v ON p.country_code = v.country_code AND p.interval_start::DATE = v.date AND p.region = v.region
+            WHERE p.country_code = ? {date_cond} AND p.price_local IS NOT NULL
+            GROUP BY p.country_code, p.interval_start::DATE, p.region, v.vwap_local, v.vwap_dollar
+            ON CONFLICT (country_code, date, region) DO UPDATE SET
+                vwap_price_local = EXCLUDED.vwap_price_local,
+                twap_price_local = EXCLUDED.twap_price_local,
+                vwap_price_dollar = EXCLUDED.vwap_price_dollar,
+                twap_price_dollar = EXCLUDED.twap_price_dollar,
+                price_min_local = EXCLUDED.price_min_local,
+                price_p5_local = EXCLUDED.price_p5_local,
+                price_median_local = EXCLUDED.price_median_local,
+                price_p95_local = EXCLUDED.price_p95_local,
+                price_max_local = EXCLUDED.price_max_local,
+                price_min_dollar = EXCLUDED.price_min_dollar,
+                price_p5_dollar = EXCLUDED.price_p5_dollar,
+                price_median_dollar = EXCLUDED.price_median_dollar,
+                price_p95_dollar = EXCLUDED.price_p95_dollar,
+                price_max_dollar = EXCLUDED.price_max_dollar;
+        """
+        self.conn.execute("BEGIN TRANSACTION")
+        try:
+            self.conn.execute(price_sql, params)
             self.conn.execute("COMMIT")
         except Exception:
             self.conn.execute("ROLLBACK")

@@ -221,6 +221,23 @@ class SingaporeEMCProvider(BaseProvider):
                     logger.warning("Real-time EMC download error for %s: %s", curr_d, e)
             curr_d += timedelta(days=1)
 
+        if price_map and conn is not None:
+            from pipeline.db import Database
+            from pipeline.models import PriceIntervalRecord
+
+            db = Database(conn=conn)
+            p_recs = [
+                PriceIntervalRecord(
+                    country_code="SG",
+                    interval_start=dt,
+                    region="SINGAPORE",
+                    price_local=p,
+                    price_dollar=None,
+                )
+                for dt, p in price_map.items()
+            ]
+            db.upsert_price_intervals(p_recs, country_code="SG")
+
         if not all_records:
             logger.warning(
                 "No energy interval records found for Singapore in date range %s to %s.",

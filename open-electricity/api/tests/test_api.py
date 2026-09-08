@@ -30,6 +30,9 @@ def test_api_get_energy_ranges_and_filters():
     assert res_1d.summary.totalGenerationGWh > 0
     assert res_1d.summary.avgPriceUSD is not None and res_1d.summary.avgPriceUSD > 0
     assert res_1d.points[0].priceDollar is not None
+    # 1D view has raw spot price without distribution bands
+    assert res_1d.points[0].priceMin is None
+    assert res_1d.points[0].priceMedian is None
 
     # Test 30d (1d interval from energy_daily)
     res_30d = get_energy(
@@ -44,6 +47,18 @@ def test_api_get_energy_ranges_and_filters():
     assert res_30d.interval == "1d"
     assert len(res_30d.points) > 0
     assert res_30d.summary.avgPriceUSD is not None and res_30d.summary.avgPriceUSD > 0
+    # 30D view has price distribution bands
+    p30 = next(p for p in res_30d.points if p.hasData and p.priceMedian is not None)
+    assert (
+        p30.priceMin is not None
+        and p30.priceP5 is not None
+        and p30.priceMedian is not None
+        and p30.priceP95 is not None
+        and p30.priceMax is not None
+    )
+    assert (
+        p30.priceMin <= p30.priceP5 <= p30.priceMedian <= p30.priceP95 <= p30.priceMax
+    )
 
     # Test regional filter
     res_luzon = get_energy(

@@ -5,13 +5,13 @@ from datetime import datetime, timezone, timedelta
 from collections import defaultdict
 from typing import List, Dict, Tuple
 from pipeline.generator_registry import GeneratorRegistry
-from pipeline.models import EnergyIntervalRecord
+from pipeline.models import EnergyIntervalRecord, PriceIntervalRecord
 
 MANILA_TZ = timezone(timedelta(hours=8))
 
 
 class IEMOPParser:
-    """Parses Philippine IEMOP RTD Prices & Schedules CSV lines into EnergyIntervalRecord objects."""
+    """Parses Philippine IEMOP RTD Prices & Schedules CSV lines into EnergyIntervalRecord and PriceIntervalRecord objects."""
 
     def __init__(self, registry: GeneratorRegistry):
         self.registry = registry
@@ -23,6 +23,8 @@ class IEMOPParser:
         formats = (
             "%m/%d/%Y %I:%M:%S %p",
             "%m/%d/%Y %I:%M %p",
+            "%m/%d/%Y %H:%M:%S %p",
+            "%m/%d/%Y %H:%M %p",
             "%m/%d/%Y %H:%M:%S",
             "%m/%d/%Y %H:%M",
             "%m/%d/%Y",
@@ -41,16 +43,21 @@ class IEMOPParser:
         # Fallback to current time if unparseable
         return datetime.now(MANILA_TZ)
 
-    def parse_rtd_dispatch(self, csv_lines: List[str]) -> List[EnergyIntervalRecord]:
+    def parse_rtd_dispatch(
+        self, csv_lines: List[str]
+    ) -> Tuple[List[EnergyIntervalRecord], List[PriceIntervalRecord]]:
         """
         Parses raw unit dispatch CSV lines and produces 5-minute fuel mix aggregations
-        as EnergyIntervalRecord dataclasses for individual regions and total Philippines ('ALL').
+        as EnergyIntervalRecord dataclasses, and market/regional GWAP prices as PriceIntervalRecord.
         """
         reader = csv.DictReader(csv_lines)
 
-        # Bucket: (interval_dt, region, fuel_tech) -> {generation_mw, price_sum, count}
-        buckets: Dict[Tuple[datetime, str, str], Dict[str, float]] = defaultdict(
-            lambda: {"generation_mw": 0.0, "price_sum": 0.0, "count": 0.0}
+        # Bucket generation: (interval_dt, region, fuel_tech) -> generation_mw
+        gen_buckets: Dict[Tuple[datetime, str, str], float] = defaultdict(float)
+
+        # Bucket price: (interval_dt, region) -> {rev_sum, mw_sum, lmp_sum, count}
+        price_buckets: Dict[Tuple[datetime, str], Dict[str, float]] = defaultdict(
+            lambda: {"rev_sum": 0.0, "mw_sum": 0.0, "lmp_sum": 0.0, "count": 0.0}
         )
 
         for row in reader:
@@ -84,23 +91,29 @@ class IEMOPParser:
             fuel_tech = gen_info["fuel_tech"]
             region = gen_info["region"]
 
-            # Aggregate per specific region
-            key = (interval_dt, region, fuel_tech)
-            buckets[key]["generation_mw"] += max(0.0, sched_mw)
-            buckets[key]["price_sum"] += lmp
-            buckets[key]["count"] += 1.0
+            mw_val = max(0.0, sched_mw)
 
-            # Aggregate for Total Philippines ('ALL')
-            key_all = (interval_dt, "ALL", fuel_tech)
-            buckets[key_all]["generation_mw"] += max(0.0, sched_mw)
-            buckets[key_all]["price_sum"] += lmp
-            buckets[key_all]["count"] += 1.0
+            # Aggregate generation per region and total 'ALL'
+            gen_buckets[(interval_dt, region, fuel_tech)] += mw_val
+            gen_buckets[(interval_dt, "ALL", fuel_tech)] += mw_val
+
+            # Aggregate WESM GWAP components per region and total 'ALL'
+            rev = mw_val * lmp
+            p_reg = price_buckets[(interval_dt, region)]
+            p_reg["rev_sum"] += rev
+            p_reg["mw_sum"] += mw_val
+            p_reg["lmp_sum"] += lmp
+            p_reg["count"] += 1.0
+
+            p_all = price_buckets[(interval_dt, "ALL")]
+            p_all["rev_sum"] += rev
+            p_all["mw_sum"] += mw_val
+            p_all["lmp_sum"] += lmp
+            p_all["count"] += 1.0
 
         records: List[EnergyIntervalRecord] = []
-        for (interval_dt, region, fuel_tech), data in buckets.items():
-            count = data["count"]
-            avg_price = data["price_sum"] / count if count > 0 else None
-            gen_mw = round(data["generation_mw"], 2)
+        for (interval_dt, region, fuel_tech), mw_val in gen_buckets.items():
+            gen_mw = round(mw_val, 2)
             # 5-minute interval energy MWh = MW * (5 / 60)
             energy_mwh = round(gen_mw * (5.0 / 60.0), 4)
 
@@ -112,9 +125,28 @@ class IEMOPParser:
                     fuel_tech=fuel_tech,
                     generation_mw=gen_mw,
                     energy_mwh=energy_mwh,
-                    price_local=round(avg_price, 2) if avg_price is not None else None,
+                )
+            )
+
+        price_records: List[PriceIntervalRecord] = []
+        for (interval_dt, region), p_data in price_buckets.items():
+            count = p_data["count"]
+            gwap = (
+                p_data["rev_sum"] / p_data["mw_sum"]
+                if p_data["mw_sum"] > 0
+                else p_data["lmp_sum"] / count
+                if count > 0
+                else None
+            )
+
+            price_records.append(
+                PriceIntervalRecord(
+                    country_code="PH",
+                    interval_start=interval_dt,
+                    region=region,
+                    price_local=round(gwap, 2) if gwap is not None else None,
                     price_dollar=None,  # Populated during DB upsert with exchange rate
                 )
             )
 
-        return records
+        return records, price_records

@@ -41,13 +41,29 @@ class EnergyIntervalRecord:
     fuel_tech: str
     generation_mw: float
     energy_mwh: float
+
+
+@dataclass(frozen=True)
+class PriceIntervalRecord:
+    """Represents regional wholesale electricity spot price for an interval in prices_interval."""
+
+    __table_name__: ClassVar[str] = "prices_interval"
+    __primary_key__: ClassVar[List[str]] = [
+        "country_code",
+        "interval_start",
+        "region",
+    ]
+
+    country_code: str
+    interval_start: datetime
+    region: str
     price_local: Optional[float] = None
     price_dollar: Optional[float] = None
 
 
 @dataclass(frozen=True)
 class EnergyDailyRecord:
-    """Represents aggregated daily fuel mix generation and prices in the energy_daily table."""
+    """Represents aggregated daily fuel mix generation in the energy_daily table."""
 
     __table_name__: ClassVar[str] = "energy_daily"
     __primary_key__: ClassVar[List[str]] = [
@@ -64,10 +80,36 @@ class EnergyDailyRecord:
     energy_mwh: float
     avg_generation_mw: float
     peak_generation_mw: float
+
+
+@dataclass(frozen=True)
+class PriceDailyRecord:
+    """Represents daily aggregated prices and distributions in prices_daily."""
+
+    __table_name__: ClassVar[str] = "prices_daily"
+    __primary_key__: ClassVar[List[str]] = [
+        "country_code",
+        "date",
+        "region",
+    ]
+
+    country_code: str
+    date: date
+    region: str
     vwap_price_local: Optional[float] = None
     twap_price_local: Optional[float] = None
     vwap_price_dollar: Optional[float] = None
     twap_price_dollar: Optional[float] = None
+    price_min_local: Optional[float] = None
+    price_p5_local: Optional[float] = None
+    price_median_local: Optional[float] = None
+    price_p95_local: Optional[float] = None
+    price_max_local: Optional[float] = None
+    price_min_dollar: Optional[float] = None
+    price_p5_dollar: Optional[float] = None
+    price_median_dollar: Optional[float] = None
+    price_p95_dollar: Optional[float] = None
+    price_max_dollar: Optional[float] = None
 
 
 @dataclass(frozen=True)
@@ -97,6 +139,8 @@ class IngestRunReport:
 TABLE_MODELS = [
     FacilityRecord,
     EnergyIntervalRecord,
+    PriceIntervalRecord,
     EnergyDailyRecord,
+    PriceDailyRecord,
     ExchangeRateRecord,
 ]
