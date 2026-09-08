@@ -6,10 +6,8 @@ import {
   CountryCode,
   Region,
   TimeRange,
-  TimeInterval,
   ViewMode,
   PaletteMode,
-  RANGE_CONFIG,
   COUNTRIES_METADATA,
 } from "@/lib/types";
 import {
@@ -34,8 +32,6 @@ interface HeaderProps {
   onRegionChange: (r: Region) => void;
   range: TimeRange;
   onRangeChange: (r: TimeRange) => void;
-  interval: TimeInterval;
-  onIntervalChange: (i: TimeInterval) => void;
   viewMode: ViewMode;
   onViewModeChange: (v: ViewMode) => void;
   paletteMode: PaletteMode;
@@ -60,8 +56,6 @@ export function Header({
   onRegionChange,
   range,
   onRangeChange,
-  interval,
-  onIntervalChange,
   viewMode,
   onViewModeChange,
   paletteMode,
@@ -94,10 +88,6 @@ export function Header({
 
   const handleRangeClick = (newRange: TimeRange) => {
     onRangeChange(newRange);
-    const config = RANGE_CONFIG[newRange];
-    if (config) {
-      onIntervalChange(config.defaultInterval);
-    }
   };
 
   const handleShare = () => {
@@ -107,11 +97,6 @@ export function Header({
       setTimeout(() => setCopied(false), 2000);
     }
   };
-
-  const allowedIntervals = RANGE_CONFIG[range]?.allowedIntervals || [
-    { id: "5m", label: "5m" },
-    { id: "30m", label: "30m" },
-  ];
 
   return (
     <header className="bg-white dark:bg-[#000000] border-b border-neutral-200 dark:border-[#27272A] sticky top-0 z-50 text-neutral-800 dark:text-neutral-200 transition-colors">
@@ -315,21 +300,7 @@ export function Header({
             ))}
           </div>
 
-          {/* Interval Resolution Pills */}
-          <div className="flex border border-neutral-200 dark:border-[#27272A] rounded p-0.5 text-xs font-medium bg-neutral-50/50 dark:bg-[#121215]">
-            {allowedIntervals.map((inv) => (
-              <button
-                key={inv.id}
-                onClick={() => onIntervalChange(inv.id)}
-                className={`px-2.5 py-0.5 rounded transition ${interval === inv.id
-                  ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold border border-neutral-300 dark:border-neutral-700 shadow-sm"
-                  : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-                  }`}
-              >
-                {inv.label}
-              </button>
-            ))}
-          </div>
+
         </div>
 
         {/* Right Controls: Theme Switcher, Refresh & Share */}

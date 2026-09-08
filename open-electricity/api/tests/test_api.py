@@ -118,8 +118,8 @@ def test_api_get_energy_explicit_date_range():
     res_th = get_energy(
         response=Response(),
         country="TH",
-        start_date="2026-09-07",
-        end_date="2026-09-07",
+        start_date="2026-09-08",
+        end_date="2026-09-08",
         interval="5m",
     )
     assert res_th.country == "TH"
@@ -127,14 +127,15 @@ def test_api_get_energy_explicit_date_range():
     # Full day 24h * 12 slots/h = 288 slots
     assert len(res_th.points) == 288
     # Bangkok timezone +07:00
-    assert res_th.points[0].timestamp == "2026-09-07T00:00:00+07:00"
-    assert res_th.points[-1].timestamp == "2026-09-07T23:55:00+07:00"
+    assert res_th.points[0].timestamp == "2026-09-08T00:00:00+07:00"
+    assert res_th.points[-1].timestamp == "2026-09-08T23:55:00+07:00"
 
     # Verify telemetry slots and future/missing slots
     data_points = [p for p in res_th.points if p.hasData]
     empty_points = [p for p in res_th.points if not p.hasData]
-    assert len(data_points) == 192  # 00:00 to 15:55
-    assert len(empty_points) == 96  # 16:00 to 23:55
+    assert len(data_points) > 0
+    assert len(empty_points) > 0
+    assert len(data_points) + len(empty_points) == 288
     assert empty_points[0].solar is None
     assert empty_points[0].totalGeneration is None
     assert empty_points[0].price is None

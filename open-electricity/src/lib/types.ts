@@ -118,55 +118,27 @@ export const RANGE_CONFIG: Record<
   TimeRange,
   {
     label: string;
-    defaultInterval: TimeInterval;
-    allowedIntervals: { id: TimeInterval; label: string }[];
     unit: "MW" | "GWh";
   }
 > = {
   "1d": {
     label: "1D",
-    defaultInterval: "5m",
-    allowedIntervals: [
-      { id: "5m", label: "5m" },
-      { id: "30m", label: "30m" },
-    ],
     unit: "MW",
   },
   "3d": {
     label: "3D",
-    defaultInterval: "30m",
-    allowedIntervals: [
-      { id: "30m", label: "30m" },
-      { id: "1h", label: "1h" },
-    ],
     unit: "MW",
   },
   "7d": {
     label: "7D",
-    defaultInterval: "30m",
-    allowedIntervals: [
-      { id: "30m", label: "30m" },
-      { id: "1h", label: "1h" },
-      { id: "1d", label: "1d" },
-    ],
     unit: "MW",
   },
   "30d": {
     label: "30D",
-    defaultInterval: "1d",
-    allowedIntervals: [
-      { id: "1d", label: "1d" },
-      { id: "1w", label: "1w" },
-    ],
     unit: "GWh",
   },
   "1y": {
     label: "1Y",
-    defaultInterval: "1w",
-    allowedIntervals: [
-      { id: "1w", label: "1w" },
-      { id: "1m", label: "1m" },
-    ],
     unit: "GWh",
   },
 };

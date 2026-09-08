@@ -1,5 +1,13 @@
 import { format, parseISO, differenceInHours } from "date-fns";
-import { FuelGenerationPoint, TimeRange, TimeInterval, RANGE_CONFIG } from "./types";
+import { FuelGenerationPoint, TimeRange, TimeInterval } from "./types";
+
+const DEFAULT_RANGE_INTERVALS: Record<TimeRange, TimeInterval> = {
+  "1d": "5m",
+  "3d": "30m",
+  "7d": "30m",
+  "30d": "1d",
+  "1y": "1w",
+};
 
 /**
  * Creates a modern Shadcn UI vertical linear gradient for ECharts area fills.
@@ -94,7 +102,7 @@ export function alignPointsToTimeGrid(
   if (!points || points.length === 0) return [];
 
   const activeInterval =
-    interval || (range ? RANGE_CONFIG[range]?.defaultInterval : "30m") || "30m";
+    interval || (range ? DEFAULT_RANGE_INTERVALS[range] : "30m") || "30m";
   let stepMs = 30 * 60 * 1000;
   if (activeInterval === "5m") stepMs = 5 * 60 * 1000;
   else if (activeInterval === "30m") stepMs = 30 * 60 * 1000;

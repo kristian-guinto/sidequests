@@ -493,7 +493,10 @@ def resolve_energy_query_params(
             status_code=400,
             detail=f"For date ranges greater than 3 days (requested {span_days} days), minimum allowed interval is '30m'. Got '5m'.",
         )
-    if c_meta.get("minInterval") == "30m" and active_interval == "5m":
+    min_inv = c_meta.get("minInterval")
+    if min_inv == "1h" and active_interval in ("5m", "30m"):
+        active_interval = "1h"
+    elif min_inv == "30m" and active_interval == "5m":
         active_interval = "30m"
 
     use_daily = active_interval in ("1d", "7d", "1w", "1m", "1M") or span_days >= 30

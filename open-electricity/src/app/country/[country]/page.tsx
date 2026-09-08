@@ -6,7 +6,6 @@ import {
   CountryCode,
   Region,
   TimeRange,
-  TimeInterval,
   ViewMode,
   PaletteMode,
   FuelGenerationPoint,
@@ -41,7 +40,6 @@ export default function CountryDetailPage({ params }: CountryPageProps) {
     COUNTRIES_METADATA[initialCountry]?.defaultRegion || "ALL"
   );
   const [range, setRange] = useState<TimeRange>("7d");
-  const [interval, setInterval] = useState<TimeInterval>("30m");
   const [viewMode, setViewMode] = useState<ViewMode>("percentage");
   const [paletteMode, setPaletteMode] = useState<PaletteMode>("clean-fossil");
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -87,10 +85,6 @@ export default function CountryDetailPage({ params }: CountryPageProps) {
 
   const handleRangeChange = (newRange: TimeRange) => {
     setRange(newRange);
-    const cfg = RANGE_CONFIG[newRange];
-    if (cfg) {
-      setInterval(cfg.defaultInterval);
-    }
     setHoveredPoint(null);
   };
 
@@ -99,11 +93,11 @@ export default function CountryDetailPage({ params }: CountryPageProps) {
     try {
       const { startDate, endDate } = getDateRangeParams(range);
       const res = await fetch(
-        `/api/energy?country=${country}&region=${region}&start_date=${startDate}&end_date=${endDate}&range=${range}&interval=${interval}`
+        `/api/energy?country=${country}&region=${region}&start_date=${startDate}&end_date=${endDate}&range=${range}`
       );
       if (res.ok) {
         const json = await res.json();
-        const alignedPoints = alignPointsToTimeGrid(json.points || [], range, interval);
+        const alignedPoints = alignPointsToTimeGrid(json.points || [], range, json.interval);
         setPoints(alignedPoints);
         setBreakdown(json.breakdown || []);
         if (json.summary) {
@@ -117,7 +111,7 @@ export default function CountryDetailPage({ params }: CountryPageProps) {
       }
     } catch (e) {
       console.warn("No data available or error fetching:", e);
-      const emptyPoints = alignPointsToTimeGrid([], range, interval);
+      const emptyPoints = alignPointsToTimeGrid([], range);
       setPoints(emptyPoints);
       setBreakdown([]);
       setSummary(null);
@@ -125,7 +119,7 @@ export default function CountryDetailPage({ params }: CountryPageProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [country, region, range, interval]);
+  }, [country, region, range]);
 
   useEffect(() => {
     fetchData();
@@ -141,8 +135,6 @@ export default function CountryDetailPage({ params }: CountryPageProps) {
         onRegionChange={setRegion}
         range={range}
         onRangeChange={handleRangeChange}
-        interval={interval}
-        onIntervalChange={setInterval}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         paletteMode={paletteMode}
@@ -172,7 +164,7 @@ export default function CountryDetailPage({ params }: CountryPageProps) {
         <div className="bg-neutral-100 dark:bg-[#121215] border-b border-neutral-200 dark:border-[#27272A] px-4 py-2 text-xs text-neutral-600 dark:text-neutral-400 flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <span className="font-medium">
-              No live telemetry data available for this range and interval.
+              No live telemetry data available for this range.
             </span>
           </div>
           <button
