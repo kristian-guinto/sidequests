@@ -101,7 +101,7 @@ export function WaffleMatrix({
     <div className={`select-none ${className}`}>
       {/* 10x10 Waffle Grid — flush on card, no inner container */}
       <div
-        className="grid grid-cols-10 gap-[5px]"
+        className="grid grid-cols-10 gap-[3px] sm:gap-[5px]"
         onMouseLeave={() => onHoverFuel(null)}
       >
         {tiles.map((tile, idx) => {
@@ -116,10 +116,10 @@ export function WaffleMatrix({
                 backgroundColor: tile.color,
               }}
               className={`aspect-square rounded-[3px] transition-all duration-150 cursor-pointer ${isDirectlyHovered
-                  ? "ring-1.5 ring-white/80 dark:ring-white/70 shadow-lg z-10 scale-105"
-                  : isHighlighted
-                    ? "opacity-90"
-                    : "opacity-20"
+                ? "ring-1.5 ring-white/80 dark:ring-white/70 shadow-lg z-10 scale-105"
+                : isHighlighted
+                  ? "opacity-90"
+                  : "opacity-20"
                 }`}
               title={tile.label}
             />

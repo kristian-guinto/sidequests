@@ -5,7 +5,8 @@ import ReactECharts from "echarts-for-react";
 import * as echarts from "echarts";
 import { FuelGenerationPoint, ViewMode, FuelTech, PaletteMode, TimeRange } from "@/lib/types";
 import { getFuelMeta } from "@/lib/colors";
-import { computeXAxisConfig, formatMarketDate, getShadcnTooltipConfig } from "@/lib/chartUtils";
+import { computeXAxisConfig, formatMarketDate, getShadcnTooltipConfig, formatCompactValue } from "@/lib/chartUtils";
+import { useIsMobile } from "@/lib/useIsMobile";
 import {
   ChartCard,
   ChartCardHeader,
@@ -47,14 +48,17 @@ export function GenerationChart({
   viewMode,
   paletteMode = "clean-fossil",
   unit = "MW",
-  height = "330px",
+  height,
   hoveredFuel,
   onHoverPoint,
 }: GenerationChartProps) {
   const { isDark } = useTheme();
+  const isMobile = useIsMobile();
   const isPercentage = viewMode === "percentage";
   const isEnergy = unit === "GWh";
   const isBarView = range === "30d" || range === "1y";
+
+  const chartHeight = height || (isMobile ? "250px" : "310px");
 
   const avgGeneration = useMemo(() => {
     if (!data || data.length === 0) return 0;
@@ -86,7 +90,10 @@ export function GenerationChart({
     return totSum > 0 ? Math.round((renSum / totSum) * 1000) / 10 : 0;
   }, [data]);
 
-  const xAxisConfig = useMemo(() => computeXAxisConfig(data, isDark, range), [data, isDark, range]);
+  const xAxisConfig = useMemo(
+    () => computeXAxisConfig(data, isDark, range, undefined, isMobile),
+    [data, isDark, range, isMobile]
+  );
   const tooltipConfig = useMemo(() => getShadcnTooltipConfig(isDark), [isDark]);
 
   const option = useMemo(() => {
@@ -117,7 +124,6 @@ export function GenerationChart({
 
       if (paletteMode === "clean-fossil") {
         if (fuel === "gas") {
-          // Prominent line marking the boundary between fossil base and clean canopy
           lineWidth = 1.8;
           lineColor = isDark ? "#10B981" : "#059669";
           zLevel = 6;
@@ -208,93 +214,6 @@ export function GenerationChart({
             type: "dashed",
           },
         },
-        formatter: (params: any[]) => {
-          if (!params || params.length === 0) return "";
-          const idx = params[0].dataIndex;
-          const rawPt = data[idx];
-          let formattedTime = params[0].axisValue;
-          if (rawPt?.timestamp) {
-            formattedTime = formatMarketDate(rawPt.timestamp, "d MMM yyyy, h:mm a");
-          }
-
-          let total = rawPt?.totalGeneration || 0;
-          if (total === 0) {
-            total = params.reduce((acc, p) => acc + (Number(p.value) || 0), 0);
-          }
-
-          const unitStr = isEnergy ? "GWh" : "MW";
-          const formattedTotal = isEnergy
-            ? total.toFixed(2)
-            : Math.round(total).toLocaleString();
-
-          const rows = params.map((p) => {
-            const val = Number(p.value) || 0;
-            const rawVal = rawPt ? Number((rawPt as any)[p.seriesName.toLowerCase()] || 0) : 0;
-            const pct = isPercentage ? val : total > 0 ? (val / total) * 100 : 0;
-            return {
-              name: p.seriesName,
-              val,
-              rawVal,
-              pct,
-              color: p.color,
-            };
-          });
-
-          const borderCls = isDark ? "border-[#27272A]" : "border-neutral-100";
-          const textMuted = isDark ? "text-neutral-400" : "text-neutral-500";
-          const pillBg = isDark
-            ? "bg-[#27272A] text-neutral-100 border border-neutral-700"
-            : "bg-neutral-100 text-neutral-900";
-          const textPrimary = isDark ? "text-neutral-100" : "text-neutral-900";
-          const textSecondary = isDark ? "text-neutral-300" : "text-neutral-600";
-          const textSubPct = isDark ? "text-neutral-500" : "text-neutral-400";
-
-          if (rawPt?.hasData === false) {
-            return `<div class="font-sans min-w-[180px]">
-              <div class="border-b ${borderCls} pb-1.5 mb-2 flex justify-between items-center text-xs">
-                <span class="${textMuted} font-medium">${formattedTime}</span>
-                <span class="inline-flex items-center px-1.5 py-0.5 rounded ${pillBg} font-mono text-[11px] text-neutral-400">No data</span>
-              </div>
-              <div class="text-xs text-neutral-400 py-1 text-center">No data for this time period</div>
-            </div>`;
-          }
-
-          let html = `<div class="font-sans min-w-[210px]">
-            <div class="border-b ${borderCls} pb-1.5 mb-2 flex justify-between items-center text-xs">
-              <span class="${textMuted} font-medium">${formattedTime}</span>
-              <span class="inline-flex items-center px-1.5 py-0.5 rounded ${pillBg} font-bold font-mono">${isPercentage ? "100%" : `${formattedTotal} ${unitStr}`}</span>
-            </div>`;
-
-          rows.sort((a, b) => b.pct - a.pct).forEach((r) => {
-            if (r.pct > 0 || r.val > 0) {
-              const displayVal = isPercentage
-                ? `${r.pct.toFixed(1)}%`
-                : `${isEnergy ? r.val.toFixed(2) : Math.round(r.val).toLocaleString()} ${unitStr}`;
-              const subPct = !isPercentage ? `<span class="${textSubPct} text-[10px] ml-1">(${r.pct.toFixed(1)}%)</span>` : "";
-
-              const isClean = ["solar", "wind", "hydro", "geothermal", "biomass", "battery", "bioenergy"].some(
-                (f) => r.name.toLowerCase().includes(f)
-              );
-              const cleanBadge = paletteMode === "clean-fossil"
-                ? isClean
-                  ? `<span class="text-[9px] px-1 py-0.2 rounded bg-emerald-500/15 text-emerald-400 font-mono ml-1.5 font-semibold">Clean</span>`
-                  : `<span class="text-[9px] px-1 py-0.2 rounded bg-neutral-700/30 text-neutral-400 font-mono ml-1.5 font-semibold">Fossil</span>`
-                : "";
-
-              html += `<div class="flex justify-between items-center py-0.5 text-xs">
-                <span class="flex items-center ${textSecondary}">
-                  <span class="w-2.5 h-2.5 rounded-[3px] mr-2 shrink-0" style="background-color:${r.color}"></span>
-                  ${r.name}
-                  ${cleanBadge}
-                </span>
-                <span class="font-mono ${textPrimary} font-medium">${displayVal} ${subPct}</span>
-              </div>`;
-            }
-          });
-
-          html += `</div>`;
-          return html;
-        },
       },
       grid: xAxisConfig.grid,
       xAxis: {
@@ -317,10 +236,16 @@ export function GenerationChart({
         axisTick: { show: false },
         axisLabel: {
           color: isDark ? "#A1A1AA" : "#64748B",
-          fontSize: 10,
-          margin: 12,
+          fontSize: isMobile ? 9 : 10,
+          margin: isMobile ? 6 : 12,
           formatter: (v: number) =>
-            isPercentage ? `${v}%` : isEnergy ? `${v}` : `${v.toLocaleString()}`,
+            isPercentage
+              ? `${v}%`
+              : isEnergy
+                ? `${v}`
+                : isMobile
+                  ? formatCompactValue(v)
+                  : `${v.toLocaleString()}`,
         },
         splitLine: {
           lineStyle: { color: gridLineColor, type: "dashed" },
@@ -328,7 +253,7 @@ export function GenerationChart({
       },
       series,
     };
-  }, [data, range, isPercentage, isEnergy, isBarView, xAxisConfig, tooltipConfig, isDark, hoveredFuel, paletteMode]);
+  }, [data, range, isPercentage, isEnergy, isBarView, xAxisConfig, tooltipConfig, isDark, hoveredFuel, paletteMode, isMobile]);
 
   const onEvents = useMemo(() => {
     return {
@@ -352,14 +277,14 @@ export function GenerationChart({
   return (
     <ChartCard onMouseLeave={() => onHoverPoint?.(null)}>
       <ChartCardHeader className="py-2.5 px-3 sm:px-4">
-        <ChartCardTitle>
-          <div className="flex items-center space-x-2">
+        <ChartCardTitle className="flex-wrap gap-1.5 sm:gap-2">
+          <div className="flex items-center space-x-1.5 sm:space-x-2">
             {isPercentage ? (
-              <Percent className="h-4 w-4 text-emerald-500 dark:text-emerald-400" />
+              <Percent className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-500 dark:text-emerald-400" />
             ) : (
-              <Zap className="h-4 w-4 text-amber-500 dark:text-amber-400" />
+              <Zap className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-500 dark:text-amber-400" />
             )}
-            <span>
+            <span className="text-xs sm:text-sm">
               Generation ({isPercentage ? "%" : unit})
             </span>
             {paletteMode === "clean-fossil" && (
@@ -369,7 +294,7 @@ export function GenerationChart({
               </span>
             )}
           </div>
-          <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-100 dark:bg-[#18181B] text-neutral-800 dark:text-neutral-200 border border-neutral-200/60 dark:border-neutral-800 font-mono shadow-xs">
+          <div className="inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-[11px] sm:text-xs font-medium bg-neutral-100 dark:bg-[#18181B] text-neutral-800 dark:text-neutral-200 border border-neutral-200/60 dark:border-neutral-800 font-mono shadow-xs">
             {isPercentage ? (
               <>
                 Renewables:{" "}
@@ -389,12 +314,12 @@ export function GenerationChart({
         </ChartCardTitle>
       </ChartCardHeader>
 
-      <ChartCardContent>
+      <ChartCardContent className="p-1 sm:p-3 pt-2">
         <ReactECharts
           option={option}
           onEvents={onEvents}
           onChartReady={onChartReady}
-          style={{ height, width: "100%" }}
+          style={{ height: chartHeight, width: "100%" }}
           notMerge={true}
           lazyUpdate={false}
         />

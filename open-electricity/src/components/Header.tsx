@@ -127,23 +127,23 @@ export function Header({
             {/* Data Source Indicator */}
             {dataSource === "duckdb_local" || dataSource === "local" ? (
               <div
-                className="flex items-center space-x-1.5 bg-blue-500/10 text-blue-700 dark:text-blue-400 px-2.5 py-1 rounded-md border border-blue-500/20 text-[11px] font-medium"
+                className="flex items-center space-x-1.5 bg-blue-500/10 text-blue-700 dark:text-blue-400 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-md border border-blue-500/20 text-[10px] sm:text-[11px] font-medium"
                 title="Connected to local DuckDB database"
               >
-                <span className="h-2 w-2 rounded-full bg-blue-500" />
+                <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-blue-500" />
                 <span>local</span>
               </div>
             ) : dataSource === "motherduck" || dataSource === "motherduck_cloud" ? (
               <div
-                className="flex items-center space-x-1.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 px-2.5 py-1 rounded-md border border-emerald-500/20 text-[11px] font-medium"
+                className="flex items-center space-x-1.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-md border border-emerald-500/20 text-[10px] sm:text-[11px] font-medium"
                 title="Connected to MotherDuck Cloud"
               >
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-emerald-500" />
                 <span>cloud</span>
               </div>
             ) : null}
 
-            <div className="flex items-center space-x-1.5 bg-neutral-50 dark:bg-[#121215] px-2.5 py-1 rounded-md border border-neutral-200 dark:border-[#27272A] text-[11px] font-medium">
+            <div className="hidden sm:flex items-center space-x-1.5 bg-neutral-50 dark:bg-[#121215] px-2.5 py-1 rounded-md border border-neutral-200 dark:border-[#27272A] text-[11px] font-medium">
               <span className="text-neutral-800 dark:text-neutral-200">
                 {currentCountry.name} ({currentCountry.currencyCode})
               </span>
@@ -153,144 +153,201 @@ export function Header({
       </div>
 
       {/* Main Toolbar: Controls */}
-      <div className="w-full px-4 sm:px-6 lg:px-8 py-2 flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-[#000000]">
-        {/* Left: All Countries & Country / Region Dropdown */}
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          {/* Back to Overview */}
-          <Link
-            href="/"
-            className="flex items-center space-x-1.5 px-2.5 py-1 bg-neutral-50 dark:bg-[#121215] hover:bg-neutral-100 dark:hover:bg-[#18181B] border border-neutral-200 dark:border-[#27272A] rounded text-xs font-semibold text-neutral-700 dark:text-neutral-300 transition shadow-xs group"
-            title="Return to Southeast Asia Overview"
-          >
-            <LayoutGrid className="h-3.5 w-3.5 text-neutral-500 group-hover:text-emerald-500 dark:group-hover:text-emerald-400 transition-colors" />
-            <span>All Countries</span>
-          </Link>
-
-          {/* Country & Region Menu */}
-          <div className="relative">
-            <button
-              onClick={() => setIsRegionMenuOpen(!isRegionMenuOpen)}
-              className="flex items-center space-x-2 px-2.5 py-1 bg-neutral-50 dark:bg-[#121215] hover:bg-neutral-100 dark:hover:bg-[#18181B] border border-neutral-200 dark:border-[#27272A] rounded text-xs font-semibold text-neutral-900 dark:text-neutral-100 transition shadow-sm"
+      <div className="w-full px-3 sm:px-6 lg:px-8 py-1.5 sm:py-2 bg-white dark:bg-[#000000] space-y-1.5 sm:space-y-0">
+        {/* Row 1: Left navigation & Right action icons */}
+        <div className="flex items-center justify-between gap-2">
+          {/* Left: All Countries & Country / Region Dropdown */}
+          <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
+            {/* Back to Overview */}
+            <Link
+              href="/"
+              className="flex items-center space-x-1.5 px-2 sm:px-2.5 py-1 bg-neutral-50 dark:bg-[#121215] hover:bg-neutral-100 dark:hover:bg-[#18181B] border border-neutral-200 dark:border-[#27272A] rounded text-xs font-semibold text-neutral-700 dark:text-neutral-300 transition shadow-xs group shrink-0"
+              title="Return to Southeast Asia Overview"
             >
-              <span className="text-sm">{currentCountry.flag}</span>
-              <span>
-                {currentCountry.name} &bull; {currentRegionObj.label}
-              </span>
-              <ChevronDown className="h-3.5 w-3.5 text-neutral-500 dark:text-neutral-400" />
-            </button>
+              <LayoutGrid className="h-3.5 w-3.5 text-neutral-500 group-hover:text-emerald-500 dark:group-hover:text-emerald-400 transition-colors" />
+              <span className="hidden sm:inline">All Countries</span>
+              <span className="sm:hidden">All</span>
+            </Link>
 
-            {isRegionMenuOpen && (
-              <div className="absolute left-0 mt-1.5 w-64 bg-white dark:bg-[#09090B] rounded-lg shadow-xl border border-neutral-200 dark:border-[#27272A] py-2 z-50 text-xs">
-                <div className="px-3 py-1 text-[10px] font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider">
-                  Select Country &amp; Region
-                </div>
-                {(Object.keys(COUNTRIES_METADATA) as CountryCode[]).map((cCode) => {
-                  const cInfo = COUNTRIES_METADATA[cCode];
-                  const isCurrentC = country === cCode;
-                  return (
-                    <div key={cCode} className="border-b border-neutral-100 dark:border-[#27272A]/60 last:border-0 py-1">
-                      <button
-                        onClick={() => handleCountrySelect(cCode)}
-                        className={`w-full flex items-center justify-between px-3 py-1.5 text-left transition ${isCurrentC
-                          ? "font-bold text-neutral-950 dark:text-white bg-neutral-50 dark:bg-[#18181B]"
-                          : "text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-[#121215]"
-                          }`}
-                      >
-                        <span className="flex items-center space-x-2">
-                          <span className="text-sm">{cInfo.flag}</span>
-                          <span>{cInfo.name}</span>
-                        </span>
-                        <span className="text-[10px] font-mono text-neutral-400">
-                          {cInfo.currencyCode}
-                        </span>
-                      </button>
+            {/* Country & Region Menu */}
+            <div className="relative">
+              <button
+                onClick={() => setIsRegionMenuOpen(!isRegionMenuOpen)}
+                className="flex items-center space-x-1.5 sm:space-x-2 px-2 sm:px-2.5 py-1 bg-neutral-50 dark:bg-[#121215] hover:bg-neutral-100 dark:hover:bg-[#18181B] border border-neutral-200 dark:border-[#27272A] rounded text-xs font-semibold text-neutral-900 dark:text-neutral-100 transition shadow-sm truncate"
+              >
+                <span className="text-sm">{currentCountry.flag}</span>
+                <span className="truncate max-w-[110px] xs:max-w-[150px] sm:max-w-none">
+                  {currentCountry.name} &bull; {currentRegionObj.label}
+                </span>
+                <ChevronDown className="h-3.5 w-3.5 text-neutral-500 dark:text-neutral-400 shrink-0" />
+              </button>
 
-                      {isCurrentC && (
-                        <div className="pl-7 pr-3 py-1 space-y-0.5">
-                          {cInfo.regions.map((reg) => (
-                            <button
-                              key={reg.id}
-                              onClick={() => handleRegionSelect(reg.id)}
-                              className={`w-full text-left px-2 py-1 rounded text-xs transition ${region === reg.id
-                                ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 font-medium"
-                                : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-[#18181B]"
-                                }`}
-                            >
-                              {reg.label}
-                            </button>
-                          ))}
-                        </div>
-                      )}
+              {isRegionMenuOpen && (
+                <>
+                  {/* Dismiss Backdrop */}
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setIsRegionMenuOpen(false)}
+                  />
+                  <div className="absolute left-0 mt-1.5 w-64 bg-white dark:bg-[#09090B] rounded-lg shadow-xl border border-neutral-200 dark:border-[#27272A] py-2 z-50 text-xs animate-in fade-in zoom-in-95 duration-100">
+                    <div className="px-3 py-1 text-[10px] font-bold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider">
+                      Select Country &amp; Region
                     </div>
-                  );
-                })}
-              </div>
-            )}
+                    {(Object.keys(COUNTRIES_METADATA) as CountryCode[]).map((cCode) => {
+                      const cInfo = COUNTRIES_METADATA[cCode];
+                      const isCurrentC = country === cCode;
+                      return (
+                        <div key={cCode} className="border-b border-neutral-100 dark:border-[#27272A]/60 last:border-0 py-1">
+                          <button
+                            onClick={() => handleCountrySelect(cCode)}
+                            className={`w-full flex items-center justify-between px-3 py-1.5 text-left transition ${isCurrentC
+                              ? "font-bold text-neutral-950 dark:text-white bg-neutral-50 dark:bg-[#18181B]"
+                              : "text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-[#121215]"
+                              }`}
+                          >
+                            <span className="flex items-center space-x-2">
+                              <span className="text-sm">{cInfo.flag}</span>
+                              <span>{cInfo.name}</span>
+                            </span>
+                            <span className="text-[10px] font-mono text-neutral-400">
+                              {cInfo.currencyCode}
+                            </span>
+                          </button>
+
+                          {isCurrentC && (
+                            <div className="pl-7 pr-3 py-1 space-y-0.5">
+                              {cInfo.regions.map((reg) => (
+                                <button
+                                  key={reg.id}
+                                  onClick={() => handleRegionSelect(reg.id)}
+                                  className={`w-full text-left px-2 py-1 rounded text-xs transition ${region === reg.id
+                                    ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 font-medium"
+                                    : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-[#18181B]"
+                                    }`}
+                                >
+                                  {reg.label}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
 
-          <div className="h-4 w-[1px] bg-neutral-200 dark:bg-[#27272A] mx-1 hidden sm:block" />
+          {/* Right Controls: Theme Switcher, Refresh & Share */}
+          <div className="flex items-center space-x-1.5 shrink-0">
+            {/* Theme Toggle Button */}
+            <button
+              onClick={toggleTheme}
+              className="flex items-center justify-center p-1.5 rounded border border-neutral-200 dark:border-[#27272A] hover:bg-neutral-50 dark:hover:bg-[#121215] text-neutral-700 dark:text-neutral-300 text-xs transition"
+              title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+              aria-label="Toggle Theme"
+            >
+              {isDark ? (
+                <Sun className="h-3.5 w-3.5 text-amber-400" />
+              ) : (
+                <Moon className="h-3.5 w-3.5 text-neutral-600" />
+              )}
+            </button>
 
+            <button
+              onClick={onRefresh}
+              disabled={isLoading}
+              className="flex items-center space-x-1 sm:space-x-1.5 px-2 sm:px-2.5 py-1 rounded border border-neutral-200 dark:border-[#27272A] hover:bg-neutral-50 dark:hover:bg-[#121215] text-neutral-700 dark:text-neutral-300 text-xs font-medium transition disabled:opacity-50"
+              title="Refresh Data"
+            >
+              <RotateCw
+                className={`h-3.5 w-3.5 ${isLoading ? "animate-spin text-emerald-500" : ""}`}
+              />
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
+
+            <button
+              onClick={handleShare}
+              className="flex items-center space-x-1 sm:space-x-1.5 px-2 sm:px-2.5 py-1 rounded border border-neutral-200 dark:border-[#27272A] hover:bg-neutral-50 dark:hover:bg-[#121215] text-neutral-700 dark:text-neutral-300 text-xs font-medium transition"
+              title="Copy Page Link"
+            >
+              {copied ? (
+                <>
+                  <Check className="h-3.5 w-3.5 text-emerald-500" />
+                  <span className="text-emerald-500 font-semibold hidden sm:inline">Copied!</span>
+                </>
+              ) : (
+                <>
+                  <Share2 className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Share</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Row 2: View Mode, Palette, and Range controls in horizontal scroll container on mobile */}
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-0.5 sm:pb-0 pt-0.5 sm:pt-1">
           {/* Palette Mode Toggle (Clean / Fossil vs Detailed) */}
-          <div className="flex items-center border border-neutral-200 dark:border-[#27272A] rounded p-0.5 bg-neutral-50/50 dark:bg-[#121215]">
+          <div className="flex items-center border border-neutral-200 dark:border-[#27272A] rounded p-0.5 bg-neutral-50/50 dark:bg-[#121215] shrink-0">
             <button
               onClick={() => onPaletteModeChange("clean-fossil")}
-              className={`flex items-center space-x-1 px-2.5 py-0.5 rounded text-xs font-medium transition ${paletteMode === "clean-fossil"
+              className={`flex items-center space-x-1 px-2 sm:px-2.5 py-0.5 rounded text-xs font-medium transition ${paletteMode === "clean-fossil"
                 ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold shadow-sm"
                 : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white"
                 }`}
               title="2-Tone Clean vs. Fossil Mode"
             >
               <Leaf className="h-3.5 w-3.5 text-emerald-500 dark:text-emerald-400" />
-              <span>Clean / Fossil</span>
+              <span className="hidden sm:inline">Clean / Fossil</span>
             </button>
             <button
               onClick={() => onPaletteModeChange("detailed")}
-              className={`flex items-center space-x-1 px-2.5 py-0.5 rounded text-xs font-medium transition ${paletteMode === "detailed"
+              className={`flex items-center space-x-1 px-2 sm:px-2.5 py-0.5 rounded text-xs font-medium transition ${paletteMode === "detailed"
                 ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold shadow-sm"
                 : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white"
                 }`}
               title="Full Multi-Color Fuel Mix"
             >
               <Palette className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400" />
-              <span>Detailed</span>
+              <span className="hidden sm:inline">Detailed</span>
             </button>
           </div>
 
-          <div className="h-4 w-[1px] bg-neutral-200 dark:bg-[#27272A] mx-1 hidden sm:block" />
-
           {/* Chart Mode Toggle (Percentage vs Value) */}
-          <div className="flex items-center border border-neutral-200 dark:border-[#27272A] rounded p-0.5 bg-neutral-50/50 dark:bg-[#121215]">
+          <div className="flex items-center border border-neutral-200 dark:border-[#27272A] rounded p-0.5 bg-neutral-50/50 dark:bg-[#121215] shrink-0">
             <button
               onClick={() => onViewModeChange("percentage")}
-              className={`flex items-center space-x-1 px-2.5 py-0.5 rounded text-xs font-medium transition ${viewMode === "percentage"
+              className={`flex items-center space-x-1 px-2 sm:px-2.5 py-0.5 rounded text-xs font-medium transition ${viewMode === "percentage"
                 ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold shadow-sm"
                 : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white"
                 }`}
               title="Percentage Contribution Share (%)"
             >
               <Percent className="h-3.5 w-3.5 text-emerald-500 dark:text-emerald-400" />
-              <span>Percentage</span>
+              <span className="hidden sm:inline">Percentage</span>
             </button>
             <button
               onClick={() => onViewModeChange("stacked")}
-              className={`flex items-center space-x-1 px-2.5 py-0.5 rounded text-xs font-medium transition ${viewMode === "stacked" || viewMode === "cumulative"
+              className={`flex items-center space-x-1 px-2 sm:px-2.5 py-0.5 rounded text-xs font-medium transition ${viewMode === "stacked" || viewMode === "cumulative"
                 ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold shadow-sm"
                 : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white"
                 }`}
               title="Absolute Value (MW / GWh)"
             >
               <AreaIcon className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400" />
-              <span>Value</span>
+              <span className="hidden sm:inline">Value</span>
             </button>
           </div>
 
           {/* Range Pills (1D, 3D, 7D, 30D, 1Y) */}
-          <div className="flex border border-neutral-200 dark:border-[#27272A] rounded p-0.5 text-xs font-medium bg-neutral-50/50 dark:bg-[#121215]">
+          <div className="flex border border-neutral-200 dark:border-[#27272A] rounded p-0.5 text-xs font-medium bg-neutral-50/50 dark:bg-[#121215] shrink-0">
             {RANGES.map((rng) => (
               <button
                 key={rng.id}
                 onClick={() => handleRangeClick(rng.id)}
-                className={`px-2.5 py-0.5 rounded transition ${range === rng.id
+                className={`px-2 sm:px-2.5 py-0.5 rounded transition ${range === rng.id
                   ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold border border-neutral-300 dark:border-neutral-700 shadow-sm"
                   : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
                   }`}
@@ -299,55 +356,6 @@ export function Header({
               </button>
             ))}
           </div>
-
-
-        </div>
-
-        {/* Right Controls: Theme Switcher, Refresh & Share */}
-        <div className="flex items-center space-x-2">
-          {/* Theme Toggle Button */}
-          <button
-            onClick={toggleTheme}
-            className="flex items-center justify-center p-1.5 rounded border border-neutral-200 dark:border-[#27272A] hover:bg-neutral-50 dark:hover:bg-[#121215] text-neutral-700 dark:text-neutral-300 text-xs transition"
-            title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
-            aria-label="Toggle Theme"
-          >
-            {isDark ? (
-              <Sun className="h-3.5 w-3.5 text-amber-400" />
-            ) : (
-              <Moon className="h-3.5 w-3.5 text-neutral-600" />
-            )}
-          </button>
-
-          <button
-            onClick={onRefresh}
-            disabled={isLoading}
-            className="flex items-center space-x-1.5 px-2.5 py-1 rounded border border-neutral-200 dark:border-[#27272A] hover:bg-neutral-50 dark:hover:bg-[#121215] text-neutral-700 dark:text-neutral-300 text-xs font-medium transition disabled:opacity-50"
-            title="Refresh Data"
-          >
-            <RotateCw
-              className={`h-3.5 w-3.5 ${isLoading ? "animate-spin text-emerald-500" : ""}`}
-            />
-            <span>Refresh</span>
-          </button>
-
-          <button
-            onClick={handleShare}
-            className="flex items-center space-x-1.5 px-2.5 py-1 rounded border border-neutral-200 dark:border-[#27272A] hover:bg-neutral-50 dark:hover:bg-[#121215] text-neutral-700 dark:text-neutral-300 text-xs font-medium transition"
-            title="Copy Page Link"
-          >
-            {copied ? (
-              <>
-                <Check className="h-3.5 w-3.5 text-emerald-500" />
-                <span className="text-emerald-500 font-semibold">Copied!</span>
-              </>
-            ) : (
-              <>
-                <Share2 className="h-3.5 w-3.5" />
-                <span>Share</span>
-              </>
-            )}
-          </button>
         </div>
       </div>
     </header>

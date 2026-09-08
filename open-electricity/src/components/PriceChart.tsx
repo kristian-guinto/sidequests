@@ -5,6 +5,7 @@ import ReactECharts from "echarts-for-react";
 import * as echarts from "echarts";
 import { FuelGenerationPoint, TimeRange } from "@/lib/types";
 import { computeXAxisConfig, createShadcnGradient, formatMarketDate, getShadcnTooltipConfig } from "@/lib/chartUtils";
+import { useIsMobile } from "@/lib/useIsMobile";
 import {
   ChartCard,
   ChartCardHeader,
@@ -30,12 +31,17 @@ export function PriceChart({
   range = "7d",
   currencySymbol = "₱",
   currencyCode = "PHP",
-  height = "180px",
+  height,
   onHoverPoint,
 }: PriceChartProps) {
   const { isDark } = useTheme();
+  const isMobile = useIsMobile();
   const isBarView = range === "30d" || range === "1y";
-  const xAxisConfig = useMemo(() => computeXAxisConfig(data, isDark, range), [data, isDark, range]);
+  const chartHeight = height || (isMobile ? "135px" : "150px");
+  const xAxisConfig = useMemo(
+    () => computeXAxisConfig(data, isDark, range, undefined, isMobile),
+    [data, isDark, range, isMobile]
+  );
   const tooltipConfig = useMemo(() => getShadcnTooltipConfig(isDark), [isDark]);
 
   const hasDistribution = useMemo(() => {
@@ -236,8 +242,8 @@ export function PriceChart({
         axisTick: { show: false },
         axisLabel: {
           color: isDark ? "#A1A1AA" : "#64748B",
-          fontSize: 10,
-          margin: 12,
+          fontSize: isMobile ? 9 : 10,
+          margin: isMobile ? 6 : 12,
           formatter: (v: number) => {
             if (Math.abs(v) >= 1000) {
               return `${(v / 1000).toFixed(0)}k`;
@@ -649,15 +655,15 @@ export function PriceChart({
   return (
     <ChartCard onMouseLeave={() => onHoverPoint?.(null)}>
       <ChartCardHeader className="py-2 px-3 sm:px-4">
-        <ChartCardTitle>
-          <div className="flex items-center space-x-2">
-            <TrendingUp className="h-4 w-4 text-rose-500" />
-            <span>
+        <ChartCardTitle className="flex-wrap gap-1.5 sm:gap-2">
+          <div className="flex items-center space-x-1.5 sm:space-x-2">
+            <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-rose-500" />
+            <span className="text-xs sm:text-sm">
               Price ({currencyCode} / MWh)
             </span>
           </div>
 
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2 sm:space-x-3">
             {hasDistribution && (
               <div className="hidden sm:flex items-center space-x-3 text-[11px] text-neutral-500 dark:text-neutral-400 font-medium">
                 <span className="flex items-center space-x-1.5">
@@ -674,7 +680,7 @@ export function PriceChart({
                 </span>
               </div>
             )}
-            <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-100 dark:bg-[#18181B] text-neutral-800 dark:text-neutral-200 border border-neutral-200/60 dark:border-neutral-800 font-mono shadow-xs">
+            <div className="inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-[11px] sm:text-xs font-medium bg-neutral-100 dark:bg-[#18181B] text-neutral-800 dark:text-neutral-200 border border-neutral-200/60 dark:border-neutral-800 font-mono shadow-xs">
               Av.{" "}
               <strong className="ml-1 text-neutral-950 dark:text-white font-bold">
                 {currencySymbol}
@@ -685,12 +691,12 @@ export function PriceChart({
         </ChartCardTitle>
       </ChartCardHeader>
 
-      <ChartCardContent>
+      <ChartCardContent className="p-1 sm:p-3 pt-2">
         <ReactECharts
           option={option}
           onEvents={onEvents}
           onChartReady={onChartReady}
-          style={{ height, width: "100%" }}
+          style={{ height: chartHeight, width: "100%" }}
           notMerge={true}
           lazyUpdate={false}
         />

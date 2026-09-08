@@ -20,7 +20,7 @@ import { GenerationChart } from "@/components/GenerationChart";
 import { EmissionsChart } from "@/components/EmissionsChart";
 import { PriceChart } from "@/components/PriceChart";
 import { DataSidebar } from "@/components/DataSidebar";
-import { alignPointsToTimeGrid, getDateRangeParams } from "@/lib/chartUtils";
+import { alignPointsToTimeGrid, getDateRangeParams, formatMarketDate } from "@/lib/chartUtils";
 
 interface CountryPageProps {
   params: {
@@ -181,13 +181,32 @@ export default function CountryDetailPage({ params }: CountryPageProps) {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-start">
           {/* Left Column (8 cols ~ 67% width): Synchronized Chart Stack */}
           <div className="lg:col-span-8 space-y-2.5">
+            {/* Mobile Live Scrub HUD: displays hovered point telemetry under thumb */}
+            {hoveredPoint && (
+              <div className="lg:hidden flex items-center justify-between px-3 py-1.5 bg-emerald-500/10 dark:bg-emerald-950/40 border border-emerald-500/30 rounded-lg text-xs font-mono shadow-xs animate-in fade-in duration-150">
+                <span className="text-neutral-600 dark:text-neutral-400 font-medium">
+                  {formatMarketDate(hoveredPoint.timestamp, "d MMM, h:mm a")}
+                </span>
+                <div className="flex items-center space-x-2.5">
+                  <span className="text-neutral-900 dark:text-white font-bold">
+                    {Math.round(hoveredPoint.totalGeneration || 0).toLocaleString()} {unit}
+                  </span>
+                  {hoveredPoint.renewablesPct != null && (
+                    <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                      {Math.round(hoveredPoint.renewablesPct)}% Clean
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
             <GenerationChart
               data={points}
               range={range}
               viewMode={viewMode}
               paletteMode={paletteMode}
-              height="310px"
               hoveredFuel={hoveredFuel}
+              onHoverPoint={setHoveredPoint}
             />
 
             {/* Chart 2: Emissions Volume (tCO2e/interval) */}
@@ -195,7 +214,6 @@ export default function CountryDetailPage({ params }: CountryPageProps) {
               data={points}
               range={range}
               viewMode={viewMode}
-              height="170px"
               hoveredFuel={hoveredFuel}
               onHoverPoint={setHoveredPoint}
             />
@@ -206,7 +224,6 @@ export default function CountryDetailPage({ params }: CountryPageProps) {
               range={range}
               currencySymbol={countryInfo.currencySymbol}
               currencyCode={countryInfo.currencyCode}
-              height="150px"
               onHoverPoint={setHoveredPoint}
             />
           </div>
@@ -230,9 +247,9 @@ export default function CountryDetailPage({ params }: CountryPageProps) {
       </main>
 
       {/* Sleek Bottom OpenNEM Status Bar */}
-      <footer className="border-t border-neutral-200 dark:border-[#27272A] bg-neutral-900 dark:bg-[#09090B] text-neutral-300 py-1 px-4 text-[11px] font-mono select-none">
-        <div className="w-full flex items-center justify-between">
-          <div className="flex items-center space-x-3 text-neutral-400">
+      <footer className="border-t border-neutral-200 dark:border-[#27272A] bg-neutral-900 dark:bg-[#09090B] text-neutral-300 py-2.5 px-4 text-[11px] font-mono select-none">
+        <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-1.5 text-center sm:text-left">
+          <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-2.5 gap-y-1 text-neutral-400">
             <span className="text-neutral-200 font-semibold">v4.54.10</span>
             <span>&bull;</span>
             <span className="flex items-center space-x-1.5">
@@ -255,11 +272,11 @@ export default function CountryDetailPage({ params }: CountryPageProps) {
             <span>API: 4.5.11</span>
           </div>
 
-          <div className="flex items-center space-x-4 text-neutral-400">
+          <div className="text-neutral-400 text-[10px] sm:text-[11px]">
             <span>Sources: IEMOP (PH), EMA (SG), Single Buyer (MY), EGAT (TH)</span>
           </div>
         </div>
       </footer>
-    </div >
+    </div>
   );
 }

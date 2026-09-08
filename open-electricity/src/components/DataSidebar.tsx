@@ -372,32 +372,32 @@ export function DataSidebar({
       </div>
 
       {/* Bottom: Breakdown Table */}
-      <div className="flex-1 overflow-x-auto">
+      <div className="flex-1 overflow-x-auto no-scrollbar">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="border-b border-neutral-200 dark:border-[#27272A] text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 bg-neutral-50/50 dark:bg-[#121215]/50">
-              <th className="py-2 px-3">
+            <tr className="border-b border-neutral-200 dark:border-[#27272A] text-[10.5px] sm:text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 bg-neutral-50/50 dark:bg-[#121215]/50">
+              <th className="py-1.5 px-2.5 sm:px-3">
                 <div className="flex items-center space-x-1 cursor-pointer">
                   <span>Detailed</span>
                   <ChevronDown className="h-3 w-3" />
                 </div>
               </th>
-              <th className="py-2 px-2 text-right font-mono">
+              <th className="py-1.5 px-1.5 sm:px-2 text-right font-mono">
                 {tableData.columnUnit}
                 <br />
-                <span className="font-normal text-[10px] text-neutral-400 dark:text-neutral-500">
+                <span className="font-normal text-[9.5px] sm:text-[10px] text-neutral-400 dark:text-neutral-500">
                   {tableData.unitSub}
                 </span>
               </th>
-              <th className="py-2 px-2 text-right font-mono">
+              <th className="py-1.5 px-1.5 sm:px-2 text-right font-mono">
                 Contrib.
                 <br />
-                <span className="font-normal text-[10px] text-neutral-400 dark:text-neutral-500">%</span>
+                <span className="font-normal text-[9.5px] sm:text-[10px] text-neutral-400 dark:text-neutral-500">%</span>
               </th>
-              <th className="py-2 px-3 text-right font-mono">
+              <th className="py-1.5 px-2 sm:px-3 text-right font-mono">
                 {isHovered ? "Spot Price" : "Av. Value"}
                 <br />
-                <span className="font-normal text-[10px] text-neutral-400 dark:text-neutral-500">
+                <span className="font-normal text-[9.5px] sm:text-[10px] text-neutral-400 dark:text-neutral-500">
                   {currencySymbol}/MWh
                 </span>
               </th>
@@ -407,7 +407,7 @@ export function DataSidebar({
           <tbody className="divide-y divide-neutral-100 dark:divide-[#27272A]/70 text-neutral-800 dark:text-neutral-200">
             {/* Sources Section Header */}
             <tr className="bg-neutral-50/80 dark:bg-[#18181B]/80 text-[10px] font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
-              <td colSpan={4} className="py-1 px-3">
+              <td colSpan={4} className="py-1 px-2.5 sm:px-3">
                 Sources
               </td>
             </tr>
@@ -429,14 +429,14 @@ export function DataSidebar({
                         : "hover:bg-neutral-50/90 dark:hover:bg-[#18181B]/70"
                     }`}
                 >
-                  <td className="py-1.5 px-3 flex items-center space-x-2">
+                  <td className="py-1.5 px-2.5 sm:px-3 flex items-center space-x-1.5 sm:space-x-2">
                     <span
                       className={`w-2.5 h-2.5 rounded-sm flex-shrink-0 transition-transform ${isThisRowHovered ? "scale-125 ring-1 ring-neutral-400" : ""
                         }`}
                       style={{ backgroundColor: row.color }}
                     />
                     <span
-                      className={`text-[11px] ${isThisRowHovered
+                      className={`text-[11px] truncate ${isThisRowHovered
                         ? "text-neutral-950 dark:text-white font-bold"
                         : "font-medium text-neutral-800 dark:text-neutral-200"
                         }`}
@@ -444,13 +444,13 @@ export function DataSidebar({
                       {row.label}
                     </span>
                   </td>
-                  <td className="py-1.5 px-2 text-right font-mono font-medium text-[11px] text-neutral-900 dark:text-neutral-100">
+                  <td className="py-1.5 px-1.5 sm:px-2 text-right font-mono font-medium text-[11px] tabular-nums text-neutral-900 dark:text-neutral-100">
                     {row.valueDisplay}
                   </td>
-                  <td className="py-1.5 px-2 text-right font-mono text-[11px] text-neutral-600 dark:text-neutral-400">
+                  <td className="py-1.5 px-1.5 sm:px-2 text-right font-mono text-[11px] tabular-nums text-neutral-600 dark:text-neutral-400">
                     {row.pct.toFixed(1)}%
                   </td>
-                  <td className="py-1.5 px-3 text-right font-mono text-[11px] text-neutral-500 dark:text-neutral-400">
+                  <td className="py-1.5 px-2 sm:px-3 text-right font-mono text-[11px] tabular-nums text-neutral-500 dark:text-neutral-400">
                     {row.priceDisplay}
                   </td>
                 </tr>

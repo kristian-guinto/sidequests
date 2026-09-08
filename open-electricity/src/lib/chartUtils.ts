@@ -173,20 +173,43 @@ export function alignPointsToTimeGrid(
 }
 
 /**
+ * Formats large values compactly (e.g., 14200 -> "14.2k" or "14k") for narrow mobile y-axes.
+ */
+export function formatCompactValue(val: number): string {
+  if (Math.abs(val) >= 1000000) {
+    return `${(val / 1000000).toFixed(1)}M`;
+  }
+  if (Math.abs(val) >= 10000) {
+    return `${Math.round(val / 1000)}k`;
+  }
+  if (Math.abs(val) >= 1000) {
+    return `${(val / 1000).toFixed(1)}k`;
+  }
+  return `${Math.round(val)}`;
+}
+
+/**
  * Computes intelligent X-axis categories, tick step, and floating borderless axis styling
- * matching the Shadcn UI Area Charts specification with dark theme calibration.
+ * matching the Shadcn UI Area Charts specification with dark theme calibration and mobile responsiveness.
  */
 export function computeXAxisConfig(
   data: FuelGenerationPoint[],
   isDark: boolean = true,
   range?: TimeRange,
-  interval?: TimeInterval
+  interval?: TimeInterval,
+  isMobile: boolean = false
 ) {
   if (!data || data.length === 0) {
     return {
       timestamps: [],
       axisLabel: { show: true },
-      grid: { left: 55, right: 20, top: 14, bottom: 26, containLabel: true },
+      grid: {
+        left: isMobile ? 36 : 55,
+        right: isMobile ? 8 : 20,
+        top: 14,
+        bottom: isMobile ? 22 : 26,
+        containLabel: true,
+      },
     };
   }
 
@@ -212,10 +235,11 @@ export function computeXAxisConfig(
   const tickIndexSet = new Set<number>();
 
   if (is1Day && parsedDates.length === n) {
+    const stepHours = isMobile ? 6 : 3;
     for (let i = 0; i < n; i++) {
       const d = parsedDates[i];
       if (!isNaN(d.getTime())) {
-        if (d.getMinutes() === 0 && d.getHours() % 3 === 0) {
+        if (d.getMinutes() === 0 && d.getHours() % stepHours === 0) {
           tickIndexSet.add(i);
         }
       }
@@ -224,34 +248,49 @@ export function computeXAxisConfig(
     for (let i = 0; i < n; i++) {
       const d = parsedDates[i];
       if (!isNaN(d.getTime())) {
-        if (d.getMinutes() === 0 && (d.getHours() === 0 || d.getHours() === 12)) {
+        if (
+          d.getMinutes() === 0 &&
+          (isMobile ? d.getHours() === 0 : d.getHours() === 0 || d.getHours() === 12)
+        ) {
           tickIndexSet.add(i);
         }
       }
     }
   } else if (is7Day && parsedDates.length === n) {
+    const dayIndices: number[] = [];
     for (let i = 0; i < n; i++) {
       const d = parsedDates[i];
       if (!isNaN(d.getTime())) {
         if (d.getMinutes() === 0 && d.getHours() === 0) {
-          tickIndexSet.add(i);
+          dayIndices.push(i);
         }
       }
     }
+    // On mobile, pick alternate days to avoid tick collisions
+    if (isMobile && dayIndices.length > 4) {
+      dayIndices.forEach((idx, i) => {
+        if (i % 2 === 0 || i === dayIndices.length - 1) {
+          tickIndexSet.add(idx);
+        }
+      });
+    } else {
+      dayIndices.forEach((idx) => tickIndexSet.add(idx));
+    }
   } else if (is30Day && parsedDates.length === n) {
-    for (let i = 0; i < n; i += 2) {
+    const step = isMobile ? 5 : 2;
+    for (let i = 0; i < n; i += step) {
       tickIndexSet.add(i);
     }
   } else if (is1Year && parsedDates.length === n) {
-    const step = n >= 40 ? 4 : 1;
+    const step = isMobile ? (n >= 40 ? 8 : 2) : n >= 40 ? 4 : 1;
     for (let i = 0; i < n; i += step) {
       tickIndexSet.add(i);
     }
     tickIndexSet.add(n - 1);
   }
 
-  if (tickIndexSet.size < 4) {
-    const targetTicks = 7;
+  if (tickIndexSet.size < 3) {
+    const targetTicks = isMobile ? 4 : 7;
     const step = Math.max(1, Math.round(n / targetTicks));
     for (let i = 0; i < n; i += step) {
       tickIndexSet.add(i);
@@ -267,11 +306,13 @@ export function computeXAxisConfig(
       if (is1Day) {
         return format(date, "HH:mm");
       } else if (is3Day) {
-        return format(date, "EEE HH:mm");
-      } else if (is7Day || is30Day) {
-        return format(date, "EEE d MMM");
+        return isMobile ? format(date, "EEE") : format(date, "EEE HH:mm");
+      } else if (is7Day) {
+        return isMobile ? format(date, "d MMM") : format(date, "EEE d MMM");
+      } else if (is30Day) {
+        return format(date, "d MMM");
       } else if (is1Year) {
-        return format(date, "MMM yyyy");
+        return isMobile ? format(date, "MMM") : format(date, "MMM yyyy");
       } else if (spanHours <= 24 * 60) {
         return format(date, "d MMM");
       } else {
@@ -287,15 +328,15 @@ export function computeXAxisConfig(
     axisLabel: {
       show: true,
       color: isDark ? "#A1A1AA" : "#64748B",
-      fontSize: 10,
-      margin: 8,
+      fontSize: isMobile ? 9 : 10,
+      margin: isMobile ? 6 : 8,
       interval: (index: number) => tickIndexSet.has(index),
     },
     grid: {
-      left: 55,
-      right: 20,
+      left: isMobile ? 36 : 55,
+      right: isMobile ? 8 : 20,
       top: 14,
-      bottom: 26,
+      bottom: isMobile ? 22 : 26,
       containLabel: true,
     },
   };

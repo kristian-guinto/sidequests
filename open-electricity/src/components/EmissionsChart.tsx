@@ -5,7 +5,8 @@ import ReactECharts from "echarts-for-react";
 import * as echarts from "echarts";
 import { FuelGenerationPoint, ViewMode, FuelTech, TimeRange } from "@/lib/types";
 import { getFuelMeta } from "@/lib/colors";
-import { computeXAxisConfig, formatMarketDate, getShadcnTooltipConfig } from "@/lib/chartUtils";
+import { computeXAxisConfig, formatMarketDate, getShadcnTooltipConfig, formatCompactValue } from "@/lib/chartUtils";
+import { useIsMobile } from "@/lib/useIsMobile";
 import {
   ChartCard,
   ChartCardHeader,
@@ -30,14 +31,21 @@ export function EmissionsChart({
   data,
   range = "7d",
   viewMode = "stacked",
-  height = "180px",
+  height,
   hoveredFuel,
   onHoverPoint,
 }: EmissionsChartProps) {
   const { isDark } = useTheme();
+  const isMobile = useIsMobile();
   const isPercentage = viewMode === "percentage";
   const isBarView = range === "30d" || range === "1y";
-  const xAxisConfig = useMemo(() => computeXAxisConfig(data, isDark, range), [data, isDark, range]);
+
+  const chartHeight = height || (isMobile ? "145px" : "170px");
+
+  const xAxisConfig = useMemo(
+    () => computeXAxisConfig(data, isDark, range, undefined, isMobile),
+    [data, isDark, range, isMobile]
+  );
   const tooltipConfig = useMemo(() => getShadcnTooltipConfig(isDark), [isDark]);
 
   const emissionsData = useMemo(() => {
@@ -153,61 +161,6 @@ export function EmissionsChart({
             type: "dashed",
           },
         },
-        formatter: (params: any[]) => {
-          if (!params || params.length === 0) return "";
-          const idx = params[0].dataIndex;
-          const rawPt = data[idx];
-          const item = emissionsData[idx];
-          let formattedTime = params[0].axisValue;
-          if (rawPt?.timestamp) {
-            formattedTime = formatMarketDate(rawPt.timestamp, "d MMM yyyy, h:mm a");
-          }
-
-          const rows = params.map((p) => {
-            const val = Number(p.value) || 0;
-            return { name: p.seriesName, val, color: p.color };
-          });
-
-          const borderCls = isDark ? "border-[#27272A]" : "border-neutral-100";
-          const textMuted = isDark ? "text-neutral-400" : "text-neutral-500";
-          const pillBg = isDark
-            ? "bg-[#27272A] text-neutral-100 border border-neutral-700"
-            : "bg-neutral-100 text-neutral-900";
-          const textPrimary = isDark ? "text-neutral-100" : "text-neutral-900";
-          const textSecondary = isDark ? "text-neutral-300" : "text-neutral-600";
-
-          if (rawPt?.hasData === false || item?.rawTotal === 0) {
-            return `<div class="font-sans min-w-[180px]">
-              <div class="border-b ${borderCls} pb-1.5 mb-2 flex justify-between items-center text-xs">
-                <span class="${textMuted} font-medium">${formattedTime}</span>
-                <span class="inline-flex items-center px-1.5 py-0.5 rounded ${pillBg} font-mono text-[11px] text-neutral-400">No data</span>
-              </div>
-              <div class="text-xs text-neutral-400 py-1 text-center">No emissions data for this period</div>
-            </div>`;
-          }
-
-          let html = `<div class="font-sans min-w-[190px]">
-            <div class="border-b ${borderCls} pb-1.5 mb-2 flex justify-between items-center text-xs">
-              <span class="${textMuted} font-medium">${formattedTime}</span>
-              <span class="inline-flex items-center px-1.5 py-0.5 rounded ${pillBg} font-bold font-mono">${isPercentage ? "100%" : `${item.total.toFixed(1)} tCO₂e`}</span>
-            </div>`;
-
-          rows.reverse().forEach((r) => {
-            if (r.val > 0) {
-              const displayVal = isPercentage ? `${r.val.toFixed(1)}%` : `${r.val.toFixed(1)} tCO₂e`;
-              html += `<div class="flex justify-between items-center py-0.5 text-xs">
-                <span class="flex items-center ${textSecondary}">
-                  <span class="w-2.5 h-2.5 rounded-[3px] mr-2" style="background-color:${r.color}"></span>
-                  ${r.name}
-                </span>
-                <span class="font-mono ${textPrimary} font-medium">${displayVal}</span>
-              </div>`;
-            }
-          });
-
-          html += `</div>`;
-          return html;
-        },
       },
       grid: xAxisConfig.grid,
       xAxis: {
@@ -230,9 +183,10 @@ export function EmissionsChart({
         axisTick: { show: false },
         axisLabel: {
           color: isDark ? "#A1A1AA" : "#64748B",
-          fontSize: 10,
-          margin: 12,
-          formatter: (v: number) => (isPercentage ? `${v}%` : `${v.toLocaleString()}`),
+          fontSize: isMobile ? 9 : 10,
+          margin: isMobile ? 6 : 12,
+          formatter: (v: number) =>
+            isPercentage ? `${v}%` : isMobile ? formatCompactValue(v) : `${v.toLocaleString()}`,
         },
         splitLine: {
           lineStyle: { color: gridLineColor, type: "dashed" },
@@ -313,7 +267,7 @@ export function EmissionsChart({
         },
       ],
     };
-  }, [data, emissionsData, range, isPercentage, isBarView, xAxisConfig, tooltipConfig, isDark, hoveredFuel]);
+  }, [data, emissionsData, range, isPercentage, isBarView, xAxisConfig, tooltipConfig, isDark, hoveredFuel, isMobile]);
 
   const onEvents = useMemo(() => {
     return {
@@ -337,14 +291,14 @@ export function EmissionsChart({
   return (
     <ChartCard onMouseLeave={() => onHoverPoint?.(null)}>
       <ChartCardHeader className="py-2 px-3 sm:px-4">
-        <ChartCardTitle>
-          <div className="flex items-center space-x-2">
-            <CloudFog className="h-4 w-4 text-neutral-500 dark:text-neutral-400" />
-            <span>
+        <ChartCardTitle className="flex-wrap gap-1.5 sm:gap-2">
+          <div className="flex items-center space-x-1.5 sm:space-x-2">
+            <CloudFog className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-neutral-500 dark:text-neutral-400" />
+            <span className="text-xs sm:text-sm">
               Emissions ({isPercentage ? "%" : "tCO₂e/5m"})
             </span>
           </div>
-          <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-100 dark:bg-[#18181B] text-neutral-800 dark:text-neutral-200 border border-neutral-200/60 dark:border-neutral-800 font-mono shadow-xs">
+          <div className="inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-[11px] sm:text-xs font-medium bg-neutral-100 dark:bg-[#18181B] text-neutral-800 dark:text-neutral-200 border border-neutral-200/60 dark:border-neutral-800 font-mono shadow-xs">
             Av.{" "}
             <strong className="ml-1 text-neutral-950 dark:text-white font-bold">
               {avgEmissions.toLocaleString()} tCO₂e
@@ -353,12 +307,12 @@ export function EmissionsChart({
         </ChartCardTitle>
       </ChartCardHeader>
 
-      <ChartCardContent>
+      <ChartCardContent className="p-1 sm:p-3 pt-2">
         <ReactECharts
           option={option}
           onEvents={onEvents}
           onChartReady={onChartReady}
-          style={{ height, width: "100%" }}
+          style={{ height: chartHeight, width: "100%" }}
           notMerge={true}
           lazyUpdate={false}
         />
