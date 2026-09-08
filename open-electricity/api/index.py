@@ -6,7 +6,6 @@ from typing import Dict, List, Optional, Any, TypedDict
 from zoneinfo import ZoneInfo
 
 import duckdb
-import pytz  # noqa: F401 - Required for DuckDB TIMESTAMPTZ support and Vercel bundling
 from fastapi import FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
