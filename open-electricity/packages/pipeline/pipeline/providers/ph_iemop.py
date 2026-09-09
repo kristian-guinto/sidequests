@@ -2,7 +2,7 @@
 
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 from pipeline.generator_registry import GeneratorRegistry
 from pipeline.iemop_client import IEMOPClient
 from pipeline.models import EnergyIntervalRecord, FacilityRecord, PriceIntervalRecord
@@ -68,8 +68,17 @@ class PhilippinesIEMOPProvider(BaseProvider):
         total_synced = 0
         global_idx = 0
 
-        def _download_file(f_info: Dict[str, Any]) -> List[str]:
-            return self.client.download_rtd_dispatch_csv(f_info["file_id"])
+        from pipeline.db import Database
+
+        db_instance = (
+            Database(conn=conn, validate_schema=False) if conn is not None else None
+        )
+
+        def _download_and_parse(
+            f_info: Dict[str, Any],
+        ) -> Tuple[List[EnergyIntervalRecord], List[PriceIntervalRecord]]:
+            csv_lines = self.client.download_rtd_dispatch_csv(f_info["file_id"])
+            return self.parser.parse_rtd_dispatch(csv_lines)
 
         for chunk_start in range(0, total_files, batch_size):
             chunk = disp_files[chunk_start : chunk_start + batch_size]
@@ -80,7 +89,8 @@ class PhilippinesIEMOPProvider(BaseProvider):
                 max_workers=min(max_workers, len(chunk))
             ) as executor:
                 future_map = {
-                    executor.submit(_download_file, f_info): f_info for f_info in chunk
+                    executor.submit(_download_and_parse, f_info): f_info
+                    for f_info in chunk
                 }
                 for future, f_info in future_map.items():
                     global_idx += 1
@@ -90,10 +100,7 @@ class PhilippinesIEMOPProvider(BaseProvider):
                         f"  -> [{global_idx}/{total_files}] ({pct:4.1f}%) Unpacking {filename}..."
                     )
                     try:
-                        csv_lines = future.result()
-                        records, price_records = self.parser.parse_rtd_dispatch(
-                            csv_lines
-                        )
+                        records, price_records = future.result()
                         batch_records.extend(records)
                         batch_prices.extend(price_records)
                     except Exception as e:
@@ -108,10 +115,9 @@ class PhilippinesIEMOPProvider(BaseProvider):
                     f"     [Saved batch: +{len(batch_records)} interval records (Total: {total_synced})]"
                 )
 
-            if conn is not None and batch_prices:
-                from pipeline.db import Database
-
-                db = Database(conn=conn)
-                db.upsert_price_intervals(batch_prices, country_code=self.country_code)
+            if db_instance is not None and batch_prices:
+                db_instance.upsert_price_intervals(
+                    batch_prices, country_code=self.country_code
+                )
 
         return all_records

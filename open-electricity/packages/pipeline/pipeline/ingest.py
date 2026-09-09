@@ -64,8 +64,20 @@ def run_country_pipeline(
         console.print(
             f"  [yellow]Missing FX rates for {curr} ({s_d} -> {e_d}). Fetching online...[/yellow]"
         )
-        synced_fx = sync_exchange_rates(db, start_date=s_d, end_date=e_d)
-        console.print(f"  [green]✓[/green] Synced {synced_fx} FX rate records.")
+        try:
+            synced_fx = sync_exchange_rates(db, start_date=s_d, end_date=e_d)
+            console.print(f"  [green]✓[/green] Synced {synced_fx} FX rate records.")
+        except Exception as e:
+            prev_row = db.conn.execute(
+                "SELECT rate_to_usd FROM exchange_rates WHERE currency = ? ORDER BY date DESC LIMIT 1",
+                [curr],
+            ).fetchone()
+            if prev_row and prev_row[0] is not None and prev_row[0] > 0:
+                console.print(
+                    f"  [yellow]⚠️ Online FX sync unavailable ({e}), using last known rate for {curr} ({prev_row[0]}).[/yellow]"
+                )
+            else:
+                raise
     else:
         console.print(
             f"  [green]✓[/green] Verified {existing_cnt} existing FX rate records for {curr}."

@@ -1,5 +1,6 @@
 """Unit tests for pipeline Typer & Rich CLI."""
 
+from datetime import date, timedelta
 from unittest.mock import patch, MagicMock
 from typer.testing import CliRunner
 from pipeline.cli import app
@@ -93,6 +94,108 @@ def test_latest_command_execution():
         assert "PH" in result.stdout
         assert "+100" in result.stdout
         mock_db.close.assert_called_once()
+
+
+def test_latest_resumes_from_db_checkpoint():
+    """Verify latest command queries checkpoint and resumes when within max_stale_days."""
+    today = date.today()
+    checkpoint_date = today - timedelta(days=1)
+    mock_report = IngestRunReport(
+        country_code="PH",
+        facilities_synced=10,
+        intervals_synced=288,
+        daily_rollups_updated=True,
+    )
+    with (
+        patch("pipeline.cli.Database") as mock_db_cls,
+        patch(
+            "pipeline.cli.run_country_pipeline", return_value=mock_report
+        ) as mock_run,
+    ):
+        mock_db = MagicMock()
+        mock_db.get_latest_interval_date.return_value = checkpoint_date
+        mock_db_cls.return_value = mock_db
+
+        result = runner.invoke(app, ["latest", "--country", "PH", "--target", "local"])
+        assert result.exit_code == 0
+        assert mock_run.called
+        call_kwargs = mock_run.call_args.kwargs
+        assert call_kwargs["start_date"] == checkpoint_date
+        assert call_kwargs["end_date"] == today
+        assert "Resuming PH from checkpoint" in result.stdout
+        assert "SUCCESS" in result.stdout
+
+
+def test_latest_skips_stale_country():
+    """Verify latest command skips countries where latest data is > max_stale_days old."""
+    today = date.today()
+    stale_date = today - timedelta(days=5)
+    with (
+        patch("pipeline.cli.Database") as mock_db_cls,
+        patch("pipeline.cli.run_country_pipeline") as mock_run,
+    ):
+        mock_db = MagicMock()
+        mock_db.get_latest_interval_date.return_value = stale_date
+        mock_db_cls.return_value = mock_db
+
+        result = runner.invoke(
+            app,
+            [
+                "latest",
+                "--country",
+                "PH",
+                "--max-stale-days",
+                "3",
+                "--target",
+                "local",
+            ],
+        )
+        assert result.exit_code == 0
+        assert not mock_run.called
+        assert "Skipping PH" in result.stdout
+        assert "exceeds" in result.stdout
+        assert "SKIPPED" in result.stdout
+
+
+def test_latest_force_days_overrides_checkpoint():
+    """Verify --force-days ignores database checkpoint and uses specified days."""
+    today = date.today()
+    stale_date = today - timedelta(days=10)
+    mock_report = IngestRunReport(
+        country_code="PH",
+        facilities_synced=5,
+        intervals_synced=50,
+        daily_rollups_updated=True,
+    )
+    with (
+        patch("pipeline.cli.Database") as mock_db_cls,
+        patch(
+            "pipeline.cli.run_country_pipeline", return_value=mock_report
+        ) as mock_run,
+    ):
+        mock_db = MagicMock()
+        mock_db.get_latest_interval_date.return_value = stale_date
+        mock_db_cls.return_value = mock_db
+
+        result = runner.invoke(
+            app,
+            [
+                "latest",
+                "--country",
+                "PH",
+                "--days",
+                "2",
+                "--force-days",
+                "--target",
+                "local",
+            ],
+        )
+        assert result.exit_code == 0
+        assert mock_run.called
+        call_kwargs = mock_run.call_args.kwargs
+        assert call_kwargs["start_date"] == today - timedelta(days=2)
+        assert "Forcing PH ingestion" in result.stdout
+        assert "SUCCESS" in result.stdout
 
 
 def test_sync_facilities_command():

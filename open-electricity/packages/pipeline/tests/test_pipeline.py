@@ -422,8 +422,13 @@ def test_database_tiered_upsert_and_populate_energy_daily(tmp_path: Path):
             energy_mwh=16.6667,
         ),
     ]
+    assert db.get_latest_interval_date("PH") is None
+    assert db.get_latest_interval_date("SG") is None
+
     upserted_e = db.upsert_energy_interval(energy_records, country_code="PH")
     assert upserted_e == 2
+    assert db.get_latest_interval_date("PH") == date(2026, 3, 1)
+    assert db.get_latest_interval_date("SG") is None
 
     price_records = [
         PriceIntervalRecord(
@@ -479,6 +484,15 @@ def test_database_tiered_upsert_and_populate_energy_daily(tmp_path: Path):
     assert p_daily[3] == 57.0  # min
     assert p_daily[4] == 85.5  # median
     assert p_daily[5] == 114.0  # max
+
+    # 6. Verify inspect_database runs without error across all tables and decoupled price tables
+    db.inspect_database(country_code="PH", table="all", limit=5)
+    db.inspect_database(country_code="PH", table="energy_interval", limit=5)
+    db.inspect_database(country_code="PH", table="prices_interval", limit=5)
+    db.inspect_database(country_code="PH", table="facilities", limit=5)
+    db.inspect_database(country_code="PH", table="energy_daily", limit=5)
+    db.inspect_database(country_code="PH", table="prices_daily", limit=5)
+
     db.close()
 
 

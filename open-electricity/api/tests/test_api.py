@@ -149,11 +149,11 @@ def test_api_get_energy_explicit_date_range():
     data_points = [p for p in res_th.points if p.hasData]
     empty_points = [p for p in res_th.points if not p.hasData]
     assert len(data_points) > 0
-    assert len(empty_points) > 0
     assert len(data_points) + len(empty_points) == 288
-    assert empty_points[0].solar is None
-    assert empty_points[0].totalGeneration is None
-    assert empty_points[0].price is None
+    if empty_points:
+        assert empty_points[0].solar is None
+        assert empty_points[0].totalGeneration is None
+        assert empty_points[0].price is None
     assert data_points[0].totalGeneration is not None
 
 

@@ -34,7 +34,20 @@ def latest(
         help="Target country (PH, SG, MY, TH, ALL). Default: ALL",
     ),
     days: int = typer.Option(
-        2, "--days", "-d", help="Number of past days to ingest (default: 2)"
+        2,
+        "--days",
+        "-d",
+        help="Fallback or override number of past days to ingest (default: 2)",
+    ),
+    max_stale_days: int = typer.Option(
+        3,
+        "--max-stale-days",
+        help="Maximum allowed days behind before skipping country (default: 3)",
+    ),
+    force_days: bool = typer.Option(
+        False,
+        "--force-days",
+        help="Force using --days instead of querying database checkpoint",
     ),
     target: str = typer.Option(
         "local", "--target", "-t", help="Target database ('local' or 'motherduck')"
@@ -55,11 +68,53 @@ def latest(
 
     try:
         today = date.today()
-        start_d = today - timedelta(days=days)
-        end_d = today
-
         reports: List[IngestRunReport] = []
+
         for c in countries:
+            if not force_days:
+                latest_date = db.get_latest_interval_date(c)
+                if isinstance(latest_date, (date, datetime)):
+                    if isinstance(latest_date, datetime):
+                        latest_date = latest_date.date()
+                    days_diff = (today - latest_date).days
+                    if days_diff > max_stale_days:
+                        console.print(
+                            f"\n[bold yellow]⚠️  Skipping {c}:[/bold yellow] Latest data in database is from "
+                            f"[bold]{latest_date}[/bold] ({days_diff} days ago, exceeds {max_stale_days}-day limit). "
+                            f"Run 'ingest backfill' to catch up.\n"
+                        )
+                        reports.append(
+                            IngestRunReport(
+                                country_code=c,
+                                facilities_synced=0,
+                                intervals_synced=0,
+                                daily_rollups_updated=False,
+                                status="skipped",
+                            )
+                        )
+                        continue
+
+                    start_d = latest_date
+                    end_d = today
+                    c_days = max(1, max(0, days_diff) + 1)
+                    console.print(
+                        f"\n[bold cyan]▶ Resuming {c} from checkpoint {start_d} ({max(0, days_diff)}d behind) to {end_d}...[/bold cyan]"
+                    )
+                else:
+                    start_d = today - timedelta(days=days)
+                    end_d = today
+                    c_days = days
+                    console.print(
+                        f"\n[bold cyan]▶ Ingesting {c} across past {days} days (from {start_d} to {end_d})...[/bold cyan]"
+                    )
+            else:
+                start_d = today - timedelta(days=days)
+                end_d = today
+                c_days = days
+                console.print(
+                    f"\n[bold cyan]▶ Forcing {c} ingestion across past {days} days (from {start_d} to {end_d})...[/bold cyan]"
+                )
+
             prov_cls = PROVIDERS[c]
             provider = prov_cls(conn=db.conn) if c == "PH" else prov_cls()
             report = run_country_pipeline(
@@ -67,7 +122,7 @@ def latest(
                 db=db,
                 start_date=start_d,
                 end_date=end_d,
-                days=days,
+                days=c_days,
                 sync_facilities_flag=True,
             )
             reports.append(report)
@@ -79,21 +134,45 @@ def latest(
         table.add_column("Facilities Synced", justify="right")
         table.add_column("Intervals Synced", justify="right")
         table.add_column("Daily Rollup", justify="center")
-        table.add_column("Status", style="bold green", justify="center")
+        table.add_column("Status", justify="center")
 
         for r in reports:
+            if r.status == "skipped":
+                status_str = "[bold yellow]SKIPPED[/bold yellow]"
+                fac_str = "-"
+                int_str = "-"
+                rollup_str = "-"
+            elif r.status == "success":
+                status_str = "[bold green]SUCCESS[/bold green]"
+                fac_str = str(r.facilities_synced)
+                int_str = f"+{r.intervals_synced}"
+                rollup_str = "✓" if r.daily_rollups_updated else "-"
+            else:
+                status_str = f"[bold red]{r.status.upper()}[/bold red]"
+                fac_str = str(r.facilities_synced)
+                int_str = str(r.intervals_synced)
+                rollup_str = "✓" if r.daily_rollups_updated else "-"
+
             table.add_row(
                 r.country_code,
-                str(r.facilities_synced),
-                f"+{r.intervals_synced}",
-                "✓" if r.daily_rollups_updated else "-",
-                "SUCCESS",
+                fac_str,
+                int_str,
+                rollup_str,
+                status_str,
             )
         console.print()
         console.print(table)
-        console.print(
-            "[bold green]✓ OpenElectricity 'latest' Sync Complete![/bold green]\n"
-        )
+
+        skipped_count = sum(1 for r in reports if r.status == "skipped")
+        if skipped_count > 0:
+            console.print(
+                f"[bold yellow]⚠ OpenElectricity 'latest' Sync Complete: "
+                f"{len(reports) - skipped_count} succeeded, {skipped_count} skipped.[/bold yellow]\n"
+            )
+        else:
+            console.print(
+                "[bold green]✓ OpenElectricity 'latest' Sync Complete![/bold green]\n"
+            )
     finally:
         db.close()
 
@@ -293,7 +372,7 @@ def inspect(
     table: Optional[str] = typer.Option(
         None,
         "--table",
-        help="Table name to inspect (facilities, energy_interval, energy_daily, exchange_rates, all)",
+        help="Table name to inspect (facilities, energy_interval, prices_interval, energy_daily, prices_daily, exchange_rates, all)",
     ),
     region: Optional[str] = typer.Option(None, "--region", help="Filter by region"),
     limit: int = typer.Option(

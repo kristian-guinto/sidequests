@@ -1,6 +1,10 @@
 """Database storage layer and SQL rollups for OpenElectricity pipeline."""
 
+import csv
+import os
+import tempfile
 import time
+from datetime import datetime, date
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Union, Sequence, Tuple
 from enum import Enum
@@ -140,7 +144,7 @@ class Database:
         facilities: Sequence[Union[FacilityRecord, Dict[str, Any]]],
         country_code: str = "PH",
     ) -> int:
-        """Idempotently upserts power plant catalog entries into facilities table."""
+        """Idempotently upserts power plant catalog entries into facilities table via bulk CSV loading."""
         if not facilities:
             return 0
 
@@ -175,22 +179,53 @@ class Database:
                     )
                 )
 
-        self.conn.executemany(
-            """
-            INSERT INTO facilities (country_code, resource_id, facility_name, region, fuel_tech, capacity_mw, is_renewable, emissions_factor, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT (country_code, resource_id) DO UPDATE SET
-                facility_name = EXCLUDED.facility_name,
-                region = EXCLUDED.region,
-                fuel_tech = EXCLUDED.fuel_tech,
-                capacity_mw = EXCLUDED.capacity_mw,
-                is_renewable = EXCLUDED.is_renewable,
-                emissions_factor = EXCLUDED.emissions_factor,
-                status = EXCLUDED.status,
-                updated_at = now();
-            """,
-            data,
-        )
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as tf:
+            writer = csv.writer(tf)
+            writer.writerow(
+                [
+                    "country_code",
+                    "resource_id",
+                    "facility_name",
+                    "region",
+                    "fuel_tech",
+                    "capacity_mw",
+                    "is_renewable",
+                    "emissions_factor",
+                    "status",
+                ]
+            )
+            for row in data:
+                writer.writerow(row)
+            temp_path = tf.name
+
+        try:
+            self.conn.execute(f"""
+                INSERT INTO facilities (country_code, resource_id, facility_name, region, fuel_tech, capacity_mw, is_renewable, emissions_factor, status)
+                SELECT
+                    country_code,
+                    resource_id,
+                    facility_name,
+                    region,
+                    fuel_tech,
+                    COALESCE(TRY_CAST(capacity_mw AS DOUBLE), 0.0),
+                    COALESCE(TRY_CAST(is_renewable AS BOOLEAN), false),
+                    COALESCE(TRY_CAST(emissions_factor AS DOUBLE), 0.0),
+                    status
+                FROM read_csv('{temp_path}', header=True, all_varchar=True)
+                ON CONFLICT (country_code, resource_id) DO UPDATE SET
+                    facility_name = EXCLUDED.facility_name,
+                    region = EXCLUDED.region,
+                    fuel_tech = EXCLUDED.fuel_tech,
+                    capacity_mw = EXCLUDED.capacity_mw,
+                    is_renewable = EXCLUDED.is_renewable,
+                    emissions_factor = EXCLUDED.emissions_factor,
+                    status = EXCLUDED.status,
+                    updated_at = now();
+            """)
+        finally:
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+
         return len(facilities)
 
     def upsert_energy_interval(
@@ -198,7 +233,7 @@ class Database:
         records: Sequence[Union[EnergyIntervalRecord, Dict[str, Any]]],
         country_code: str = "PH",
     ) -> int:
-        """Idempotently upserts generation interval records into energy_interval table inside a transaction."""
+        """Idempotently upserts generation interval records into energy_interval table inside a transaction via bulk CSV loading."""
         if not records:
             return 0
 
@@ -208,7 +243,7 @@ class Database:
         for r in records:
             if isinstance(r, EnergyIntervalRecord):
                 c_code = r.country_code.upper()
-                start_dt = r.interval_start
+                start_dt = str(r.interval_start)
                 reg = r.region
                 fuel = r.fuel_tech.lower()
                 mw = r.generation_mw
@@ -216,7 +251,7 @@ class Database:
                 data.append((c_code, start_dt, reg, fuel, mw, mwh))
             else:
                 c_code = r.get("country_code", country_code).upper()
-                start_raw = r["timestamp"]
+                start_raw = str(r["timestamp"])
                 reg = r["region"]
                 fuel = str(r.get("fuel_tech") or "").lower()
                 mw = float(r.get("generation_mw", 0.0) or 0.0)
@@ -229,25 +264,48 @@ class Database:
                 )
                 data.append((c_code, start_raw, reg, fuel, mw, mwh))
 
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as tf:
+            writer = csv.writer(tf)
+            writer.writerow(
+                [
+                    "country_code",
+                    "interval_start",
+                    "region",
+                    "fuel_tech",
+                    "generation_mw",
+                    "energy_mwh",
+                ]
+            )
+            for row in data:
+                writer.writerow(row)
+            temp_path = tf.name
+
         self.conn.execute("BEGIN TRANSACTION")
         try:
-            self.conn.executemany(
-                """
+            self.conn.execute(f"""
                 INSERT INTO energy_interval (
                     country_code, interval_start, region, fuel_tech,
                     generation_mw, energy_mwh
                 )
-                VALUES (?, ?::TIMESTAMPTZ, ?, ?, ?, ?)
+                SELECT
+                    country_code,
+                    interval_start::TIMESTAMPTZ,
+                    region,
+                    fuel_tech,
+                    COALESCE(TRY_CAST(generation_mw AS DOUBLE), 0.0),
+                    COALESCE(TRY_CAST(energy_mwh AS DOUBLE), 0.0)
+                FROM read_csv('{temp_path}', header=True, all_varchar=True)
                 ON CONFLICT (country_code, interval_start, region, fuel_tech) DO UPDATE SET
                     generation_mw = EXCLUDED.generation_mw,
                     energy_mwh = EXCLUDED.energy_mwh;
-                """,
-                data,
-            )
+            """)
             self.conn.execute("COMMIT")
         except Exception:
             self.conn.execute("ROLLBACK")
             raise
+        finally:
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
 
         return len(records)
 
@@ -258,7 +316,7 @@ class Database:
         records: Sequence[Union[PriceIntervalRecord, Dict[str, Any]]],
         country_code: str = "PH",
     ) -> int:
-        """Idempotently upserts spot price interval records into prices_interval table inside a transaction."""
+        """Idempotently upserts spot price interval records into prices_interval table inside a transaction via bulk CSV loading."""
         if not records:
             return 0
 
@@ -269,13 +327,15 @@ class Database:
         for r in records:
             if isinstance(r, PriceIntervalRecord):
                 c_code = r.country_code.upper()
-                start_dt = r.interval_start
+                start_dt = str(r.interval_start)
                 reg = r.region
                 p_local = r.price_local
                 p_dollar = r.price_dollar
+                raw_dt = r.interval_start
             else:
                 c_code = r.get("country_code", country_code).upper()
-                start_dt = r.get("interval_start", r.get("timestamp"))
+                raw_dt = r.get("interval_start", r.get("timestamp"))
+                start_dt = str(raw_dt)
                 reg = r["region"]
                 p_local = (
                     float(r.get("price_local", r.get("price_php_mwh")))
@@ -288,35 +348,62 @@ class Database:
                 p_dollar = r.get("price_dollar")
 
             if p_local is not None and p_dollar is None:
-                d_val = (
-                    start_dt.date() if hasattr(start_dt, "date") else str(start_dt)[:10]
-                )
+                d_val = raw_dt.date() if hasattr(raw_dt, "date") else str(raw_dt)[:10]
                 cache_key = (str(d_val)[:10], curr)
                 if cache_key not in fx_cache:
                     fx_cache[cache_key] = get_fx_rate(d_val, curr, conn=self.conn)
                 fx = fx_cache[cache_key]
                 p_dollar = round(p_local / fx, 2) if fx > 0 else None
 
-            data.append((c_code, start_dt, reg, p_local, p_dollar))
+            data.append(
+                (
+                    c_code,
+                    start_dt,
+                    reg,
+                    "" if p_local is None else p_local,
+                    "" if p_dollar is None else p_dollar,
+                )
+            )
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as tf:
+            writer = csv.writer(tf)
+            writer.writerow(
+                [
+                    "country_code",
+                    "interval_start",
+                    "region",
+                    "price_local",
+                    "price_dollar",
+                ]
+            )
+            for row in data:
+                writer.writerow(row)
+            temp_path = tf.name
 
         self.conn.execute("BEGIN TRANSACTION")
         try:
-            self.conn.executemany(
-                """
+            self.conn.execute(f"""
                 INSERT INTO prices_interval (
                     country_code, interval_start, region, price_local, price_dollar
                 )
-                VALUES (?, ?::TIMESTAMPTZ, ?, ?, ?)
+                SELECT
+                    country_code,
+                    interval_start::TIMESTAMPTZ,
+                    region,
+                    TRY_CAST(price_local AS DOUBLE),
+                    TRY_CAST(price_dollar AS DOUBLE)
+                FROM read_csv('{temp_path}', header=True, all_varchar=True)
                 ON CONFLICT (country_code, interval_start, region) DO UPDATE SET
                     price_local = EXCLUDED.price_local,
                     price_dollar = EXCLUDED.price_dollar;
-                """,
-                data,
-            )
+            """)
             self.conn.execute("COMMIT")
         except Exception:
             self.conn.execute("ROLLBACK")
             raise
+        finally:
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
 
         return len(records)
 
@@ -397,18 +484,22 @@ class Database:
         country = country_code.upper()
         tz = COUNTRIES_CONFIG.get(country, {}).get("timezone", "UTC")
         self.conn.execute(f"SET TimeZone = '{tz}'")
-        date_cond = ""
-        params: List[Any] = [country]
 
         if start_date and end_date:
             date_cond = " AND p.interval_start::DATE >= ?::DATE AND p.interval_start::DATE <= ?::DATE"
-            params.extend([str(start_date), str(end_date)])
+            p_params = [country, str(start_date), str(end_date)]
+            v_cond = " AND e.interval_start::DATE >= ?::DATE AND e.interval_start::DATE <= ?::DATE"
+            v_params = [country, str(start_date), str(end_date)]
         elif start_date:
             date_cond = " AND p.interval_start::DATE >= ?::DATE"
-            params.append(str(start_date))
+            p_params = [country, str(start_date)]
+            v_cond = " AND e.interval_start::DATE >= ?::DATE"
+            v_params = [country, str(start_date)]
         else:
             date_cond = " AND p.interval_start >= (SELECT COALESCE(MAX(interval_start) - INTERVAL '3 days', '2000-01-01'::TIMESTAMPTZ) FROM prices_interval WHERE country_code = ?)"
-            params.append(country)
+            p_params = [country, country]
+            v_cond = " AND e.interval_start >= (SELECT COALESCE(MAX(interval_start) - INTERVAL '3 days', '2000-01-01'::TIMESTAMPTZ) FROM energy_interval WHERE country_code = ?)"
+            v_params = [country, country]
 
         price_sql = f"""
             INSERT INTO prices_daily (
@@ -449,7 +540,7 @@ class Database:
                   ON e.country_code = p2.country_code
                  AND e.interval_start = p2.interval_start
                  AND e.region = p2.region
-                WHERE p2.price_local IS NOT NULL
+                WHERE e.country_code = ? {v_cond} AND p2.price_local IS NOT NULL
                 GROUP BY e.country_code, e.interval_start::DATE, e.region
             ) v ON p.country_code = v.country_code AND p.interval_start::DATE = v.date AND p.region = v.region
             WHERE p.country_code = ? {date_cond} AND p.price_local IS NOT NULL
@@ -472,7 +563,7 @@ class Database:
         """
         self.conn.execute("BEGIN TRANSACTION")
         try:
-            self.conn.execute(price_sql, params)
+            self.conn.execute(price_sql, v_params + p_params)
             self.conn.execute("COMMIT")
         except Exception:
             self.conn.execute("ROLLBACK")
@@ -498,6 +589,40 @@ class Database:
         )
         return len(records)
 
+    def get_latest_interval_date(self, country_code: str) -> Optional[date]:
+        """
+        Returns the most recent interval date for a country from energy_interval or prices_interval.
+        Returns None if no data exists.
+        """
+        c = country_code.upper()
+        try:
+            query = """
+                SELECT MAX(latest_dt) FROM (
+                    SELECT MAX(interval_start) AS latest_dt FROM energy_interval WHERE country_code = ?
+                    UNION ALL
+                    SELECT MAX(interval_start) AS latest_dt FROM prices_interval WHERE country_code = ?
+                )
+            """
+            res = self.conn.execute(query, [c, c]).fetchone()
+            if res and res[0] is not None:
+                val = res[0]
+                if isinstance(val, datetime):
+                    return val.date()
+                if isinstance(val, date):
+                    return val
+                if isinstance(val, str):
+                    try:
+                        return datetime.fromisoformat(val[:10]).date()
+                    except ValueError:
+                        return None
+                if hasattr(val, "date") and callable(getattr(val, "date")):
+                    d = val.date()
+                    if isinstance(d, date):
+                        return d
+        except Exception:
+            pass
+        return None
+
     def inspect_database(
         self,
         country_code: Optional[str] = None,
@@ -522,8 +647,10 @@ class Database:
 
         tables_info = [
             ("facilities", "Generator & Power Plant Catalog"),
-            ("energy_interval", "Interval Fuel Mix Generation & Prices (Local & USD)"),
-            ("energy_daily", "Daily Fuel Mix Rollups, VWAP & TWAP"),
+            ("energy_interval", "Interval Fuel Mix Generation (MW & MWh)"),
+            ("prices_interval", "Interval Electricity Spot Prices (Local & USD)"),
+            ("energy_daily", "Daily Fuel Mix Rollups (MWh & Peak/Avg MW)"),
+            ("prices_daily", "Daily Price Distributions, VWAP & TWAP"),
             ("exchange_rates", "Daily Reference FX Rates to USD"),
         ]
 
@@ -541,16 +668,19 @@ class Database:
                 ).fetchone()
                 cnt = cnt_row[0] if cnt_row is not None else 0
                 time_span = "—"
-                if tbl == "energy_interval" and cnt > 0:
+                if tbl in ("energy_interval", "prices_interval") and cnt > 0:
                     span_row = self.conn.execute(
                         f"SELECT MIN(interval_start), MAX(interval_start) FROM {tbl}{country_filter}",
                         c_params,
                     ).fetchone()
                     if span_row and span_row[0] and span_row[1]:
                         time_span = (
-                            f"{str(span_row[0])[:10]} -> {str(span_row[1])[:10]}"
+                            f"{str(span_row[0])[:16]} -> {str(span_row[1])[:16]}"
                         )
-                elif tbl in ("energy_daily", "exchange_rates") and cnt > 0:
+                elif (
+                    tbl in ("energy_daily", "prices_daily", "exchange_rates")
+                    and cnt > 0
+                ):
                     span_row = self.conn.execute(
                         f"SELECT MIN(date), MAX(date) FROM {tbl}{country_filter if tbl != 'exchange_rates' else ''}",
                         c_params if tbl != "exchange_rates" else [],
@@ -621,7 +751,7 @@ class Database:
                 f" WHERE {' AND '.join(filter_clauses)}" if filter_clauses else ""
             )
             rows = self.conn.execute(
-                f"SELECT country_code, interval_start, region, fuel_tech, generation_mw, price_local, price_dollar FROM energy_interval{where_str} ORDER BY interval_start DESC, region ASC LIMIT ?",
+                f"SELECT country_code, interval_start, region, fuel_tech, generation_mw, energy_mwh FROM energy_interval{where_str} ORDER BY interval_start DESC, region ASC LIMIT ?",
                 params + [limit],
             ).fetchall()
 
@@ -634,23 +764,151 @@ class Database:
             int_tbl.add_column("Region")
             int_tbl.add_column("Fuel Tech")
             int_tbl.add_column("Output (MW)", justify="right")
-            int_tbl.add_column("Local Price", justify="right")
-            int_tbl.add_column("USD Price", justify="right")
+            int_tbl.add_column("Energy (MWh)", justify="right")
 
             for r in rows:
-                p_sym = COUNTRIES_CONFIG.get(r[0], {}).get("currency_symbol", "$")
-                p_local_str = f"{p_sym}{r[5]:.2f}" if r[5] is not None else "—"
-                p_dollar_str = f"${r[6]:.2f}" if r[6] is not None else "—"
                 int_tbl.add_row(
                     r[0],
                     str(r[1]),
                     r[2],
                     r[3],
                     f"{r[4]:.1f}",
+                    f"{r[5]:.2f}",
+                )
+            console.print()
+            console.print(int_tbl)
+
+        if target_table in ("prices_interval", "prices", "all"):
+            filter_clauses = []
+            params = []
+            if country != "ALL":
+                filter_clauses.append("country_code = ?")
+                params.append(country)
+            if region:
+                filter_clauses.append("region = ?")
+                params.append(region.upper())
+
+            where_str = (
+                f" WHERE {' AND '.join(filter_clauses)}" if filter_clauses else ""
+            )
+            rows = self.conn.execute(
+                f"SELECT country_code, interval_start, region, price_local, price_dollar FROM prices_interval{where_str} ORDER BY interval_start DESC, region ASC LIMIT ?",
+                params + [limit],
+            ).fetchall()
+
+            p_tbl = Table(
+                title=f"Prices Interval Sample (Latest {limit} entries)",
+                border_style="cyan",
+            )
+            p_tbl.add_column("CT", style="bold", justify="center")
+            p_tbl.add_column("Interval Start", style="dim")
+            p_tbl.add_column("Region")
+            p_tbl.add_column("Local Price", justify="right")
+            p_tbl.add_column("USD Price", justify="right")
+
+            for r in rows:
+                p_sym = COUNTRIES_CONFIG.get(r[0], {}).get("currency_symbol", "$")
+                p_local_str = f"{p_sym}{r[3]:.2f}" if r[3] is not None else "—"
+                p_dollar_str = f"${r[4]:.2f}" if r[4] is not None else "—"
+                p_tbl.add_row(
+                    r[0],
+                    str(r[1]),
+                    r[2],
                     p_local_str,
                     p_dollar_str,
                 )
             console.print()
-            console.print(int_tbl)
+            console.print(p_tbl)
+
+        if target_table in ("energy_daily", "daily", "all"):
+            filter_clauses = []
+            params = []
+            if country != "ALL":
+                filter_clauses.append("country_code = ?")
+                params.append(country)
+            if region:
+                filter_clauses.append("region = ?")
+                params.append(region.upper())
+
+            where_str = (
+                f" WHERE {' AND '.join(filter_clauses)}" if filter_clauses else ""
+            )
+            rows = self.conn.execute(
+                f"SELECT country_code, date, region, fuel_tech, energy_mwh, avg_generation_mw, peak_generation_mw FROM energy_daily{where_str} ORDER BY date DESC, region ASC LIMIT ?",
+                params + [limit],
+            ).fetchall()
+
+            ed_tbl = Table(
+                title=f"Energy Daily Sample (Latest {limit} entries)",
+                border_style="yellow",
+            )
+            ed_tbl.add_column("CT", style="bold", justify="center")
+            ed_tbl.add_column("Date", style="dim")
+            ed_tbl.add_column("Region")
+            ed_tbl.add_column("Fuel Tech")
+            ed_tbl.add_column("Energy (MWh)", justify="right")
+            ed_tbl.add_column("Avg MW", justify="right")
+            ed_tbl.add_column("Peak MW", justify="right")
+
+            for r in rows:
+                ed_tbl.add_row(
+                    r[0],
+                    str(r[1]),
+                    r[2],
+                    r[3],
+                    f"{r[4]:.1f}",
+                    f"{r[5]:.1f}",
+                    f"{r[6]:.1f}",
+                )
+            console.print()
+            console.print(ed_tbl)
+
+        if target_table in ("prices_daily", "daily", "all"):
+            filter_clauses = []
+            params = []
+            if country != "ALL":
+                filter_clauses.append("country_code = ?")
+                params.append(country)
+            if region:
+                filter_clauses.append("region = ?")
+                params.append(region.upper())
+
+            where_str = (
+                f" WHERE {' AND '.join(filter_clauses)}" if filter_clauses else ""
+            )
+            rows = self.conn.execute(
+                f"SELECT country_code, date, region, vwap_price_local, twap_price_local, vwap_price_dollar, twap_price_dollar, price_median_local FROM prices_daily{where_str} ORDER BY date DESC, region ASC LIMIT ?",
+                params + [limit],
+            ).fetchall()
+
+            pd_tbl = Table(
+                title=f"Prices Daily Sample (Latest {limit} entries)",
+                border_style="blue",
+            )
+            pd_tbl.add_column("CT", style="bold", justify="center")
+            pd_tbl.add_column("Date", style="dim")
+            pd_tbl.add_column("Region")
+            pd_tbl.add_column("VWAP (Local)", justify="right")
+            pd_tbl.add_column("TWAP (Local)", justify="right")
+            pd_tbl.add_column("VWAP (USD)", justify="right")
+            pd_tbl.add_column("Median (Local)", justify="right")
+
+            for r in rows:
+                p_sym = COUNTRIES_CONFIG.get(r[0], {}).get("currency_symbol", "$")
+                vwap_loc = f"{p_sym}{r[3]:.2f}" if r[3] is not None else "—"
+                twap_loc = f"{p_sym}{r[4]:.2f}" if r[4] is not None else "—"
+                vwap_usd = f"${r[5]:.2f}" if r[5] is not None else "—"
+                med_loc = f"{p_sym}{r[7]:.2f}" if r[7] is not None else "—"
+                pd_tbl.add_row(
+                    r[0],
+                    str(r[1]),
+                    r[2],
+                    vwap_loc,
+                    twap_loc,
+                    vwap_usd,
+                    med_loc,
+                )
+            console.print()
+            console.print(pd_tbl)
 
         console.print()

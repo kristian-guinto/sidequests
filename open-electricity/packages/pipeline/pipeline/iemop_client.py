@@ -25,9 +25,10 @@ class IEMOPClient:
         self.session.headers.update(self.headers)
 
         retry = Retry(
-            total=3,
-            backoff_factor=0.5,
+            total=4,
+            backoff_factor=1.0,
             status_forcelist=[500, 502, 503, 504],
+            allowed_methods=None,
         )
         adapter = HTTPAdapter(
             pool_connections=10,

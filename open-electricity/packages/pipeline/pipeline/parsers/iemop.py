@@ -1,9 +1,10 @@
 """Parser for Philippine IEMOP / WESM Real-Time Dispatch (RTD) market data."""
 
 import csv
+import functools
 from datetime import datetime, timezone, timedelta
 from collections import defaultdict
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
 from pipeline.generator_registry import GeneratorRegistry
 from pipeline.models import EnergyIntervalRecord, PriceIntervalRecord
 
@@ -16,7 +17,10 @@ class IEMOPParser:
     def __init__(self, registry: GeneratorRegistry):
         self.registry = registry
 
+    _last_format: Optional[str] = None
+
     @staticmethod
+    @functools.lru_cache(maxsize=4096)
     def parse_timestamp(time_str: str) -> datetime:
         """Parses IEMOP timestamp string into timezone-aware datetime (UTC+8)."""
         time_str = time_str.strip()
@@ -34,9 +38,18 @@ class IEMOPParser:
             "%Y/%m/%d %H:%M:%S",
             "%Y/%m/%d",
         )
+        # Try the last successful format first if available
+        if IEMOPParser._last_format:
+            try:
+                dt = datetime.strptime(time_str, IEMOPParser._last_format)
+                return dt.replace(tzinfo=MANILA_TZ)
+            except ValueError:
+                pass
+
         for fmt in formats:
             try:
                 dt = datetime.strptime(time_str, fmt)
+                IEMOPParser._last_format = fmt
                 return dt.replace(tzinfo=MANILA_TZ)
             except ValueError:
                 continue
