@@ -217,6 +217,10 @@ def test_emc_parser():
     assert len(rt_records) > 0
     assert all(r.country_code == "SG" for r in rt_records)
 
+    rt_prices = parser.parse_realtime_prices(rt_csv)
+    assert len(rt_prices) == 2
+    assert list(rt_prices.values()) == [130.0, 128.0]
+
 
 def test_singlebuyer_parser():
     parser = SingleBuyerParser()

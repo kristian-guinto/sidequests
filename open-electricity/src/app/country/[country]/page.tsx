@@ -222,6 +222,9 @@ export default function CountryDetailPage({ params }: CountryPageProps) {
             <PriceChart
               data={points}
               range={range}
+              country={country}
+              hasSpotMarket={countryInfo.hasSpotMarket}
+              spotMarketNote={countryInfo.spotMarketNote}
               currencySymbol={countryInfo.currencySymbol}
               currencyCode={countryInfo.currencyCode}
               onHoverPoint={setHoveredPoint}

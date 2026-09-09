@@ -4,12 +4,23 @@
 * **No Blanket Peaker Fallback**: Power market generators (IEMOP, EMC, Single Buyer) must be categorized strictly according to official registered plant technology. Distillate/Oil must be reserved for true peaking diesel plants and power barges (~1-2% grid share).
 * **Fuel Ordering Convention**: Stacked area charts must follow canonical OpenElectricity stacking:
   $$\text{Coal} \rightarrow \text{Distillate} \rightarrow \text{Gas} \rightarrow \text{Biomass} \rightarrow \text{Geothermal} \rightarrow \text{Battery} \rightarrow \text{Hydro} \rightarrow \text{Wind} \rightarrow \text{Solar}$$
+* **Wholesale Spot Market Modeling vs. Single Buyer**:
+  * Decoupled pricing (`prices_interval`, `prices_daily`) is strictly for wholesale spot electricity markets (e.g. Philippines WESM GWAP, Singapore EMC USEP, Malaysia SMP).
+  * Countries operating under Single Buyer or regulated tariff structures (e.g., Thailand EGAT Enhanced Single Buyer model) do not have competitive wholesale spot markets. Do **not** inject synthetic or regulated benchmark tariffs into `prices_interval`; spot price fields must remain `None`, and frontend metadata must set `hasSpotMarket: false` with explanatory notes.
 
 ## 2. Database Queries & Timezone Invariance
 * **Local Timestamp Format**: All 5-minute dispatch rows store ISO 8601 strings with local timezone offset (e.g. `YYYY-MM-DDTHH:mm:ss+08:00`).
 * **Timezone Continuity in SQL**: When generating SQL cutoff strings for range queries (`1d`, `3d`, `7d`, `30d`), never use `new Date().toISOString()`. Always use proper datetime formatting with timezone offset to preserve local timezone string comparability in DuckDB and MotherDuck.
+* **SQL-Level Timestamp Formatting & Zero-`pytz` Invariant**:
+  * Never import or depend on `pytz` in the API or serverless functions (causes Vercel runtime startup bundling failures). Use standard library `zoneinfo.ZoneInfo` or `datetime.timezone`.
+  * Format query timestamps directly in DuckDB SQL: `strftime({time_expr} AT TIME ZONE '{tz_name}', '%Y-%m-%dT%H:%M:00{tz_offset}')`.
 
-## 3. High-Density Charting & Axis Alignment
+## 3. Pipeline Ingestion & Checkpointing Standards
+* **DB Checkpoint Resume**: `ingest latest` must always inspect target DB `MAX(interval_start)` per country before querying upstream providers to avoid redundant historical downloads.
+* **Bulk Stream Uploads**: Use DuckDB bulk registration/appends over row-by-row iteration for CSV imports.
+* **Stale Feed Protection**: Automatically flag and bypass feeds with data lag exceeding 3 days.
+
+## 4. High-Density Charting & Axis Alignment
 * **Clock-Locked Ticks**: In 1D view (288 points), tick intervals must lock strictly to round 3-hour boundaries (`00:00`, `03:00`, `06:00`, `09:00`, `12:00`, `15:00`, `18:00`, `21:00`).
 * **Grid Containment**: All vertically stacked charts must specify `containLabel: true`, `left: 55`, `right: 20`, and `bottom: 26` to guarantee zero text clipping and vertical gridline synchronization.
 * **Chart Views**: Support both absolute capacity (MW / GWh) and normalized 100% Stacked share (`0% – 100%`).

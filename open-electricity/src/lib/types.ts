@@ -12,6 +12,8 @@ export interface CountryInfo {
   unavailableReason?: string;
   gridOperator?: string;
   installedCapacityGw?: string;
+  hasSpotMarket?: boolean;
+  spotMarketNote?: string;
 }
 
 export const COUNTRIES_METADATA: Record<CountryCode, CountryInfo> = {
@@ -23,6 +25,7 @@ export const COUNTRIES_METADATA: Record<CountryCode, CountryInfo> = {
     currencySymbol: "₱",
     defaultRegion: "ALL",
     hasLivePipeline: true,
+    hasSpotMarket: true,
     gridOperator: "IEMOP",
     regions: [
       { id: "ALL", label: "All PH" },
@@ -39,6 +42,7 @@ export const COUNTRIES_METADATA: Record<CountryCode, CountryInfo> = {
     currencySymbol: "S$",
     defaultRegion: "SINGAPORE",
     hasLivePipeline: true,
+    hasSpotMarket: true,
     gridOperator: "EMA / EMC",
     regions: [{ id: "SINGAPORE", label: "National Grid" }],
   },
@@ -50,6 +54,7 @@ export const COUNTRIES_METADATA: Record<CountryCode, CountryInfo> = {
     currencySymbol: "RM",
     defaultRegion: "PENINSULAR",
     hasLivePipeline: true,
+    hasSpotMarket: true,
     gridOperator: "Single Buyer / GSO",
     regions: [{ id: "PENINSULAR", label: "Peninsular" }],
   },
@@ -61,6 +66,9 @@ export const COUNTRIES_METADATA: Record<CountryCode, CountryInfo> = {
     currencySymbol: "฿",
     defaultRegion: "THAILAND",
     hasLivePipeline: true,
+    hasSpotMarket: false,
+    spotMarketNote:
+      "Thailand operates under an Enhanced Single Buyer (ESB) model with regulated tariffs set by the Energy Regulatory Commission (ERC), rather than a dynamic wholesale spot electricity market.",
     gridOperator: "EGAT / SO Thailand",
     regions: [
       { id: "THAILAND", label: "All Thailand" },

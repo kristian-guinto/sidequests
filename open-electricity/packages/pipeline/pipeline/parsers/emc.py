@@ -362,3 +362,65 @@ class EMCParser:
                 continue
 
         return records
+
+    @staticmethod
+    def parse_realtime_prices(csv_content: str) -> Dict[datetime, float]:
+        """
+        Parses real-time USEP prices from current-day provisional CSV (value=10 / RT48_EGO_*.csv).
+        Returns mapping: interval_start -> usep_price.
+        """
+        if not csv_content or not csv_content.strip():
+            return {}
+
+        prices: Dict[datetime, float] = {}
+        reader = csv.DictReader(io.StringIO(csv_content))
+
+        for raw_row in reader:
+            row = {_clean_key(k): v.strip() for k, v in raw_row.items() if k}
+            d_str = row.get("DATE", "")
+            p_str = row.get("PERIOD", "")
+            if not p_str:
+                continue
+
+            try:
+                if d_str:
+                    if "-" in p_str:
+                        start_time_str = p_str.split("-")[0].strip()
+                        parsed_d = datetime.strptime(d_str, "%d-%b-%Y").date()
+                        hour, minute = map(int, start_time_str.split(":"))
+                        dt = datetime(
+                            parsed_d.year,
+                            parsed_d.month,
+                            parsed_d.day,
+                            hour,
+                            minute,
+                            tzinfo=SGT,
+                        )
+                    else:
+                        dt = parse_emc_date_period(d_str, p_str)
+                else:
+                    today_d = datetime.now(SGT).date()
+                    p = int(p_str.strip())
+                    minute_offset = max(0, (p - 1) * 30)
+                    dt = datetime(
+                        today_d.year,
+                        today_d.month,
+                        today_d.day,
+                        minute_offset // 60,
+                        minute_offset % 60,
+                        tzinfo=SGT,
+                    )
+
+                raw_usep = (
+                    row.get("USEP ($/MWH)")
+                    or row.get("USEP ($/MW)")
+                    or row.get("USEP")
+                    or ""
+                )
+                if raw_usep:
+                    usep_val = float(raw_usep.replace(",", ""))
+                    prices[dt] = round(usep_val, 2)
+            except (ValueError, TypeError):
+                continue
+
+        return prices

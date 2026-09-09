@@ -11,8 +11,9 @@ from pipeline.facility_registry import FacilityRegistry
 logger = logging.getLogger(__name__)
 ICT = timezone(timedelta(hours=7))  # Indochina Time (Bangkok, UTC+7)
 
-# Regulated wholesale electricity benchmark tariff in Thailand: ~3,850 THB/MWh (~$107/MWh)
-DEFAULT_THB_PRICE_MWH = 3850.0
+# Thailand operates under an Enhanced Single Buyer (ESB) model with regulated tariffs.
+# There is no competitive wholesale spot market, so spot prices are None.
+DEFAULT_THB_PRICE_MWH = None
 
 
 class ThailandEGATProvider(BaseProvider):
@@ -333,7 +334,9 @@ class ThailandEGATProvider(BaseProvider):
 
             curr_d += timedelta(days=1)
 
-        if all_records and conn is not None:
+        # Thailand operates under an Enhanced Single Buyer (ESB) model with regulated tariffs.
+        # There is no wholesale spot market, so spot prices are None.
+        if DEFAULT_THB_PRICE_MWH is not None and all_records and conn is not None:
             from pipeline.db import Database
 
             db = Database(conn=conn)

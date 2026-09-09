@@ -3,7 +3,7 @@
 import React, { useMemo, useCallback } from "react";
 import ReactECharts from "echarts-for-react";
 import * as echarts from "echarts";
-import { FuelGenerationPoint, TimeRange } from "@/lib/types";
+import { FuelGenerationPoint, TimeRange, CountryCode } from "@/lib/types";
 import { computeXAxisConfig, createShadcnGradient, formatMarketDate, getShadcnTooltipConfig } from "@/lib/chartUtils";
 import { useIsMobile } from "@/lib/useIsMobile";
 import {
@@ -14,7 +14,7 @@ import {
   ChartCardContent,
 } from "@/components/ui/ChartCard";
 import { format, parseISO } from "date-fns";
-import { TrendingUp } from "lucide-react";
+import { TrendingUp, Info } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 
 interface PriceChartProps {
@@ -24,6 +24,9 @@ interface PriceChartProps {
   currencyCode?: string;
   height?: string;
   onHoverPoint?: (pt: FuelGenerationPoint | null) => void;
+  country?: CountryCode;
+  hasSpotMarket?: boolean;
+  spotMarketNote?: string;
 }
 
 export function PriceChart({
@@ -33,6 +36,9 @@ export function PriceChart({
   currencyCode = "PHP",
   height,
   onHoverPoint,
+  country,
+  hasSpotMarket = true,
+  spotMarketNote,
 }: PriceChartProps) {
   const { isDark } = useTheme();
   const isMobile = useIsMobile();
@@ -651,6 +657,43 @@ export function PriceChart({
     echartsInstance.group = "opennem_sync_group";
     echarts.connect("opennem_sync_group");
   }, []);
+
+  if (hasSpotMarket === false || country === "TH") {
+    return (
+      <ChartCard onMouseLeave={() => onHoverPoint?.(null)}>
+        <ChartCardHeader className="py-2 px-3 sm:px-4">
+          <ChartCardTitle className="flex-wrap gap-1.5 sm:gap-2">
+            <div className="flex items-center space-x-1.5 sm:space-x-2">
+              <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-rose-500" />
+              <span className="text-xs sm:text-sm">
+                Wholesale Price ({currencyCode} / MWh)
+              </span>
+            </div>
+            <div className="inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-[11px] sm:text-xs font-medium bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 font-mono shadow-xs">
+              Regulated Tariff
+            </div>
+          </ChartCardTitle>
+        </ChartCardHeader>
+
+        <ChartCardContent className="p-3 sm:p-4 pt-1">
+          <div className="flex flex-col sm:flex-row items-center sm:items-start space-y-2.5 sm:space-y-0 sm:space-x-3.5 p-3.5 sm:p-4 rounded-xl border border-dashed border-neutral-200 dark:border-neutral-800 bg-neutral-50/60 dark:bg-neutral-900/30">
+            <div className="w-8 h-8 shrink-0 rounded-full bg-amber-500/10 dark:bg-amber-500/20 flex items-center justify-center">
+              <Info className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div className="text-center sm:text-left space-y-1">
+              <h4 className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                No Wholesale Spot Electricity Market in Thailand
+              </h4>
+              <p className="text-[11px] sm:text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                {spotMarketNote ||
+                  "Thailand operates under an Enhanced Single Buyer (ESB) model managed by the Electricity Generating Authority of Thailand (EGAT). Electricity generation is procured through long-term Power Purchase Agreements (PPAs) with regulated tariffs approved by the Energy Regulatory Commission (ERC), rather than an open wholesale spot market."}
+              </p>
+            </div>
+          </div>
+        </ChartCardContent>
+      </ChartCard>
+    );
+  }
 
   return (
     <ChartCard onMouseLeave={() => onHoverPoint?.(null)}>

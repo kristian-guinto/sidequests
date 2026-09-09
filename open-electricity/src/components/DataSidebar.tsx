@@ -143,7 +143,10 @@ export function DataSidebar({
         totalDisplay: `${Math.round(totalGen).toLocaleString()} MW`,
         renValDisplay: `${Math.round(renVal).toLocaleString()} MW`,
         renPctDisplay: `${renPct.toFixed(1)}%`,
-        priceDisplay: `${currencySymbol}${Math.round(ptPrice).toLocaleString()}`,
+        priceDisplay:
+          ptPrice != null && ptPrice > 0
+            ? `${currencySymbol}${Math.round(ptPrice).toLocaleString()}`
+            : "—",
         emissionsDisplay: `${totalEmissionsT.toFixed(1)} tCO₂e`,
         peakDisplay: null,
         columnUnit: "Power",
@@ -173,7 +176,10 @@ export function DataSidebar({
             : `${Math.round(mw).toLocaleString()} MW`,
           rawVal: isEnergy ? gwh : mw,
           pct: pct,
-          priceDisplay: `${currencySymbol}${Math.round(price).toLocaleString()}`,
+          priceDisplay:
+            price != null && price > 0
+              ? `${currencySymbol}${Math.round(price).toLocaleString()}`
+              : "—",
           isRenewable: meta.isRenewable,
         };
       });
@@ -195,7 +201,10 @@ export function DataSidebar({
           ? `${renVal.toFixed(1)} GWh`
           : `${Math.round(renVal).toLocaleString()} MW`,
         renPctDisplay: `${renPct.toFixed(1)}%`,
-        priceDisplay: `${currencySymbol}${Math.round(avgPrice).toLocaleString()}`,
+        priceDisplay:
+          avgPrice != null && avgPrice > 0
+            ? `${currencySymbol}${Math.round(avgPrice).toLocaleString()}`
+            : "—",
         emissionsDisplay: totalEmissions > 0 ? `${Math.round(totalEmissions).toLocaleString()} tCO₂e` : null,
         peakDisplay: peakGen > 0 ? `Peak ${Math.round(peakGen).toLocaleString()} MW` : null,
         columnUnit: isEnergy ? "Energy" : "Power",

@@ -201,22 +201,31 @@ class SingaporeEMCProvider(BaseProvider):
         except Exception as e:
             logger.debug("Metered generation download error: %s", e)
 
-        # 2. For dates where finalized metered generation is not yet published by EMC,
+        # 2. For dates where finalized metered generation or USEP is not yet published by EMC,
         # fetch the daily 48-period dataset (value=10 / RT48_EGO) per day
         dates_with_data = {r.interval_start.date() for r in all_records}
+        dates_with_prices = {dt.date() for dt in price_map.keys()}
         curr_d = start_d
         now_sgt = datetime.now(SGT)
         while curr_d <= end_d:
-            if curr_d not in dates_with_data:
+            if curr_d not in dates_with_data or curr_d not in dates_with_prices:
                 try:
                     rt_csv = self.client.download_realtime_csv(curr_d)
-                    rt_records = self.parser.parse_realtime(rt_csv)
-                    valid_recs = [r for r in rt_records if r.interval_start <= now_sgt]
-                    if valid_recs:
-                        all_records.extend(valid_recs)
-                        print(
-                            f"  -> [{curr_d}] Synced {len(valid_recs)} provisional intervals for Singapore."
-                        )
+                    if curr_d not in dates_with_data:
+                        rt_records = self.parser.parse_realtime(rt_csv)
+                        valid_recs = [
+                            r for r in rt_records if r.interval_start <= now_sgt
+                        ]
+                        if valid_recs:
+                            all_records.extend(valid_recs)
+                            print(
+                                f"  -> [{curr_d}] Synced {len(valid_recs)} provisional intervals for Singapore."
+                            )
+
+                    rt_prices = self.parser.parse_realtime_prices(rt_csv)
+                    for p_dt, p_val in rt_prices.items():
+                        if p_dt <= now_sgt and p_dt not in price_map:
+                            price_map[p_dt] = p_val
                 except Exception as e:
                     logger.warning("Real-time EMC download error for %s: %s", curr_d, e)
             curr_d += timedelta(days=1)
