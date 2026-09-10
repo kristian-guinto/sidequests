@@ -122,10 +122,9 @@ export default function SoutheastAsiaOverviewPage() {
       {/* Top Global Navigation Bar */}
       <header className="bg-white dark:bg-[#000000] border-b border-neutral-200 dark:border-[#27272A] sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8">
-          {/* Main Row: Brand & Desktop Controls or Mobile Action Icons */}
-          <div className="flex items-center justify-between h-14">
-            {/* Logo */}
-            <Link href="/" className="flex items-center space-x-2.5 group min-w-0">
+          <div className="flex flex-wrap sm:flex-nowrap items-center justify-between py-2 sm:py-0 sm:h-14 gap-y-2">
+            {/* 1. Logo (order-1) */}
+            <Link href="/" className="order-1 flex items-center space-x-2.5 group min-w-0">
               <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-emerald-600 via-emerald-500 to-teal-400 flex items-center justify-center shadow-xs shadow-emerald-500/20 group-hover:scale-105 transition-transform shrink-0">
                 <svg
                   className="h-4.5 w-4.5 text-white fill-white"
@@ -146,139 +145,79 @@ export default function SoutheastAsiaOverviewPage() {
               </div>
             </Link>
 
-            {/* Desktop Controls (hidden on mobile, full width on sm+) */}
-            <div className="hidden sm:flex items-center space-x-2 sm:space-x-3">
+            {/* 2. Global Actions: Refresh & Theme (order-2 on mobile, order-3 on desktop) */}
+            <div className="order-2 sm:order-3 flex items-center space-x-1.5 sm:space-x-2">
+              <button
+                onClick={fetchAllCountriesData}
+                disabled={isLoading}
+                className="p-1.5 sm:p-2 rounded-md border border-neutral-200 dark:border-[#27272A] hover:bg-neutral-50 dark:hover:bg-[#121215] text-neutral-700 dark:text-neutral-300 transition disabled:opacity-50 shadow-xs"
+                title="Refresh datasets"
+                aria-label="Refresh datasets"
+              >
+                <RotateCw
+                  className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${isLoading ? "animate-spin text-emerald-500" : ""}`}
+                />
+              </button>
+
+              <button
+                onClick={toggleTheme}
+                className="p-1.5 sm:p-2 rounded-md border border-neutral-200 dark:border-[#27272A] hover:bg-neutral-50 dark:hover:bg-[#121215] text-neutral-700 dark:text-neutral-300 transition shadow-xs"
+                title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                aria-label="Toggle Theme"
+              >
+                {isDark ? (
+                  <Sun className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-400" />
+                ) : (
+                  <Moon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-neutral-600" />
+                )}
+              </button>
+            </div>
+
+            {/* 3. Controls: Palette Mode & Past 30 Days (order-3 on mobile row 2, order-2 on desktop inline) */}
+            <div className="order-3 sm:order-2 w-full sm:w-auto flex items-center justify-between sm:justify-start space-x-2 sm:space-x-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-neutral-100 dark:border-[#27272A]/80">
               {/* Palette Mode Toggle */}
-              <div className="flex items-center border border-neutral-200 dark:border-[#27272A] rounded p-0.5 bg-neutral-50/50 dark:bg-[#121215]">
+              <div className="flex items-center border border-neutral-200 dark:border-[#27272A] rounded-md p-0.5 bg-neutral-50/70 dark:bg-[#121215]">
                 <button
                   onClick={() => handlePaletteModeChange("clean-fossil")}
-                  className={`flex items-center space-x-1 px-2.5 py-0.5 rounded text-xs font-medium transition ${paletteMode === "clean-fossil"
-                    ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold shadow-sm"
-                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white"
+                  className={`flex items-center space-x-1.5 px-2.5 py-1 sm:py-0.5 rounded text-xs font-medium transition ${paletteMode === "clean-fossil"
+                    ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold border border-neutral-300 dark:border-neutral-600 shadow-xs"
+                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white border border-transparent"
                     }`}
                   title="Clean (Green) vs. Fossil (Slate)"
                 >
-                  <Leaf className="h-3.5 w-3.5 text-emerald-500 dark:text-emerald-400" />
+                  <Leaf className="h-3.5 w-3.5 text-emerald-500 dark:text-emerald-400 shrink-0" />
                   <span>Clean / Fossil</span>
                 </button>
                 <button
                   onClick={() => handlePaletteModeChange("detailed")}
-                  className={`flex items-center space-x-1 px-2.5 py-0.5 rounded text-xs font-medium transition ${paletteMode === "detailed"
-                    ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold shadow-sm"
-                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white"
+                  className={`flex items-center space-x-1.5 px-2.5 py-1 sm:py-0.5 rounded text-xs font-medium transition ${paletteMode === "detailed"
+                    ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold border border-neutral-300 dark:border-neutral-600 shadow-xs"
+                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white border border-transparent"
                     }`}
                   title="Full Multi-Color Palette"
                 >
-                  <Palette className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400" />
+                  <Palette className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400 shrink-0" />
                   <span>Detailed</span>
                 </button>
               </div>
 
               {/* Static Time Window Indicator */}
-              <span className="px-2.5 py-1 rounded border border-neutral-200 dark:border-[#27272A] bg-neutral-50/50 dark:bg-[#121215] text-xs font-medium text-neutral-600 dark:text-neutral-400">
+              <span className="text-xs font-medium text-neutral-600 dark:text-neutral-400 px-2.5 py-1 sm:py-0.5 rounded-md bg-neutral-100 dark:bg-[#18181B] border border-neutral-200 dark:border-[#27272A]">
                 Past 30 Days
               </span>
-
-              {/* Refresh Button */}
-              <button
-                onClick={fetchAllCountriesData}
-                disabled={isLoading}
-                className="p-1.5 rounded border border-neutral-200 dark:border-[#27272A] hover:bg-neutral-50 dark:hover:bg-[#121215] text-neutral-700 dark:text-neutral-300 text-xs transition disabled:opacity-50"
-                title="Refresh datasets"
-              >
-                <RotateCw
-                  className={`h-3.5 w-3.5 ${isLoading ? "animate-spin text-emerald-500" : ""}`}
-                />
-              </button>
-
-              {/* Theme Toggle */}
-              <button
-                onClick={toggleTheme}
-                className="p-1.5 rounded border border-neutral-200 dark:border-[#27272A] hover:bg-neutral-50 dark:hover:bg-[#121215] text-neutral-700 dark:text-neutral-300 text-xs transition"
-                title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
-                aria-label="Toggle Theme"
-              >
-                {isDark ? (
-                  <Sun className="h-3.5 w-3.5 text-amber-400" />
-                ) : (
-                  <Moon className="h-3.5 w-3.5 text-neutral-600" />
-                )}
-              </button>
             </div>
-
-            {/* Mobile Actions (Refresh & Theme Toggle) */}
-            <div className="flex sm:hidden items-center space-x-2">
-              <button
-                onClick={fetchAllCountriesData}
-                disabled={isLoading}
-                className="p-2 rounded-md border border-neutral-200 dark:border-[#27272A] hover:bg-neutral-50 dark:hover:bg-[#121215] text-neutral-700 dark:text-neutral-300 transition disabled:opacity-50 shadow-xs"
-                title="Refresh datasets"
-                aria-label="Refresh datasets"
-              >
-                <RotateCw
-                  className={`h-4 w-4 ${isLoading ? "animate-spin text-emerald-500" : ""}`}
-                />
-              </button>
-
-              <button
-                onClick={toggleTheme}
-                className="p-2 rounded-md border border-neutral-200 dark:border-[#27272A] hover:bg-neutral-50 dark:hover:bg-[#121215] text-neutral-700 dark:text-neutral-300 transition shadow-xs"
-                title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
-                aria-label="Toggle Theme"
-              >
-                {isDark ? (
-                  <Sun className="h-4 w-4 text-amber-400" />
-                ) : (
-                  <Moon className="h-4 w-4 text-neutral-600" />
-                )}
-              </button>
-            </div>
-          </div>
-
-          {/* Mobile Sub-Toolbar: Row 2 with Palette and Time Range controls */}
-          <div className="flex sm:hidden items-center justify-between py-2 border-t border-neutral-100 dark:border-[#27272A]/80">
-            {/* Palette Mode Toggle */}
-            <div className="flex items-center border border-neutral-200 dark:border-[#27272A] rounded-md p-0.5 bg-neutral-50/70 dark:bg-[#121215]">
-              <button
-                onClick={() => handlePaletteModeChange("clean-fossil")}
-                className={`flex items-center space-x-1.5 px-2.5 py-1 rounded text-xs font-medium transition ${paletteMode === "clean-fossil"
-                  ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-semibold shadow-xs"
-                  : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white"
-                  }`}
-                title="Clean (Green) vs. Fossil (Slate)"
-              >
-                <Leaf className="h-3.5 w-3.5 text-emerald-500 dark:text-emerald-400 shrink-0" />
-                <span>Clean / Fossil</span>
-              </button>
-              <button
-                onClick={() => handlePaletteModeChange("detailed")}
-                className={`flex items-center space-x-1.5 px-2.5 py-1 rounded text-xs font-medium transition ${paletteMode === "detailed"
-                  ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-semibold shadow-xs"
-                  : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white"
-                  }`}
-                title="Full Multi-Color Palette"
-              >
-                <Palette className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400 shrink-0" />
-                <span>Detailed</span>
-              </button>
-            </div>
-
-            {/* Static Time Window Indicator */}
-            <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400 px-2.5 py-1 rounded-md bg-neutral-100 dark:bg-[#18181B] border border-neutral-200 dark:border-[#27272A]">
-              Past 30 Days
-            </span>
           </div>
         </div>
       </header>
 
       {/* Main Container */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-10">
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
         {/* Minimal page heading */}
         <div className="mb-4 sm:mb-5">
           <h1 className="text-lg sm:text-xl font-bold text-neutral-950 dark:text-white tracking-tight">
             Southeast Asia Electricity Mix
           </h1>
-          <p className="text-xs text-neutral-400 dark:text-neutral-500 mt-0.5">
+          <p className="text-xs sm:text-[13px] text-neutral-600 dark:text-neutral-400 mt-0.5">
             Electricity generation, grid scale, and carbon intensity across tracked markets
           </p>
         </div>

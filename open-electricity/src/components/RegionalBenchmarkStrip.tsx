@@ -260,7 +260,7 @@ export function RegionalBenchmarkStrip({
   };
 
   return (
-    <div className="mb-6 rounded-xl border border-neutral-200/80 dark:border-[#1E1E21] bg-white dark:bg-[#0C0C0E] shadow-xs transition-all relative">
+    <div className="mb-6 rounded-xl border border-neutral-200/80 dark:border-[#1E1E21] bg-white dark:bg-[#0C0C0E] shadow-xs transition-all relative overflow-hidden">
       {/* Benchmark Header Banner */}
       <div className="px-4 py-2.5 sm:px-5 sm:py-3 rounded-t-xl border-b border-neutral-100 dark:border-[#1E1E21] flex flex-wrap items-center justify-between gap-2 bg-neutral-50/50 dark:bg-[#121215]/50">
         <div className="flex items-center space-x-2">
@@ -276,7 +276,7 @@ export function RegionalBenchmarkStrip({
         </div>
 
         {/* Combined Tracked Aggregates */}
-        <div className="flex items-center space-x-2 sm:space-x-3 text-[11px] font-mono">
+        <div className="flex flex-wrap items-center gap-x-2 sm:gap-x-3 gap-y-1 text-[11px] font-mono">
           {isLoading ? (
             <div className="h-4 w-44 bg-neutral-200/60 dark:bg-neutral-800 animate-pulse rounded" />
           ) : hasAnyData ? (
@@ -287,7 +287,7 @@ export function RegionalBenchmarkStrip({
                   {formatEnergy(totalRegionalGWh)}
                 </span>
               </div>
-              <span className="text-neutral-300 dark:text-neutral-700">&bull;</span>
+              <span className="text-neutral-300 dark:text-neutral-700 hidden sm:inline">&bull;</span>
               <div className="flex items-center space-x-1 text-neutral-600 dark:text-neutral-400">
                 <span>Weighted Avg:</span>
                 <span className="font-bold text-neutral-950 dark:text-white">
@@ -300,9 +300,9 @@ export function RegionalBenchmarkStrip({
       </div>
 
       {/* 2-Column Comparative Layout: Treemap Tiles vs Carbon & Renewables Table */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 rounded-b-xl divide-y lg:divide-y-0 lg:divide-x divide-neutral-100 dark:divide-[#1E1E21]">
+      <div className="grid grid-cols-1 lg:grid-cols-12 rounded-b-xl divide-y lg:divide-y-0 lg:divide-x divide-neutral-100 dark:divide-[#1E1E21] min-w-0">
         {/* Left Column (7 cols): Proportional Treemap Area Tiles */}
-        <div className="lg:col-span-7 p-4 sm:p-5 flex flex-col justify-between">
+        <div className="lg:col-span-7 min-w-0 p-4 sm:p-5 flex flex-col justify-between">
           <div className="flex items-center justify-between text-[11px] uppercase tracking-wider font-semibold text-neutral-400 dark:text-neutral-500 mb-3">
             <div className="flex items-center space-x-1.5">
               <Zap className="w-3 h-3 text-amber-500" />
@@ -419,7 +419,7 @@ export function RegionalBenchmarkStrip({
         </div>
 
         {/* Right Column (5 cols): Sortable Carbon & Renewables Table */}
-        <div className="lg:col-span-5 p-4 sm:p-5 flex flex-col justify-between">
+        <div className="lg:col-span-5 min-w-0 p-4 sm:p-5 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between text-[11px] uppercase tracking-wider font-semibold text-neutral-400 dark:text-neutral-500 mb-2">
               <div className="flex items-center space-x-1.5">
@@ -556,21 +556,21 @@ export function RegionalBenchmarkStrip({
               <div className="col-span-4 flex justify-end">
                 <button
                   onClick={() => handleSort("intensity")}
-                  className={`flex items-center space-x-1 px-1.5 py-0.5 rounded transition ${sortField === "intensity"
-                    ? "text-neutral-950 dark:text-white font-bold bg-neutral-100 dark:bg-[#1E1E22]"
-                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200"
+                  className={`flex items-center space-x-1 px-2 py-0.5 rounded border text-xs transition cursor-pointer ${sortField === "intensity"
+                    ? "text-neutral-950 dark:text-white font-bold bg-neutral-100 dark:bg-[#1E1E22] border-neutral-300 dark:border-neutral-700 shadow-2xs"
+                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 border-transparent hover:border-neutral-200 dark:hover:border-[#27272A] hover:bg-neutral-100/70 dark:hover:bg-[#1E1E22]/60"
                     }`}
                   title="Sort by Carbon Intensity (lower is cleaner)"
                 >
                   <span>Intensity</span>
                   {sortField === "intensity" ? (
                     sortDir === "asc" ? (
-                      <ArrowUp className="w-2.5 h-2.5 text-emerald-500" />
+                      <ArrowUp className="w-3 h-3 text-emerald-500 shrink-0" />
                     ) : (
-                      <ArrowDown className="w-2.5 h-2.5 text-amber-500" />
+                      <ArrowDown className="w-3 h-3 text-amber-500 shrink-0" />
                     )
                   ) : (
-                    <ArrowUpDown className="w-2.5 h-2.5 opacity-40" />
+                    <ArrowUpDown className="w-3 h-3 opacity-40 shrink-0" />
                   )}
                 </button>
               </div>
@@ -579,21 +579,21 @@ export function RegionalBenchmarkStrip({
               <div className="col-span-3 flex justify-end">
                 <button
                   onClick={() => handleSort("renewables")}
-                  className={`flex items-center space-x-1 px-1.5 py-0.5 rounded transition ${sortField === "renewables"
-                    ? "text-neutral-950 dark:text-white font-bold bg-neutral-100 dark:bg-[#1E1E22]"
-                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200"
+                  className={`flex items-center space-x-1 px-2 py-0.5 rounded border text-xs transition cursor-pointer ${sortField === "renewables"
+                    ? "text-neutral-950 dark:text-white font-bold bg-neutral-100 dark:bg-[#1E1E22] border-neutral-300 dark:border-neutral-700 shadow-2xs"
+                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 border-transparent hover:border-neutral-200 dark:hover:border-[#27272A] hover:bg-neutral-100/70 dark:hover:bg-[#1E1E22]/60"
                     }`}
                   title="Sort by Renewable Share (higher is cleaner)"
                 >
                   <span>Clean %</span>
                   {sortField === "renewables" ? (
                     sortDir === "desc" ? (
-                      <ArrowDown className="w-2.5 h-2.5 text-emerald-500" />
+                      <ArrowDown className="w-3 h-3 text-emerald-500 shrink-0" />
                     ) : (
-                      <ArrowUp className="w-2.5 h-2.5 text-amber-500" />
+                      <ArrowUp className="w-3 h-3 text-amber-500 shrink-0" />
                     )
                   ) : (
-                    <ArrowUpDown className="w-2.5 h-2.5 opacity-40" />
+                    <ArrowUpDown className="w-3 h-3 opacity-40 shrink-0" />
                   )}
                 </button>
               </div>

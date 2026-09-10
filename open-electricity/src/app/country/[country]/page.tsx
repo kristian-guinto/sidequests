@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   CountryCode,
   Region,
@@ -26,6 +26,8 @@ import { EmissionsChart } from "@/components/EmissionsChart";
 import { PriceChart } from "@/components/PriceChart";
 import { DataSidebar } from "@/components/DataSidebar";
 import { alignPointsToTimeGrid, getDateRangeParams, formatMarketDate } from "@/lib/chartUtils";
+import { getFuelMeta } from "@/lib/colors";
+import { useTheme } from "@/components/ThemeProvider";
 
 interface CountryPageProps {
   params: {
@@ -40,25 +42,30 @@ const VALID_PALETTES: readonly PaletteMode[] = ["clean-fossil", "detailed"];
 
 export default function CountryDetailPage({ params, searchParams }: CountryPageProps) {
   const router = useRouter();
+  const searchParamsHook = useSearchParams();
+  const { isDark } = useTheme();
 
   // Validate initial country from URL params
   const rawCountry = (params?.country || "PH").toUpperCase() as CountryCode;
   const initialCountry: CountryCode = COUNTRIES_METADATA[rawCountry] ? rawCountry : "PH";
   const defaultRegion = COUNTRIES_METADATA[initialCountry]?.defaultRegion || "ALL";
 
-  const paramRange = typeof searchParams?.range === "string" ? (searchParams.range as TimeRange) : null;
+  const urlRange = searchParamsHook?.get("range") || (typeof searchParams?.range === "string" ? searchParams.range : null);
+  const paramRange = urlRange && VALID_RANGES.includes(urlRange as TimeRange) ? (urlRange as TimeRange) : null;
   const initialRange: TimeRange =
     paramRange && VALID_RANGES.includes(paramRange) ? paramRange : "7d";
 
-  const paramView = typeof searchParams?.view === "string" ? (searchParams.view as ViewMode) : null;
+  const urlView = searchParamsHook?.get("view") || searchParamsHook?.get("viewMode") || (typeof searchParams?.view === "string" ? searchParams.view : null);
+  const paramView = urlView && VALID_VIEWS.includes(urlView as ViewMode) ? (urlView as ViewMode) : null;
   const initialView: ViewMode =
     paramView && VALID_VIEWS.includes(paramView) ? paramView : "percentage";
 
-  const paramPalette = typeof searchParams?.palette === "string" ? (searchParams.palette as PaletteMode) : null;
+  const urlPalette = searchParamsHook?.get("palette") || (typeof searchParams?.palette === "string" ? searchParams.palette : null);
+  const paramPalette = urlPalette && VALID_PALETTES.includes(urlPalette as PaletteMode) ? (urlPalette as PaletteMode) : null;
   const initialPalette: PaletteMode =
     paramPalette && VALID_PALETTES.includes(paramPalette) ? paramPalette : "clean-fossil";
 
-  const paramRegion = typeof searchParams?.region === "string" ? searchParams.region : null;
+  const paramRegion = searchParamsHook?.get("region") || (typeof searchParams?.region === "string" ? searchParams.region : null);
   const validRegions = COUNTRIES_METADATA[initialCountry]?.regions.map((r) => r.id) || [];
   const initialRegion: Region =
     paramRegion && validRegions.includes(paramRegion) ? paramRegion : defaultRegion;
@@ -126,6 +133,12 @@ export default function CountryDetailPage({ params, searchParams }: CountryPageP
     };
   }, [points]);
 
+  const dominantFuelRow = useMemo(() => {
+    if (!breakdown || breakdown.length === 0) return null;
+    const sorted = [...breakdown].filter((r) => r.percentage > 0).sort((a, b) => b.percentage - a.percentage);
+    return sorted[0] || null;
+  }, [breakdown]);
+
   const mobilePeriodLabel = useMemo(() => {
     if (!timeSpan?.start || !timeSpan?.end) return "Period Total";
     try {
@@ -142,13 +155,22 @@ export default function CountryDetailPage({ params, searchParams }: CountryPageP
       if (typeof window === "undefined") return;
       const url = new URL(window.location.href);
       if (newParams.range !== undefined) url.searchParams.set("range", newParams.range);
-      if (newParams.view !== undefined) url.searchParams.set("view", newParams.view);
+      if (newParams.view !== undefined) {
+        url.searchParams.set("view", newParams.view);
+        url.searchParams.delete("viewMode");
+      }
       if (newParams.palette !== undefined) url.searchParams.set("palette", newParams.palette);
       if (newParams.region !== undefined) url.searchParams.set("region", newParams.region);
       window.history.replaceState(null, "", url.toString());
     },
     []
   );
+
+  useEffect(() => {
+    if (paramView && paramView !== viewMode) {
+      setViewMode(paramView);
+    }
+  }, [paramView]);
 
   const handleCountryChange = (newCountry: CountryCode) => {
     setCountry(newCountry);
@@ -277,62 +299,73 @@ export default function CountryDetailPage({ params, searchParams }: CountryPageP
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-start">
           {/* Left Column (8 cols ~ 67% width): Synchronized Chart Stack */}
           <div className="lg:col-span-8 flex flex-col gap-2.5">
-            {/* Mobile Persistent Status & Scrub Slot (Screens < 1024px) */}
-            <div
-              className={`lg:hidden flex items-center justify-between px-3 py-1.5 min-h-[34px] rounded-lg text-xs font-mono shadow-2xs transition-colors duration-150 ${hoveredPoint
-                ? "bg-emerald-500/10 dark:bg-emerald-950/40 border border-emerald-500/30"
-                : "bg-neutral-100/80 dark:bg-[#18181B]/80 border border-neutral-200/80 dark:border-[#27272A]/80"
-                }`}
-            >
-              {hoveredPoint ? (
-                <>
-                  <div className="flex items-center space-x-1.5 min-w-0">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                    <span className="text-neutral-800 dark:text-neutral-200 font-semibold truncate">
-                      {formatMarketDate(hoveredPoint.timestamp, "d MMM, h:mm a")}
+            {/* Mobile Persistent Status & Summary Slot (Screens < 1024px) */}
+            {hoveredPoint ? (
+              <div className="lg:hidden flex items-center justify-between px-3 py-2 min-h-[38px] rounded-lg text-xs font-mono shadow-2xs transition-colors duration-150 bg-emerald-500/10 dark:bg-emerald-950/40 border border-emerald-500/30">
+                <div className="flex items-center space-x-1.5 min-w-0">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                  <span className="text-neutral-800 dark:text-neutral-200 font-semibold truncate">
+                    {formatMarketDate(hoveredPoint.timestamp, "d MMM, h:mm a")}
+                  </span>
+                </div>
+                <div className="flex items-center space-x-2.5 shrink-0">
+                  <span className="text-neutral-900 dark:text-white font-bold">
+                    {unit === "GWh"
+                      ? `${(hoveredPoint.totalGeneration || 0).toFixed(1)} GWh`
+                      : `${Math.round(hoveredPoint.totalGeneration || 0).toLocaleString()} MW`}
+                  </span>
+                  {hoveredPoint.renewablesPct != null && (
+                    <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                      {Math.round(hoveredPoint.renewablesPct)}% Clean
                     </span>
-                  </div>
-                  <div className="flex items-center space-x-2.5 shrink-0">
-                    <span className="text-neutral-900 dark:text-white font-bold">
-                      {unit === "GWh"
-                        ? `${(hoveredPoint.totalGeneration || 0).toFixed(1)} GWh`
-                        : `${Math.round(hoveredPoint.totalGeneration || 0).toLocaleString()} MW`}
-                    </span>
-                    {hoveredPoint.renewablesPct != null && (
-                      <span className="text-emerald-600 dark:text-emerald-400 font-bold">
-                        {Math.round(hoveredPoint.renewablesPct)}% Clean
-                      </span>
-                    )}
-                  </div>
-                </>
-              ) : (
-                <>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="lg:hidden rounded-lg text-xs font-mono shadow-2xs transition-colors duration-150 bg-neutral-50/90 dark:bg-[#121215] border border-neutral-200/80 dark:border-[#27272A]/80 p-2.5 space-y-1.5">
+                <div className="flex items-center justify-between text-neutral-600 dark:text-neutral-400">
                   <div className="flex items-center space-x-1.5 min-w-0">
-                    <span className="w-1.5 h-1.5 rounded-full bg-neutral-400 dark:bg-neutral-600 shrink-0" />
-                    <span className="text-neutral-600 dark:text-neutral-400 font-medium truncate">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                    <span className="font-semibold text-neutral-800 dark:text-neutral-200 truncate">
                       {mobilePeriodLabel}
                     </span>
                   </div>
-                  <div className="flex items-center space-x-2 text-neutral-600 dark:text-neutral-400 font-medium shrink-0">
-                    <span>
-                      {unit === "GWh"
-                        ? `${summary?.totalGenerationGWh?.toFixed(1) || 0} GWh`
-                        : summary?.peakGenerationMW
-                          ? `Peak ${Math.round(summary.peakGenerationMW).toLocaleString()} MW`
-                          : "—"}
-                    </span>
-                    {summary?.renewablesPct != null && (
-                      <>
-                        <span className="text-neutral-300 dark:text-neutral-700">&bull;</span>
-                        <span className="text-emerald-600 dark:text-emerald-400 font-bold">
-                          {Math.round(summary.renewablesPct)}% Clean
-                        </span>
-                      </>
-                    )}
+                  <div className="text-neutral-950 dark:text-white font-bold text-xs">
+                    {unit === "GWh"
+                      ? `${summary?.totalGenerationGWh?.toFixed(1) || 0} GWh`
+                      : summary?.peakGenerationMW
+                        ? `Peak ${Math.round(summary.peakGenerationMW).toLocaleString()} MW`
+                        : "—"}
                   </div>
-                </>
-              )}
-            </div>
+                </div>
+
+                {/* Metric Pills */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                  {summary?.renewablesPct != null && (
+                    <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                      <span>🌿</span>
+                      <span>{Math.round(summary.renewablesPct)}% Clean</span>
+                    </span>
+                  )}
+                  {dominantFuelRow && (
+                    <span className="inline-flex items-center space-x-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium bg-neutral-100 dark:bg-[#1C1C20] text-neutral-800 dark:text-neutral-200 border border-neutral-200/60 dark:border-[#27272A]">
+                      <span
+                        className="w-1.5 h-1.5 rounded-xs shrink-0"
+                        style={{ backgroundColor: getFuelMeta(dominantFuelRow.fuelTech, isDark, paletteMode).color }}
+                      />
+                      <span>
+                        {getFuelMeta(dominantFuelRow.fuelTech, isDark, paletteMode).label} {Math.round(dominantFuelRow.percentage)}%
+                      </span>
+                    </span>
+                  )}
+                  {summary?.emissionsIntensityGPerKWh != null && summary.emissionsIntensityGPerKWh > 0 && (
+                    <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-neutral-100 dark:bg-[#1C1C20] text-neutral-600 dark:text-neutral-400 border border-neutral-200/60 dark:border-[#27272A]">
+                      <span>{Math.round(summary.emissionsIntensityGPerKWh)} g/kWh</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
 
             <GenerationChart
               data={points}

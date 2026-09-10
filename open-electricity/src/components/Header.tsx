@@ -244,8 +244,8 @@ export function Header({
                   onClick={() => handleCountrySelect(cCode)}
                   title={cInfo.name}
                   className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition shrink-0 ${isSelected
-                      ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-950 font-bold shadow-xs border border-neutral-900 dark:border-white"
-                      : "bg-neutral-50 dark:bg-[#121215] text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-[#18181B] border border-neutral-200/80 dark:border-[#27272A]"
+                    ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-950 font-bold shadow-xs border border-neutral-900 dark:border-white"
+                    : "bg-neutral-50 dark:bg-[#121215] text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-[#18181B] border border-neutral-200/80 dark:border-[#27272A]"
                     }`}
                 >
                   <span className="text-base leading-none select-none">{cInfo.flag}</span>
@@ -294,12 +294,12 @@ export function Header({
           {/* Right / Row 3 (on mobile): View Mode, Palette, and Range controls in horizontal scroll container */}
           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5 shrink-0">
             {/* Palette Mode Toggle (Clean / Fossil vs Detailed) */}
-            <div className="flex items-center border border-neutral-200 dark:border-[#27272A] rounded p-0.5 bg-neutral-50/50 dark:bg-[#121215] shrink-0">
+            <div className="flex items-center border border-neutral-200 dark:border-[#27272A] rounded-md p-0.5 bg-neutral-50/70 dark:bg-[#121215] shrink-0">
               <button
                 onClick={() => onPaletteModeChange("clean-fossil")}
                 className={`flex items-center space-x-1 px-2 sm:px-2.5 py-0.5 rounded text-xs font-medium transition ${paletteMode === "clean-fossil"
-                  ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold shadow-sm"
-                  : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white"
+                  ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold border border-neutral-300 dark:border-neutral-600 shadow-2xs"
+                  : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white border border-transparent"
                   }`}
                 title="2-Tone Clean vs. Fossil Mode"
               >
@@ -309,8 +309,8 @@ export function Header({
               <button
                 onClick={() => onPaletteModeChange("detailed")}
                 className={`flex items-center space-x-1 px-2 sm:px-2.5 py-0.5 rounded text-xs font-medium transition ${paletteMode === "detailed"
-                  ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold shadow-sm"
-                  : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white"
+                  ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold border border-neutral-300 dark:border-neutral-600 shadow-2xs"
+                  : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white border border-transparent"
                   }`}
                 title="Full Multi-Color Fuel Mix"
               >
@@ -320,12 +320,12 @@ export function Header({
             </div>
 
             {/* Chart Mode Toggle (Percentage vs Value) */}
-            <div className="flex items-center border border-neutral-200 dark:border-[#27272A] rounded p-0.5 bg-neutral-50/50 dark:bg-[#121215] shrink-0">
+            <div className="flex items-center border border-neutral-200 dark:border-[#27272A] rounded-md p-0.5 bg-neutral-50/70 dark:bg-[#121215] shrink-0">
               <button
                 onClick={() => onViewModeChange("percentage")}
                 className={`flex items-center space-x-1 px-2 sm:px-2.5 py-0.5 rounded text-xs font-medium transition ${viewMode === "percentage"
-                  ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold shadow-sm"
-                  : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white"
+                  ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold border border-neutral-300 dark:border-neutral-600 shadow-2xs"
+                  : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white border border-transparent"
                   }`}
                 title="Percentage Contribution Share (%)"
               >
@@ -335,8 +335,8 @@ export function Header({
               <button
                 onClick={() => onViewModeChange("stacked")}
                 className={`flex items-center space-x-1 px-2 sm:px-2.5 py-0.5 rounded text-xs font-medium transition ${viewMode === "stacked" || viewMode === "cumulative"
-                  ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold shadow-sm"
-                  : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white"
+                  ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold border border-neutral-300 dark:border-neutral-600 shadow-2xs"
+                  : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white border border-transparent"
                   }`}
                 title="Absolute Value (MW / GWh)"
               >
@@ -346,14 +346,14 @@ export function Header({
             </div>
 
             {/* Range Pills (1D, 3D, 7D, 30D, 1Y) */}
-            <div className="flex border border-neutral-200 dark:border-[#27272A] rounded p-0.5 text-xs font-medium bg-neutral-50/50 dark:bg-[#121215] shrink-0">
+            <div className="flex border border-neutral-200 dark:border-[#27272A] rounded-md p-0.5 text-xs font-medium bg-neutral-50/70 dark:bg-[#121215] shrink-0">
               {RANGES.map((rng) => (
                 <button
                   key={rng.id}
                   onClick={() => handleRangeClick(rng.id)}
                   className={`px-2 sm:px-2.5 py-0.5 rounded transition ${range === rng.id
-                    ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold border border-neutral-300 dark:border-neutral-700 shadow-sm"
-                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                    ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold border border-neutral-300 dark:border-neutral-600 shadow-2xs"
+                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white border border-transparent"
                     }`}
                 >
                   {rng.label}

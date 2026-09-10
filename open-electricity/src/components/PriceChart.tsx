@@ -56,6 +56,15 @@ export function PriceChart({
     );
   }, [data]);
 
+  const hasNegativePrice = useMemo(() => {
+    return data.some(
+      (d) =>
+        (d.price != null && d.price < 0) ||
+        (d.priceMin != null && d.priceMin < 0) ||
+        (d.priceMedian != null && d.priceMedian < 0)
+    );
+  }, [data]);
+
   const prices = useMemo(() => {
     return data.map((d) => (d.price != null && d.hasData !== false ? d.price : null));
   }, [data]);
@@ -73,6 +82,30 @@ export function PriceChart({
 
   const option = useMemo(() => {
     const gridLineColor = isDark ? "rgba(255, 255, 255, 0.07)" : "#F1F5F9";
+    const zeroMarkLine = hasNegativePrice
+      ? {
+        symbol: "none",
+        silent: true,
+        data: [
+          {
+            yAxis: 0,
+            lineStyle: {
+              color: isDark ? "rgba(255, 255, 255, 0.45)" : "rgba(0, 0, 0, 0.4)",
+              width: 1.5,
+              type: "dashed",
+            },
+            label: {
+              show: true,
+              position: "end",
+              formatter: "0",
+              color: isDark ? "#A1A1AA" : "#64748B",
+              fontSize: 9,
+              fontFamily: "monospace",
+            },
+          },
+        ],
+      }
+      : undefined;
 
     return {
       backgroundColor: "transparent",
@@ -158,6 +191,12 @@ export function PriceChart({
                     </div>`
                 : ""
               }
+              ${barVal < 0
+                ? `<div class="pt-1.5 mt-1 border-t ${borderCls} text-[10px] text-amber-500 font-sans leading-tight">
+                    Negative price: curtailment / surplus dispatch
+                  </div>`
+                : ""
+              }
             </div>`;
           }
 
@@ -199,10 +238,17 @@ export function PriceChart({
                     </div>`
                 : ""
               }
+              ${rawPt.priceMedian < 0
+                ? `<div class="pt-1.5 mt-1 border-t ${borderCls} text-[10px] text-amber-500 font-sans leading-tight">
+                    Negative price: curtailment / surplus dispatch
+                  </div>`
+                : ""
+              }
             </div>`;
           }
 
           const val = Number(rawPt?.price ?? pList[0].value) || 0;
+          const isNegative = val < 0 || (rawPt?.price != null && rawPt.price < 0);
 
           return `<div class="font-sans min-w-[180px]">
             <div class="${textMuted} font-medium text-xs mb-1.5">${formattedTime}</div>
@@ -215,6 +261,12 @@ export function PriceChart({
             val
           ).toLocaleString()} /MWh</span>
             </div>
+            ${isNegative
+              ? `<div class="pt-1.5 mt-1 border-t ${borderCls} text-[10px] text-amber-500 font-sans leading-tight">
+                  Negative price: curtailment / surplus dispatch
+                </div>`
+              : ""
+            }
           </div>`;
         },
         axisPointer: {
@@ -608,6 +660,7 @@ export function PriceChart({
                 width: 2.0,
                 color: "#E11D48",
               },
+              markLine: zeroMarkLine,
               z: 3,
             },
           ]
@@ -625,6 +678,7 @@ export function PriceChart({
               areaStyle: {
                 color: createShadcnGradient("#E11D48", isDark ? 0.25 : 0.35, 0.01),
               },
+              markLine: zeroMarkLine,
             },
           ],
     };
@@ -632,6 +686,7 @@ export function PriceChart({
     data,
     prices,
     hasDistribution,
+    hasNegativePrice,
     isBarView,
     currencySymbol,
     xAxisConfig,
@@ -660,38 +715,30 @@ export function PriceChart({
 
   if (hasSpotMarket === false || country === "TH") {
     return (
-      <ChartCard onMouseLeave={() => onHoverPoint?.(null)}>
-        <ChartCardHeader className="py-2 px-3 sm:px-4">
-          <ChartCardTitle className="flex-wrap gap-1.5 sm:gap-2">
-            <div className="flex items-center space-x-1.5 sm:space-x-2">
-              <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-rose-500" />
-              <span className="text-xs sm:text-sm">
-                Wholesale Price ({currencyCode} / MWh)
+      <aside
+        className="rounded-xl border border-neutral-200/70 dark:border-[#202024] bg-neutral-50/60 dark:bg-[#101012] p-3.5 sm:p-4 text-xs shadow-2xs transition-colors"
+        aria-label="Spot market status"
+      >
+        <div className="flex items-start space-x-3">
+          <div className="w-7 h-7 shrink-0 rounded-lg bg-amber-500/10 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center mt-0.5">
+            <Info className="h-4 w-4" />
+          </div>
+          <div className="space-y-1 min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <h4 className="font-semibold text-xs sm:text-[13px] text-neutral-900 dark:text-neutral-100">
+                Regulated Tariff Structure ({currencyCode})
+              </h4>
+              <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-medium bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 font-mono">
+                No Spot Market
               </span>
             </div>
-            <div className="inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-[11px] sm:text-xs font-medium bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 font-mono shadow-xs">
-              Regulated Tariff
-            </div>
-          </ChartCardTitle>
-        </ChartCardHeader>
-
-        <ChartCardContent className="p-3 sm:p-4 pt-1">
-          <div className="flex flex-col sm:flex-row items-center sm:items-start space-y-2.5 sm:space-y-0 sm:space-x-3.5 p-3.5 sm:p-4 rounded-xl border border-dashed border-neutral-200 dark:border-neutral-800 bg-neutral-50/60 dark:bg-neutral-900/30">
-            <div className="w-8 h-8 shrink-0 rounded-full bg-amber-500/10 dark:bg-amber-500/20 flex items-center justify-center">
-              <Info className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-            </div>
-            <div className="text-center sm:text-left space-y-1">
-              <h4 className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-neutral-100">
-                No Wholesale Spot Electricity Market in Thailand
-              </h4>
-              <p className="text-[11px] sm:text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
-                {spotMarketNote ||
-                  "Thailand operates under an Enhanced Single Buyer (ESB) model managed by the Electricity Generating Authority of Thailand (EGAT). Electricity generation is procured through long-term Power Purchase Agreements (PPAs) with regulated tariffs approved by the Energy Regulatory Commission (ERC), rather than an open wholesale spot market."}
-              </p>
-            </div>
+            <p className="text-[11px] sm:text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
+              {spotMarketNote ||
+                "Thailand operates under an Enhanced Single Buyer (ESB) model managed by EGAT. Generation is procured via long-term PPAs with regulated tariffs approved by the ERC, rather than an open wholesale spot exchange."}
+            </p>
           </div>
-        </ChartCardContent>
-      </ChartCard>
+        </div>
+      </aside>
     );
   }
 

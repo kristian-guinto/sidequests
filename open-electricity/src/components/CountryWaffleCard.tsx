@@ -87,6 +87,8 @@ export function CountryWaffleCard({
           <div className="w-12 h-5 rounded-full bg-neutral-100 dark:bg-neutral-800/60 animate-pulse" />
         ) : hasData ? (
           <span
+            title={`Clean energy: ${cleanPct}%`}
+            aria-label={`${cleanPct}% clean energy`}
             className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${cleanPct >= 35
               ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
               : cleanPct >= 15
@@ -196,12 +198,12 @@ export function CountryWaffleCard({
         )}
       </div>
 
-      {/* Subtle card footer — hover reveal */}
-      <div className="px-4 py-2.5 border-t border-transparent group-hover:border-neutral-100 dark:group-hover:border-[#1E1E21] flex items-center justify-between text-[11px] text-neutral-400 dark:text-neutral-500 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-all">
-        <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+      {/* Card footer — visible on touch/mobile, hover highlight on desktop */}
+      <div className="px-4 py-2.5 border-t border-neutral-100/60 dark:border-[#1E1E21]/60 flex items-center justify-between text-[11px] text-neutral-400 dark:text-neutral-500 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-all">
+        <span className="opacity-70 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
           View detailed dispatch
         </span>
-        <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transform group-hover:translate-x-0.5 transition-all" />
+        <ArrowRight className="w-3.5 h-3.5 opacity-70 sm:opacity-0 sm:group-hover:opacity-100 transform group-hover:translate-x-0.5 transition-all" />
       </div>
     </Link>
   );
