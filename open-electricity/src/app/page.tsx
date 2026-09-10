@@ -121,14 +121,14 @@ export default function SoutheastAsiaOverviewPage() {
     <div className="flex flex-col min-h-screen bg-[#FAFAFA] dark:bg-[#000000] text-neutral-900 dark:text-neutral-100 font-sans transition-colors duration-150">
       {/* Top Global Navigation Bar */}
       <header className="bg-white dark:bg-[#000000] border-b border-neutral-200 dark:border-[#27272A] sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8">
           {/* Main Row: Brand & Desktop Controls or Mobile Action Icons */}
-          <div className="flex items-center justify-between h-13 sm:h-14">
+          <div className="flex items-center justify-between h-14">
             {/* Logo */}
-            <Link href="/" className="flex items-center space-x-2 sm:space-x-2.5 group min-w-0">
-              <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-gradient-to-tr from-emerald-600 via-emerald-500 to-teal-400 flex items-center justify-center shadow-xs shadow-emerald-500/20 group-hover:scale-105 transition-transform shrink-0">
+            <Link href="/" className="flex items-center space-x-2.5 group min-w-0">
+              <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-emerald-600 via-emerald-500 to-teal-400 flex items-center justify-center shadow-xs shadow-emerald-500/20 group-hover:scale-105 transition-transform shrink-0">
                 <svg
-                  className="h-4 w-4 sm:h-4.5 sm:w-4.5 text-white fill-white"
+                  className="h-4.5 w-4.5 text-white fill-white"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
                   strokeWidth="1"
@@ -207,63 +207,64 @@ export default function SoutheastAsiaOverviewPage() {
             </div>
 
             {/* Mobile Actions (Refresh & Theme Toggle) */}
-            <div className="flex sm:hidden items-center space-x-1.5">
+            <div className="flex sm:hidden items-center space-x-2">
               <button
                 onClick={fetchAllCountriesData}
                 disabled={isLoading}
-                className="p-1.5 rounded border border-neutral-200 dark:border-[#27272A] hover:bg-neutral-50 dark:hover:bg-[#121215] text-neutral-700 dark:text-neutral-300 text-xs transition disabled:opacity-50"
+                className="p-2 rounded-md border border-neutral-200 dark:border-[#27272A] hover:bg-neutral-50 dark:hover:bg-[#121215] text-neutral-700 dark:text-neutral-300 transition disabled:opacity-50 shadow-xs"
                 title="Refresh datasets"
+                aria-label="Refresh datasets"
               >
                 <RotateCw
-                  className={`h-3.5 w-3.5 ${isLoading ? "animate-spin text-emerald-500" : ""}`}
+                  className={`h-4 w-4 ${isLoading ? "animate-spin text-emerald-500" : ""}`}
                 />
               </button>
 
               <button
                 onClick={toggleTheme}
-                className="p-1.5 rounded border border-neutral-200 dark:border-[#27272A] hover:bg-neutral-50 dark:hover:bg-[#121215] text-neutral-700 dark:text-neutral-300 text-xs transition"
+                className="p-2 rounded-md border border-neutral-200 dark:border-[#27272A] hover:bg-neutral-50 dark:hover:bg-[#121215] text-neutral-700 dark:text-neutral-300 transition shadow-xs"
                 title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
                 aria-label="Toggle Theme"
               >
                 {isDark ? (
-                  <Sun className="h-3.5 w-3.5 text-amber-400" />
+                  <Sun className="h-4 w-4 text-amber-400" />
                 ) : (
-                  <Moon className="h-3.5 w-3.5 text-neutral-600" />
+                  <Moon className="h-4 w-4 text-neutral-600" />
                 )}
               </button>
             </div>
           </div>
 
           {/* Mobile Sub-Toolbar: Row 2 with Palette and Time Range controls */}
-          <div className="flex sm:hidden items-center justify-between pb-2 pt-0.5 border-t border-neutral-100 dark:border-[#27272A]/60">
+          <div className="flex sm:hidden items-center justify-between py-2 border-t border-neutral-100 dark:border-[#27272A]/80">
             {/* Palette Mode Toggle */}
-            <div className="flex items-center border border-neutral-200 dark:border-[#27272A] rounded p-0.5 bg-neutral-50/50 dark:bg-[#121215]">
+            <div className="flex items-center border border-neutral-200 dark:border-[#27272A] rounded-md p-0.5 bg-neutral-50/70 dark:bg-[#121215]">
               <button
                 onClick={() => handlePaletteModeChange("clean-fossil")}
-                className={`flex items-center space-x-1 px-2 py-0.5 rounded text-xs font-medium transition ${paletteMode === "clean-fossil"
-                  ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold shadow-sm"
+                className={`flex items-center space-x-1.5 px-2.5 py-1 rounded text-xs font-medium transition ${paletteMode === "clean-fossil"
+                  ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-semibold shadow-xs"
                   : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white"
                   }`}
                 title="Clean (Green) vs. Fossil (Slate)"
               >
-                <Leaf className="h-3.5 w-3.5 text-emerald-500 dark:text-emerald-400" />
-                <span className="text-[11px]">Clean / Fossil</span>
+                <Leaf className="h-3.5 w-3.5 text-emerald-500 dark:text-emerald-400 shrink-0" />
+                <span>Clean / Fossil</span>
               </button>
               <button
                 onClick={() => handlePaletteModeChange("detailed")}
-                className={`flex items-center space-x-1 px-2 py-0.5 rounded text-xs font-medium transition ${paletteMode === "detailed"
-                  ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold shadow-sm"
+                className={`flex items-center space-x-1.5 px-2.5 py-1 rounded text-xs font-medium transition ${paletteMode === "detailed"
+                  ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-semibold shadow-xs"
                   : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white"
                   }`}
                 title="Full Multi-Color Palette"
               >
-                <Palette className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400" />
-                <span className="text-[11px]">Detailed</span>
+                <Palette className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400 shrink-0" />
+                <span>Detailed</span>
               </button>
             </div>
 
             {/* Static Time Window Indicator */}
-            <span className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400 px-2 py-0.5 rounded bg-neutral-100 dark:bg-[#18181B] border border-neutral-200 dark:border-[#27272A]">
+            <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400 px-2.5 py-1 rounded-md bg-neutral-100 dark:bg-[#18181B] border border-neutral-200 dark:border-[#27272A]">
               Past 30 Days
             </span>
           </div>

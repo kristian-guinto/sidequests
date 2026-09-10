@@ -345,20 +345,15 @@ export function RegionalBenchmarkStrip({
                         <ArrowRight className="w-3 h-3 text-neutral-300 dark:text-neutral-600 group-hover:text-emerald-500 group-hover:translate-x-0.5 transition-all shrink-0" />
                       </div>
 
-                      <div className="flex items-end justify-between gap-1 mt-1">
-                        <div className="min-w-0">
-                          <div className="font-mono font-bold text-xs sm:text-sm text-neutral-950 dark:text-white">
-                            {formatEnergy(c.genGWh)}
-                          </div>
-                          {c.peakMW > 0 && (
-                            <div className="text-[10px] text-neutral-400 dark:text-neutral-500 truncate">
-                              {formatPeak(c.peakMW)} peak
-                            </div>
-                          )}
+                      <div className="mt-1">
+                        <div className="font-mono font-bold text-xs sm:text-sm text-neutral-950 dark:text-white">
+                          {formatEnergy(c.genGWh)}
                         </div>
-                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-neutral-200/50 dark:bg-[#202024] text-neutral-600 dark:text-neutral-400 shrink-0">
-                          {c.dominantFuel} {c.dominantPct}%
-                        </span>
+                        {c.peakMW > 0 && (
+                          <div className="text-[10px] text-neutral-400 dark:text-neutral-500 truncate">
+                            {formatPeak(c.peakMW)} peak
+                          </div>
+                        )}
                       </div>
                     </Link>
                   );
@@ -400,20 +395,15 @@ export function RegionalBenchmarkStrip({
                           <ArrowRight className="w-3 h-3 text-neutral-300 dark:text-neutral-600 group-hover:text-emerald-500 group-hover:translate-x-0.5 transition-all shrink-0" />
                         </div>
 
-                        <div className="flex items-end justify-between gap-1 mt-1">
-                          <div className="min-w-0">
-                            <div className="font-mono font-bold text-xs sm:text-sm text-neutral-950 dark:text-white">
-                              {formatEnergy(c.genGWh)}
-                            </div>
-                            {c.peakMW > 0 && (
-                              <div className="text-[10px] text-neutral-400 dark:text-neutral-500 truncate">
-                                {formatPeak(c.peakMW)} peak
-                              </div>
-                            )}
+                        <div className="mt-1">
+                          <div className="font-mono font-bold text-xs sm:text-sm text-neutral-950 dark:text-white">
+                            {formatEnergy(c.genGWh)}
                           </div>
-                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-neutral-200/50 dark:bg-[#202024] text-neutral-600 dark:text-neutral-400 shrink-0">
-                            {c.dominantFuel} {c.dominantPct}%
-                          </span>
+                          {c.peakMW > 0 && (
+                            <div className="text-[10px] text-neutral-400 dark:text-neutral-500 truncate">
+                              {formatPeak(c.peakMW)} peak
+                            </div>
+                          )}
                         </div>
                       </Link>
                     );
@@ -448,8 +438,8 @@ export function RegionalBenchmarkStrip({
                   type="button"
                   onClick={() => setIsInfoOpen((prev) => !prev)}
                   className={`p-1 rounded-md transition-colors flex items-center justify-center ${isInfoOpen || isInfoHovered
-                      ? "bg-neutral-200/80 dark:bg-[#27272A] text-neutral-900 dark:text-white"
-                      : "text-neutral-400 dark:text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-[#1E1E22]"
+                    ? "bg-neutral-200/80 dark:bg-[#27272A] text-neutral-900 dark:text-white"
+                    : "text-neutral-400 dark:text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-[#1E1E22]"
                     }`}
                   title="How intensity and clean numbers are calculated"
                   aria-label="How intensity and clean numbers are calculated"
