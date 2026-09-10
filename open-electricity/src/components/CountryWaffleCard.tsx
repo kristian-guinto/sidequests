@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import {
   CountryCode,
+  TimeRange,
   FuelBreakdownRow,
   SummaryMetrics,
   PaletteMode,
@@ -20,6 +21,7 @@ interface CountryWaffleCardProps {
   breakdown: FuelBreakdownRow[];
   summary: SummaryMetrics | null;
   paletteMode: PaletteMode;
+  range?: TimeRange;
   isLoading?: boolean;
 }
 
@@ -28,6 +30,7 @@ export function CountryWaffleCard({
   breakdown,
   summary,
   paletteMode,
+  range = "7d",
   isLoading = false,
 }: CountryWaffleCardProps) {
   const { isDark } = useTheme();
@@ -65,7 +68,7 @@ export function CountryWaffleCard({
 
   return (
     <Link
-      href={`/country/${country}`}
+      href={`/country/${country}?range=${range}&palette=${paletteMode}`}
       className="group block rounded-xl border border-neutral-200/60 dark:border-[#1E1E21] bg-white dark:bg-[#0C0C0E] hover:border-emerald-500/30 dark:hover:border-emerald-500/30 hover:shadow-lg dark:hover:shadow-emerald-950/20 transition-all duration-200 cursor-pointer overflow-hidden"
     >
       {/* Card Header */}
@@ -85,10 +88,10 @@ export function CountryWaffleCard({
         ) : hasData ? (
           <span
             className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${cleanPct >= 35
-                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                : cleanPct >= 15
-                  ? "bg-amber-500/8 text-amber-600 dark:text-amber-400"
-                  : "bg-neutral-100 dark:bg-neutral-800/50 text-neutral-500 dark:text-neutral-400"
+              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+              : cleanPct >= 15
+                ? "bg-amber-500/8 text-amber-600 dark:text-amber-400"
+                : "bg-neutral-100 dark:bg-neutral-800/50 text-neutral-500 dark:text-neutral-400"
               }`}
           >
             {cleanPct >= 20 ? (
@@ -143,10 +146,10 @@ export function CountryWaffleCard({
                   }}
                   onMouseLeave={() => setHoveredFuel(null)}
                   className={`flex items-center justify-between py-1.5 cursor-pointer transition-opacity ${isHovered
-                      ? "opacity-100"
-                      : isAnyHovered
-                        ? "opacity-30"
-                        : "opacity-80 hover:opacity-100"
+                    ? "opacity-100"
+                    : isAnyHovered
+                      ? "opacity-30"
+                      : "opacity-80 hover:opacity-100"
                     }`}
                 >
                   <div className="flex items-center space-x-2">

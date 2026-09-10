@@ -10,6 +10,11 @@ import {
   SummaryMetrics,
   COUNTRIES_METADATA,
 } from "@/lib/types";
+import {
+  PREFERENCE_KEYS,
+  getStoredPreference,
+  setStoredPreference,
+} from "@/lib/preferences";
 import { CountryWaffleCard } from "@/components/CountryWaffleCard";
 import { UnavailableCountryCard } from "@/components/UnavailableCountryCard";
 import { useTheme } from "@/components/ThemeProvider";
@@ -30,11 +35,44 @@ const TIME_RANGES: { id: TimeRange; label: string; shortLabel: string; sub: stri
   { id: "30d", label: "30 Days", shortLabel: "30d", sub: "Monthly mix" },
 ];
 
+const VALID_OVERVIEW_RANGES: readonly TimeRange[] = ["1d", "7d", "30d"];
+const VALID_PALETTES: readonly PaletteMode[] = ["clean-fossil", "detailed"];
+
 export default function SoutheastAsiaOverviewPage() {
   const { isDark, toggleTheme } = useTheme();
   const [paletteMode, setPaletteMode] = useState<PaletteMode>("clean-fossil");
   const [range, setRange] = useState<TimeRange>("7d");
   const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  // Client-side hydration from localStorage
+  useEffect(() => {
+    const storedRange = getStoredPreference<TimeRange>(
+      PREFERENCE_KEYS.RANGE,
+      VALID_OVERVIEW_RANGES,
+      "7d"
+    );
+    if (storedRange !== "7d") {
+      setRange(storedRange);
+    }
+    const storedPalette = getStoredPreference<PaletteMode>(
+      PREFERENCE_KEYS.PALETTE_MODE,
+      VALID_PALETTES,
+      "clean-fossil"
+    );
+    if (storedPalette !== "clean-fossil") {
+      setPaletteMode(storedPalette);
+    }
+  }, []);
+
+  const handleRangeChange = (newRange: TimeRange) => {
+    setRange(newRange);
+    setStoredPreference(PREFERENCE_KEYS.RANGE, newRange);
+  };
+
+  const handlePaletteModeChange = (newPalette: PaletteMode) => {
+    setPaletteMode(newPalette);
+    setStoredPreference(PREFERENCE_KEYS.PALETTE_MODE, newPalette);
+  };
 
   // Country datasets populated strictly from database API
   const [countryData, setCountryData] = useState<
@@ -132,7 +170,7 @@ export default function SoutheastAsiaOverviewPage() {
               {/* Palette Mode Toggle */}
               <div className="flex items-center border border-neutral-200 dark:border-[#27272A] rounded p-0.5 bg-neutral-50/50 dark:bg-[#121215]">
                 <button
-                  onClick={() => setPaletteMode("clean-fossil")}
+                  onClick={() => handlePaletteModeChange("clean-fossil")}
                   className={`flex items-center space-x-1 px-2.5 py-0.5 rounded text-xs font-medium transition ${paletteMode === "clean-fossil"
                     ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold shadow-sm"
                     : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white"
@@ -143,7 +181,7 @@ export default function SoutheastAsiaOverviewPage() {
                   <span>Clean / Fossil</span>
                 </button>
                 <button
-                  onClick={() => setPaletteMode("detailed")}
+                  onClick={() => handlePaletteModeChange("detailed")}
                   className={`flex items-center space-x-1 px-2.5 py-0.5 rounded text-xs font-medium transition ${paletteMode === "detailed"
                     ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold shadow-sm"
                     : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white"
@@ -160,7 +198,7 @@ export default function SoutheastAsiaOverviewPage() {
                 {TIME_RANGES.map((rng) => (
                   <button
                     key={rng.id}
-                    onClick={() => setRange(rng.id)}
+                    onClick={() => handleRangeChange(rng.id)}
                     className={`px-2.5 py-0.5 rounded transition ${range === rng.id
                       ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold border border-neutral-300 dark:border-neutral-700 shadow-sm"
                       : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
@@ -231,7 +269,7 @@ export default function SoutheastAsiaOverviewPage() {
             {/* Palette Mode Toggle */}
             <div className="flex items-center border border-neutral-200 dark:border-[#27272A] rounded p-0.5 bg-neutral-50/50 dark:bg-[#121215]">
               <button
-                onClick={() => setPaletteMode("clean-fossil")}
+                onClick={() => handlePaletteModeChange("clean-fossil")}
                 className={`flex items-center space-x-1 px-2 py-0.5 rounded text-xs font-medium transition ${paletteMode === "clean-fossil"
                   ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold shadow-sm"
                   : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white"
@@ -242,7 +280,7 @@ export default function SoutheastAsiaOverviewPage() {
                 <span className="text-[11px]">Clean / Fossil</span>
               </button>
               <button
-                onClick={() => setPaletteMode("detailed")}
+                onClick={() => handlePaletteModeChange("detailed")}
                 className={`flex items-center space-x-1 px-2 py-0.5 rounded text-xs font-medium transition ${paletteMode === "detailed"
                   ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold shadow-sm"
                   : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-white"
@@ -259,7 +297,7 @@ export default function SoutheastAsiaOverviewPage() {
               {TIME_RANGES.map((rng) => (
                 <button
                   key={rng.id}
-                  onClick={() => setRange(rng.id)}
+                  onClick={() => handleRangeChange(rng.id)}
                   className={`px-2.5 py-0.5 rounded transition ${range === rng.id
                     ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold border border-neutral-300 dark:border-neutral-700 shadow-sm"
                     : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
@@ -300,6 +338,7 @@ export default function SoutheastAsiaOverviewPage() {
                 breakdown={data?.breakdown || []}
                 summary={data?.summary || null}
                 paletteMode={paletteMode}
+                range={range}
                 isLoading={isLoading && !data}
               />
             );

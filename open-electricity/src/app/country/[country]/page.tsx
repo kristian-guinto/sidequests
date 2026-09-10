@@ -15,6 +15,11 @@ import {
   RANGE_CONFIG,
   COUNTRIES_METADATA,
 } from "@/lib/types";
+import {
+  PREFERENCE_KEYS,
+  getStoredPreference,
+  setStoredPreference,
+} from "@/lib/preferences";
 import { Header } from "@/components/Header";
 import { GenerationChart } from "@/components/GenerationChart";
 import { EmissionsChart } from "@/components/EmissionsChart";
@@ -26,22 +31,43 @@ interface CountryPageProps {
   params: {
     country: string;
   };
+  searchParams?: { [key: string]: string | string[] | undefined };
 }
 
-export default function CountryDetailPage({ params }: CountryPageProps) {
+const VALID_RANGES: readonly TimeRange[] = ["1d", "3d", "7d", "30d", "1y"];
+const VALID_VIEWS: readonly ViewMode[] = ["percentage", "stacked"];
+const VALID_PALETTES: readonly PaletteMode[] = ["clean-fossil", "detailed"];
+
+export default function CountryDetailPage({ params, searchParams }: CountryPageProps) {
   const router = useRouter();
 
   // Validate initial country from URL params
   const rawCountry = (params?.country || "PH").toUpperCase() as CountryCode;
   const initialCountry: CountryCode = COUNTRIES_METADATA[rawCountry] ? rawCountry : "PH";
+  const defaultRegion = COUNTRIES_METADATA[initialCountry]?.defaultRegion || "ALL";
+
+  const paramRange = typeof searchParams?.range === "string" ? (searchParams.range as TimeRange) : null;
+  const initialRange: TimeRange =
+    paramRange && VALID_RANGES.includes(paramRange) ? paramRange : "7d";
+
+  const paramView = typeof searchParams?.view === "string" ? (searchParams.view as ViewMode) : null;
+  const initialView: ViewMode =
+    paramView && VALID_VIEWS.includes(paramView) ? paramView : "percentage";
+
+  const paramPalette = typeof searchParams?.palette === "string" ? (searchParams.palette as PaletteMode) : null;
+  const initialPalette: PaletteMode =
+    paramPalette && VALID_PALETTES.includes(paramPalette) ? paramPalette : "clean-fossil";
+
+  const paramRegion = typeof searchParams?.region === "string" ? searchParams.region : null;
+  const validRegions = COUNTRIES_METADATA[initialCountry]?.regions.map((r) => r.id) || [];
+  const initialRegion: Region =
+    paramRegion && validRegions.includes(paramRegion) ? paramRegion : defaultRegion;
 
   const [country, setCountry] = useState<CountryCode>(initialCountry);
-  const [region, setRegion] = useState<Region>(
-    COUNTRIES_METADATA[initialCountry]?.defaultRegion || "ALL"
-  );
-  const [range, setRange] = useState<TimeRange>("7d");
-  const [viewMode, setViewMode] = useState<ViewMode>("percentage");
-  const [paletteMode, setPaletteMode] = useState<PaletteMode>("clean-fossil");
+  const [region, setRegion] = useState<Region>(initialRegion);
+  const [range, setRange] = useState<TimeRange>(initialRange);
+  const [viewMode, setViewMode] = useState<ViewMode>(initialView);
+  const [paletteMode, setPaletteMode] = useState<PaletteMode>(initialPalette);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const [points, setPoints] = useState<FuelGenerationPoint[]>([]);
@@ -53,14 +79,41 @@ export default function CountryDetailPage({ params }: CountryPageProps) {
   const [hoveredPoint, setHoveredPoint] = useState<FuelGenerationPoint | null>(null);
   const [hoveredFuel, setHoveredFuel] = useState<FuelTech | null>(null);
 
-  // Sync if URL param updates
+  // Client-side hydration of localStorage preferences if not specified in URL search params
+  useEffect(() => {
+    if (!paramRange) {
+      const storedRange = getStoredPreference<TimeRange>(PREFERENCE_KEYS.RANGE, VALID_RANGES, "7d");
+      if (storedRange !== initialRange) {
+        setRange(storedRange);
+      }
+    }
+    if (!paramView) {
+      const storedView = getStoredPreference<ViewMode>(PREFERENCE_KEYS.VIEW_MODE, VALID_VIEWS, "percentage");
+      if (storedView !== initialView) {
+        setViewMode(storedView);
+      }
+    }
+    if (!paramPalette) {
+      const storedPalette = getStoredPreference<PaletteMode>(PREFERENCE_KEYS.PALETTE_MODE, VALID_PALETTES, "clean-fossil");
+      if (storedPalette !== initialPalette) {
+        setPaletteMode(storedPalette);
+      }
+    }
+  }, []);
+
+  // Sync if URL country param updates
   useEffect(() => {
     const updated = (params?.country || "PH").toUpperCase() as CountryCode;
     if (COUNTRIES_METADATA[updated]) {
       setCountry(updated);
-      setRegion(COUNTRIES_METADATA[updated].defaultRegion);
+      const validCountryRegions = COUNTRIES_METADATA[updated].regions.map((r) => r.id);
+      if (paramRegion && validCountryRegions.includes(paramRegion)) {
+        setRegion(paramRegion);
+      } else {
+        setRegion(COUNTRIES_METADATA[updated].defaultRegion);
+      }
     }
-  }, [params?.country]);
+  }, [params?.country, paramRegion]);
 
   const countryInfo = COUNTRIES_METADATA[country] || COUNTRIES_METADATA["PH"];
   const unit = RANGE_CONFIG[range]?.unit || "MW";
@@ -73,6 +126,19 @@ export default function CountryDetailPage({ params }: CountryPageProps) {
     };
   }, [points]);
 
+  const syncUrlParams = useCallback(
+    (newParams: { range?: string; view?: string; palette?: string; region?: string }) => {
+      if (typeof window === "undefined") return;
+      const url = new URL(window.location.href);
+      if (newParams.range !== undefined) url.searchParams.set("range", newParams.range);
+      if (newParams.view !== undefined) url.searchParams.set("view", newParams.view);
+      if (newParams.palette !== undefined) url.searchParams.set("palette", newParams.palette);
+      if (newParams.region !== undefined) url.searchParams.set("region", newParams.region);
+      window.history.replaceState(null, "", url.toString());
+    },
+    []
+  );
+
   const handleCountryChange = (newCountry: CountryCode) => {
     setCountry(newCountry);
     const info = COUNTRIES_METADATA[newCountry];
@@ -80,12 +146,31 @@ export default function CountryDetailPage({ params }: CountryPageProps) {
       setRegion(info.defaultRegion);
     }
     setHoveredPoint(null);
-    router.push(`/country/${newCountry}`);
+    router.push(`/country/${newCountry}?range=${range}&view=${viewMode}&palette=${paletteMode}`);
   };
 
   const handleRangeChange = (newRange: TimeRange) => {
     setRange(newRange);
+    setStoredPreference(PREFERENCE_KEYS.RANGE, newRange);
+    syncUrlParams({ range: newRange });
     setHoveredPoint(null);
+  };
+
+  const handleViewModeChange = (newView: ViewMode) => {
+    setViewMode(newView);
+    setStoredPreference(PREFERENCE_KEYS.VIEW_MODE, newView);
+    syncUrlParams({ view: newView });
+  };
+
+  const handlePaletteModeChange = (newPalette: PaletteMode) => {
+    setPaletteMode(newPalette);
+    setStoredPreference(PREFERENCE_KEYS.PALETTE_MODE, newPalette);
+    syncUrlParams({ palette: newPalette });
+  };
+
+  const handleRegionChange = (newRegion: Region) => {
+    setRegion(newRegion);
+    syncUrlParams({ region: newRegion });
   };
 
   const fetchData = useCallback(async () => {
@@ -132,13 +217,13 @@ export default function CountryDetailPage({ params }: CountryPageProps) {
         country={country}
         onCountryChange={handleCountryChange}
         region={region}
-        onRegionChange={setRegion}
+        onRegionChange={handleRegionChange}
         range={range}
         onRangeChange={handleRangeChange}
         viewMode={viewMode}
-        onViewModeChange={setViewMode}
+        onViewModeChange={handleViewModeChange}
         paletteMode={paletteMode}
-        onPaletteModeChange={setPaletteMode}
+        onPaletteModeChange={handlePaletteModeChange}
         onRefresh={fetchData}
         isLoading={isLoading}
         dataSource={dataSource}
