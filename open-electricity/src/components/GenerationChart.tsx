@@ -67,8 +67,10 @@ export function GenerationChart({
     );
     if (validData.length === 0) return 0;
     const totalSum = validData.reduce((acc, d) => acc + (d.totalGeneration || 0), 0);
-    return Math.round(totalSum / validData.length);
-  }, [data]);
+    return isEnergy
+      ? Math.round((totalSum / validData.length) * 10) / 10
+      : Math.round(totalSum / validData.length);
+  }, [data, isEnergy]);
 
   const avgRenewablesPct = useMemo(() => {
     if (!data || data.length === 0) return 0;
@@ -302,11 +304,18 @@ export function GenerationChart({
                   {avgRenewablesPct}%
                 </strong>
               </>
+            ) : isEnergy ? (
+              <>
+                {range === "1y" ? "Av. Weekly: " : "Av. Daily: "}
+                <strong className="ml-1 text-neutral-950 dark:text-white font-bold">
+                  {avgGeneration.toFixed(1)} GWh
+                </strong>
+              </>
             ) : (
               <>
-                Av.{" "}
+                Av. Power:{" "}
                 <strong className="ml-1 text-neutral-950 dark:text-white font-bold">
-                  {avgGeneration.toLocaleString()} {unit}
+                  {avgGeneration.toLocaleString()} MW
                 </strong>
               </>
             )}

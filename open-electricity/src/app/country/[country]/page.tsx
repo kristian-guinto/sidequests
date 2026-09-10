@@ -280,8 +280,8 @@ export default function CountryDetailPage({ params, searchParams }: CountryPageP
             {/* Mobile Persistent Status & Scrub Slot (Screens < 1024px) */}
             <div
               className={`lg:hidden flex items-center justify-between px-3 py-1.5 min-h-[34px] rounded-lg text-xs font-mono shadow-2xs transition-colors duration-150 ${hoveredPoint
-                  ? "bg-emerald-500/10 dark:bg-emerald-950/40 border border-emerald-500/30"
-                  : "bg-neutral-100/80 dark:bg-[#18181B]/80 border border-neutral-200/80 dark:border-[#27272A]/80"
+                ? "bg-emerald-500/10 dark:bg-emerald-950/40 border border-emerald-500/30"
+                : "bg-neutral-100/80 dark:bg-[#18181B]/80 border border-neutral-200/80 dark:border-[#27272A]/80"
                 }`}
             >
               {hoveredPoint ? (
@@ -294,7 +294,9 @@ export default function CountryDetailPage({ params, searchParams }: CountryPageP
                   </div>
                   <div className="flex items-center space-x-2.5 shrink-0">
                     <span className="text-neutral-900 dark:text-white font-bold">
-                      {Math.round(hoveredPoint.totalGeneration || 0).toLocaleString()} {unit}
+                      {unit === "GWh"
+                        ? `${(hoveredPoint.totalGeneration || 0).toFixed(1)} GWh`
+                        : `${Math.round(hoveredPoint.totalGeneration || 0).toLocaleString()} MW`}
                     </span>
                     {hoveredPoint.renewablesPct != null && (
                       <span className="text-emerald-600 dark:text-emerald-400 font-bold">
@@ -337,6 +339,7 @@ export default function CountryDetailPage({ params, searchParams }: CountryPageP
               range={range}
               viewMode={viewMode}
               paletteMode={paletteMode}
+              unit={unit}
               hoveredFuel={hoveredFuel}
               onHoverPoint={setHoveredPoint}
             />
@@ -375,6 +378,7 @@ export default function CountryDetailPage({ params, searchParams }: CountryPageP
               currencySymbol={countryInfo.currencySymbol}
               currencyCode={countryInfo.currencyCode}
               unit={unit}
+              range={range}
               paletteMode={paletteMode}
             />
           </div>

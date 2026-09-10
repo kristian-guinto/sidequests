@@ -62,9 +62,22 @@ export function EmissionsChart({
           rawTotal: 0,
         };
       }
-      const coalT = (d.coal || 0) * (5.0 / 60.0) * 0.9;
-      const gasT = (d.gas || 0) * (5.0 / 60.0) * 0.38;
-      const oilT = (d.oil || 0) * (5.0 / 60.0) * 0.75;
+      let coalT = 0;
+      let gasT = 0;
+      let oilT = 0;
+
+      if (isBarView) {
+        // Data is in GWh (30d / 1y) -> 1 GWh = 1000 MWh
+        coalT = (d.coal || 0) * 1000 * 0.90;
+        gasT = (d.gas || 0) * 1000 * 0.38;
+        oilT = (d.oil || 0) * 1000 * 0.75;
+      } else {
+        // Data is in MW (1d / 3d / 7d)
+        const intervalHours = range === "1d" ? 5.0 / 60.0 : 0.5;
+        coalT = (d.coal || 0) * intervalHours * 0.90;
+        gasT = (d.gas || 0) * intervalHours * 0.38;
+        oilT = (d.oil || 0) * intervalHours * 0.75;
+      }
       const total = coalT + gasT + oilT;
 
       if (isPercentage) {
@@ -288,6 +301,14 @@ export function EmissionsChart({
     echarts.connect("opennem_sync_group");
   }, []);
 
+  const emissionsUnitLabel = useMemo(() => {
+    if (isPercentage) return "%";
+    if (range === "30d") return "tCO₂e/day";
+    if (range === "1y") return "tCO₂e/week";
+    if (range === "1d") return "tCO₂e/5m";
+    return "tCO₂e/30m";
+  }, [isPercentage, range]);
+
   return (
     <ChartCard onMouseLeave={() => onHoverPoint?.(null)}>
       <ChartCardHeader className="py-2 px-3 sm:px-4">
@@ -295,7 +316,7 @@ export function EmissionsChart({
           <div className="flex items-center space-x-1.5 sm:space-x-2">
             <CloudFog className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-neutral-500 dark:text-neutral-400" />
             <span className="text-xs sm:text-sm">
-              Emissions ({isPercentage ? "%" : "tCO₂e/5m"})
+              Emissions ({emissionsUnitLabel})
             </span>
           </div>
           <div className="inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-[11px] sm:text-xs font-medium bg-neutral-100 dark:bg-[#18181B] text-neutral-800 dark:text-neutral-200 border border-neutral-200/60 dark:border-neutral-800 font-mono shadow-xs">

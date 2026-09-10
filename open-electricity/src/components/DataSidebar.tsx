@@ -7,6 +7,7 @@ import {
   SummaryMetrics,
   FuelTech,
   PaletteMode,
+  TimeRange,
 } from "@/lib/types";
 import { getFuelMeta } from "@/lib/colors";
 import { ChevronDown, Zap, CloudFog, TrendingUp } from "lucide-react";
@@ -25,6 +26,7 @@ interface DataSidebarProps {
   currencySymbol?: string;
   currencyCode?: string;
   unit?: "MW" | "GWh";
+  range?: TimeRange;
   paletteMode?: PaletteMode;
 }
 
@@ -50,6 +52,7 @@ export function DataSidebar({
   currencySymbol = "₱",
   currencyCode = "PHP",
   unit = "MW",
+  range = "7d",
   paletteMode = "clean-fossil",
 }: DataSidebarProps) {
   const { isDark } = useTheme();
@@ -59,6 +62,9 @@ export function DataSidebar({
   // Format header time text
   const formattedTimeHeader = useMemo(() => {
     if (isHovered && hoveredPoint?.timestamp) {
+      if (range === "30d" || range === "1y") {
+        return formatMarketDate(hoveredPoint.timestamp, "d MMM yyyy");
+      }
       return formatMarketDate(hoveredPoint.timestamp, "d MMM yyyy, h:mm a");
     }
     if (timeSpan?.start && timeSpan?.end) {
@@ -74,7 +80,7 @@ export function DataSidebar({
       }
     }
     return "Summary (Total Range)";
-  }, [isHovered, hoveredPoint, timeSpan]);
+  }, [isHovered, hoveredPoint, timeSpan, range]);
 
   // Compute table rows based on hover or aggregate
   const tableData = useMemo(() => {
@@ -100,18 +106,29 @@ export function DataSidebar({
           renPctDisplay: "—",
           emissionsDisplay: "—",
           peakDisplay: null,
-          columnUnit: "Power",
-          unitSub: "MW",
+          columnUnit: isEnergy ? "Energy" : "Power",
+          unitSub: isEnergy ? "GWh" : "MW",
         };
       }
 
       const totalGen = pt.totalGeneration || 1;
 
-      // Calculate emissions for point in time (5-minute interval)
-      const coalT = (pt.coal || 0) * (5.0 / 60.0) * 0.9;
-      const gasT = (pt.gas || 0) * (5.0 / 60.0) * 0.38;
-      const oilT = (pt.oil || 0) * (5.0 / 60.0) * 0.75;
-      const totalEmissionsT = coalT + gasT + oilT;
+      // Calculate emissions for point in time
+      let totalEmissionsT = 0;
+      if (isEnergy) {
+        // Points are in GWh (30d / 1y)
+        const coalT = (pt.coal || 0) * 1000 * 0.90;
+        const gasT = (pt.gas || 0) * 1000 * 0.38;
+        const oilT = (pt.oil || 0) * 1000 * 0.75;
+        totalEmissionsT = coalT + gasT + oilT;
+      } else {
+        // Points are in MW (1d / 3d / 7d)
+        const intervalHours = range === "1d" ? 5.0 / 60.0 : 0.5;
+        const coalT = (pt.coal || 0) * intervalHours * 0.90;
+        const gasT = (pt.gas || 0) * intervalHours * 0.38;
+        const oilT = (pt.oil || 0) * intervalHours * 0.75;
+        totalEmissionsT = coalT + gasT + oilT;
+      }
 
       const rows = FUEL_DISPLAY_ORDER.map((fKey) => {
         const meta = getFuelMeta(fKey, isDark, paletteMode);
@@ -121,7 +138,9 @@ export function DataSidebar({
           fuelTech: fKey,
           label: meta.label,
           color: meta.color,
-          valueDisplay: `${val.toLocaleString()} MW`,
+          valueDisplay: isEnergy
+            ? `${val.toFixed(1)} GWh`
+            : `${Math.round(val).toLocaleString()} MW`,
           rawVal: val,
           pct: pct,
           isRenewable: meta.isRenewable,
@@ -136,16 +155,23 @@ export function DataSidebar({
 
       return {
         rows,
-        totalDisplay: `${Math.round(totalGen).toLocaleString()} MW`,
-        renValDisplay: `${Math.round(renVal).toLocaleString()} MW`,
+        totalDisplay: isEnergy
+          ? `${(pt.totalGeneration || 0).toFixed(1)} GWh`
+          : `${Math.round(totalGen).toLocaleString()} MW`,
+        renValDisplay: isEnergy
+          ? `${renVal.toFixed(1)} GWh`
+          : `${Math.round(renVal).toLocaleString()} MW`,
         renPctDisplay: `${renPct.toFixed(1)}%`,
-        emissionsDisplay: `${totalEmissionsT.toFixed(1)} tCO₂e`,
+        emissionsDisplay:
+          totalEmissionsT > 0
+            ? `${Math.round(totalEmissionsT).toLocaleString()} tCO₂e`
+            : "0 tCO₂e",
         peakDisplay: null,
-        columnUnit: "Power",
-        unitSub: "MW",
+        columnUnit: isEnergy ? "Energy" : "Power",
+        unitSub: isEnergy ? "GWh" : "MW",
       };
     } else {
-      const isEnergy = unit === "GWh";
+      // Period Total (Idle state): Always presents Energy over the full selected range
       const totalGWh = summary?.totalGenerationGWh || 0;
       const totalEmissions = summary?.totalEmissionsTonnes || 0;
       const peakGen = summary?.peakGenerationMW || 0;
@@ -154,17 +180,14 @@ export function DataSidebar({
         const meta = getFuelMeta(fKey, isDark, paletteMode);
         const b = breakdown.find((item) => item.fuelTech === fKey);
         const gwh = b?.energyGWh || 0;
-        const mw = b?.generationMW || 0;
         const pct = b?.percentage || 0;
 
         return {
           fuelTech: fKey,
           label: meta.label,
           color: meta.color,
-          valueDisplay: isEnergy
-            ? `${gwh.toFixed(1)} GWh`
-            : `${Math.round(mw).toLocaleString()} MW`,
-          rawVal: isEnergy ? gwh : mw,
+          valueDisplay: `${gwh.toFixed(1)} GWh`,
+          rawVal: gwh,
           pct: pct,
           isRenewable: meta.isRenewable,
         };
@@ -178,22 +201,22 @@ export function DataSidebar({
 
       return {
         rows,
-        totalDisplay: isEnergy
-          ? `${totalGWh.toFixed(1)} GWh`
-          : `${Math.round(
-            rows.reduce((acc, r) => acc + (isEnergy ? 0 : r.rawVal), 0)
-          ).toLocaleString()} MW`,
-        renValDisplay: isEnergy
-          ? `${renVal.toFixed(1)} GWh`
-          : `${Math.round(renVal).toLocaleString()} MW`,
+        totalDisplay: `${totalGWh.toFixed(1)} GWh`,
+        renValDisplay: `${renVal.toFixed(1)} GWh`,
         renPctDisplay: `${renPct.toFixed(1)}%`,
-        emissionsDisplay: totalEmissions > 0 ? `${Math.round(totalEmissions).toLocaleString()} tCO₂e` : null,
-        peakDisplay: peakGen > 0 ? `Peak ${Math.round(peakGen).toLocaleString()} MW` : null,
-        columnUnit: isEnergy ? "Energy" : "Power",
-        unitSub: isEnergy ? "GWh" : "MW",
+        emissionsDisplay:
+          totalEmissions > 0
+            ? `${Math.round(totalEmissions).toLocaleString()} tCO₂e`
+            : null,
+        peakDisplay:
+          peakGen > 0
+            ? `Peak ${Math.round(peakGen).toLocaleString()} MW`
+            : null,
+        columnUnit: "Energy",
+        unitSub: "GWh",
       };
     }
-  }, [isHovered, hoveredPoint, breakdown, summary, unit, isDark, paletteMode]);
+  }, [isHovered, hoveredPoint, breakdown, summary, isEnergy, range, isDark, paletteMode]);
 
   // Donut chart option
   const donutOption = useMemo(() => {
@@ -326,7 +349,7 @@ export function DataSidebar({
 
         {isHovered ? (
           <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50">
-            Interval
+            {isEnergy ? (range === "1y" ? "Week" : "Day") : "Interval"}
           </span>
         ) : (
           <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-neutral-100 dark:bg-[#27272A] text-neutral-600 dark:text-neutral-400">
@@ -442,7 +465,7 @@ export function DataSidebar({
             <tr className="border-t-2 border-neutral-200 dark:border-[#27272A] bg-neutral-50/40 dark:bg-[#121215]/50 font-bold text-neutral-900 dark:text-white">
               <td className="py-2 px-2.5 sm:px-3 text-[11px] flex items-center space-x-1.5">
                 <Zap className="h-3 w-3 text-amber-500" />
-                <span>Net {isHovered ? "Power" : "Generation"}</span>
+                <span>Net {isHovered ? (isEnergy ? "Energy" : "Power") : "Generation"}</span>
               </td>
               <td className="py-2 px-2 sm:px-2.5 text-right font-mono text-[11px]">
                 {tableData.totalDisplay}
@@ -475,7 +498,13 @@ export function DataSidebar({
                   {tableData.emissionsDisplay}
                 </td>
                 <td className="py-1.5 px-2.5 sm:px-3 text-right font-mono text-[10px] text-neutral-400 dark:text-neutral-500">
-                  {isHovered ? "Interval" : "Total Period"}
+                  {isHovered
+                    ? isEnergy
+                      ? range === "1y"
+                        ? "Week"
+                        : "Day"
+                      : "Interval"
+                    : "Total Period"}
                 </td>
               </tr>
             )}

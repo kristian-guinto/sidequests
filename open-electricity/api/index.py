@@ -1056,17 +1056,24 @@ def build_summary_metrics(
 def build_fuel_breakdown(
     fuel_totals_mwh: Dict[str, float],
     latest_point: Optional[FuelGenerationPoint],
+    is_energy_unit: bool = False,
+    span_days: int = 1,
 ) -> List[FuelBreakdownRow]:
     tot_mwh = sum(fuel_totals_mwh.values())
     breakdown: List[FuelBreakdownRow] = []
+    hours = max(1.0, float(span_days * 24))
 
     for f, mwh in fuel_totals_mwh.items():
         meta = FUEL_META[f]
         pct = round((mwh / tot_mwh * 100.0), 1) if tot_mwh > 0 else 0.0
         cur_val = (
             getattr(latest_point, f, 0.0)
-            if latest_point and getattr(latest_point, f, None) is not None
-            else 0.0
+            if (
+                latest_point
+                and not is_energy_unit
+                and getattr(latest_point, f, None) is not None
+            )
+            else round(mwh / hours, 1)
         )
         breakdown.append(
             FuelBreakdownRow(
@@ -1151,7 +1158,13 @@ def get_energy(
         )
         summary = build_summary_metrics(agg_data, peak_gen, query_params.country_meta)
         latest_point = next((p for p in reversed(points) if p.hasData), None)
-        breakdown = build_fuel_breakdown(agg_data.fuel_totals_mwh, latest_point)
+        span_days = (query_params.end_date - query_params.start_date).days + 1
+        breakdown = build_fuel_breakdown(
+            agg_data.fuel_totals_mwh,
+            latest_point,
+            is_energy_unit=is_energy_unit,
+            span_days=span_days,
+        )
 
         return EnergyResponse(
             country=query_params.country,
