@@ -17,6 +17,7 @@ import {
 } from "@/lib/preferences";
 import { CountryWaffleCard } from "@/components/CountryWaffleCard";
 import { UnavailableCountryCard } from "@/components/UnavailableCountryCard";
+import { RegionalBenchmarkStrip } from "@/components/RegionalBenchmarkStrip";
 import { useTheme } from "@/components/ThemeProvider";
 import { getDateRangeParams } from "@/lib/chartUtils";
 import {
@@ -29,31 +30,16 @@ import {
 
 const COUNTRY_CODES: CountryCode[] = ["PH", "SG", "MY", "TH", "VN", "ID"];
 
-const TIME_RANGES: { id: TimeRange; label: string; shortLabel: string; sub: string }[] = [
-  { id: "1d", label: "24 Hours", shortLabel: "24h", sub: "Daily dispatch" },
-  { id: "7d", label: "7 Days", shortLabel: "7d", sub: "Weekly average" },
-  { id: "30d", label: "30 Days", shortLabel: "30d", sub: "Monthly mix" },
-];
-
-const VALID_OVERVIEW_RANGES: readonly TimeRange[] = ["1d", "7d", "30d"];
 const VALID_PALETTES: readonly PaletteMode[] = ["clean-fossil", "detailed"];
 
 export default function SoutheastAsiaOverviewPage() {
   const { isDark, toggleTheme } = useTheme();
   const [paletteMode, setPaletteMode] = useState<PaletteMode>("clean-fossil");
-  const [range, setRange] = useState<TimeRange>("7d");
+  const range: TimeRange = "30d";
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Client-side hydration from localStorage
+  // Client-side hydration of palette from localStorage
   useEffect(() => {
-    const storedRange = getStoredPreference<TimeRange>(
-      PREFERENCE_KEYS.RANGE,
-      VALID_OVERVIEW_RANGES,
-      "7d"
-    );
-    if (storedRange !== "7d") {
-      setRange(storedRange);
-    }
     const storedPalette = getStoredPreference<PaletteMode>(
       PREFERENCE_KEYS.PALETTE_MODE,
       VALID_PALETTES,
@@ -63,11 +49,6 @@ export default function SoutheastAsiaOverviewPage() {
       setPaletteMode(storedPalette);
     }
   }, []);
-
-  const handleRangeChange = (newRange: TimeRange) => {
-    setRange(newRange);
-    setStoredPreference(PREFERENCE_KEYS.RANGE, newRange);
-  };
 
   const handlePaletteModeChange = (newPalette: PaletteMode) => {
     setPaletteMode(newPalette);
@@ -193,21 +174,10 @@ export default function SoutheastAsiaOverviewPage() {
                 </button>
               </div>
 
-              {/* Time Range Selector */}
-              <div className="flex border border-neutral-200 dark:border-[#27272A] rounded p-0.5 text-xs font-medium bg-neutral-50/50 dark:bg-[#121215]">
-                {TIME_RANGES.map((rng) => (
-                  <button
-                    key={rng.id}
-                    onClick={() => handleRangeChange(rng.id)}
-                    className={`px-2.5 py-0.5 rounded transition ${range === rng.id
-                      ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold border border-neutral-300 dark:border-neutral-700 shadow-sm"
-                      : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-                      }`}
-                  >
-                    {rng.label}
-                  </button>
-                ))}
-              </div>
+              {/* Static Time Window Indicator */}
+              <span className="px-2.5 py-1 rounded border border-neutral-200 dark:border-[#27272A] bg-neutral-50/50 dark:bg-[#121215] text-xs font-medium text-neutral-600 dark:text-neutral-400">
+                Past 30 Days
+              </span>
 
               {/* Refresh Button */}
               <button
@@ -292,21 +262,10 @@ export default function SoutheastAsiaOverviewPage() {
               </button>
             </div>
 
-            {/* Time Range Selector */}
-            <div className="flex border border-neutral-200 dark:border-[#27272A] rounded p-0.5 text-xs font-medium bg-neutral-50/50 dark:bg-[#121215]">
-              {TIME_RANGES.map((rng) => (
-                <button
-                  key={rng.id}
-                  onClick={() => handleRangeChange(rng.id)}
-                  className={`px-2.5 py-0.5 rounded transition ${range === rng.id
-                    ? "bg-white dark:bg-[#27272A] text-neutral-950 dark:text-white font-bold border border-neutral-300 dark:border-neutral-700 shadow-sm"
-                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-                    }`}
-                >
-                  {rng.shortLabel}
-                </button>
-              ))}
-            </div>
+            {/* Static Time Window Indicator */}
+            <span className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400 px-2 py-0.5 rounded bg-neutral-100 dark:bg-[#18181B] border border-neutral-200 dark:border-[#27272A]">
+              Past 30 Days
+            </span>
           </div>
         </div>
       </header>
@@ -314,14 +273,22 @@ export default function SoutheastAsiaOverviewPage() {
       {/* Main Container */}
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-10">
         {/* Minimal page heading */}
-        <div className="mb-6">
+        <div className="mb-4 sm:mb-5">
           <h1 className="text-lg sm:text-xl font-bold text-neutral-950 dark:text-white tracking-tight">
             Southeast Asia Electricity Mix
           </h1>
           <p className="text-xs text-neutral-400 dark:text-neutral-500 mt-0.5">
-            Generation by fuel source &bull; Click to explore
+            Electricity generation, grid scale, and carbon intensity across tracked markets
           </p>
         </div>
+
+        {/* Regional Market Scale & Carbon Intensity Benchmark Strip */}
+        <RegionalBenchmarkStrip
+          countryData={countryData}
+          range={range}
+          paletteMode={paletteMode}
+          isLoading={isLoading}
+        />
 
         {/* 6-Country Grid — 3 cols */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
