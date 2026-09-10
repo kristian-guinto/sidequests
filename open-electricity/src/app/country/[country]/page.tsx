@@ -126,6 +126,17 @@ export default function CountryDetailPage({ params, searchParams }: CountryPageP
     };
   }, [points]);
 
+  const mobilePeriodLabel = useMemo(() => {
+    if (!timeSpan?.start || !timeSpan?.end) return "Period Total";
+    try {
+      const s = formatMarketDate(timeSpan.start, "d MMM");
+      const e = formatMarketDate(timeSpan.end, "d MMM");
+      return s === e ? formatMarketDate(timeSpan.start, "d MMM yyyy") : `${s} – ${e}`;
+    } catch {
+      return "Period Total";
+    }
+  }, [timeSpan]);
+
   const syncUrlParams = useCallback(
     (newParams: { range?: string; view?: string; palette?: string; region?: string }) => {
       if (typeof window === "undefined") return;
@@ -265,25 +276,61 @@ export default function CountryDetailPage({ params, searchParams }: CountryPageP
       <main className="flex-1 w-full px-3 sm:px-4 lg:px-6 py-3">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-start">
           {/* Left Column (8 cols ~ 67% width): Synchronized Chart Stack */}
-          <div className="lg:col-span-8 space-y-2.5">
-            {/* Mobile Live Scrub HUD: displays hovered point telemetry under thumb */}
-            {hoveredPoint && (
-              <div className="lg:hidden flex items-center justify-between px-3 py-1.5 bg-emerald-500/10 dark:bg-emerald-950/40 border border-emerald-500/30 rounded-lg text-xs font-mono shadow-xs animate-in fade-in duration-150">
-                <span className="text-neutral-600 dark:text-neutral-400 font-medium">
-                  {formatMarketDate(hoveredPoint.timestamp, "d MMM, h:mm a")}
-                </span>
-                <div className="flex items-center space-x-2.5">
-                  <span className="text-neutral-900 dark:text-white font-bold">
-                    {Math.round(hoveredPoint.totalGeneration || 0).toLocaleString()} {unit}
-                  </span>
-                  {hoveredPoint.renewablesPct != null && (
-                    <span className="text-emerald-600 dark:text-emerald-400 font-bold">
-                      {Math.round(hoveredPoint.renewablesPct)}% Clean
+          <div className="lg:col-span-8 flex flex-col gap-2.5">
+            {/* Mobile Persistent Status & Scrub Slot (Screens < 1024px) */}
+            <div
+              className={`lg:hidden flex items-center justify-between px-3 py-1.5 min-h-[34px] rounded-lg text-xs font-mono shadow-2xs transition-colors duration-150 ${hoveredPoint
+                  ? "bg-emerald-500/10 dark:bg-emerald-950/40 border border-emerald-500/30"
+                  : "bg-neutral-100/80 dark:bg-[#18181B]/80 border border-neutral-200/80 dark:border-[#27272A]/80"
+                }`}
+            >
+              {hoveredPoint ? (
+                <>
+                  <div className="flex items-center space-x-1.5 min-w-0">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                    <span className="text-neutral-800 dark:text-neutral-200 font-semibold truncate">
+                      {formatMarketDate(hoveredPoint.timestamp, "d MMM, h:mm a")}
                     </span>
-                  )}
-                </div>
-              </div>
-            )}
+                  </div>
+                  <div className="flex items-center space-x-2.5 shrink-0">
+                    <span className="text-neutral-900 dark:text-white font-bold">
+                      {Math.round(hoveredPoint.totalGeneration || 0).toLocaleString()} {unit}
+                    </span>
+                    {hoveredPoint.renewablesPct != null && (
+                      <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                        {Math.round(hoveredPoint.renewablesPct)}% Clean
+                      </span>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center space-x-1.5 min-w-0">
+                    <span className="w-1.5 h-1.5 rounded-full bg-neutral-400 dark:bg-neutral-600 shrink-0" />
+                    <span className="text-neutral-600 dark:text-neutral-400 font-medium truncate">
+                      {mobilePeriodLabel}
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2 text-neutral-600 dark:text-neutral-400 font-medium shrink-0">
+                    <span>
+                      {unit === "GWh"
+                        ? `${summary?.totalGenerationGWh?.toFixed(1) || 0} GWh`
+                        : summary?.peakGenerationMW
+                          ? `Peak ${Math.round(summary.peakGenerationMW).toLocaleString()} MW`
+                          : "—"}
+                    </span>
+                    {summary?.renewablesPct != null && (
+                      <>
+                        <span className="text-neutral-300 dark:text-neutral-700">&bull;</span>
+                        <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                          {Math.round(summary.renewablesPct)}% Clean
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
 
             <GenerationChart
               data={points}
