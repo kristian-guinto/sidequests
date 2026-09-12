@@ -27,6 +27,7 @@ import {
   Moon,
   RotateCw,
   Clock,
+  BookOpen,
 } from "lucide-react";
 
 const COUNTRY_CODES: CountryCode[] = ["PH", "SG", "MY", "TH", "VN", "ID"];
@@ -146,8 +147,17 @@ export default function SoutheastAsiaOverviewPage() {
               </div>
             </Link>
 
-            {/* 2. Global Actions: Refresh & Theme (order-2 on mobile, order-3 on desktop) */}
+            {/* 2. Global Actions: Insights, Refresh & Theme (order-2 on mobile, order-3 on desktop) */}
             <div className="order-2 sm:order-3 flex items-center space-x-1.5 sm:space-x-2">
+              <Link
+                href="/blog"
+                className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-md border border-neutral-200 dark:border-[#27272A] hover:bg-neutral-50 dark:hover:bg-[#121215] text-neutral-800 dark:text-neutral-200 text-xs font-semibold transition shadow-xs group"
+                title="Read Grid Insights & Engineering Notes"
+              >
+                <BookOpen className="h-3.5 w-3.5 text-amber-500 group-hover:text-emerald-500 transition-colors" />
+                <span className="hidden sm:inline">Insights</span>
+              </Link>
+
               <button
                 onClick={fetchAllCountriesData}
                 disabled={isLoading}

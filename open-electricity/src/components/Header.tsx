@@ -23,6 +23,7 @@ import {
   LayoutGrid,
   MapPin,
   Clock,
+  BookOpen,
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 
@@ -221,6 +222,17 @@ export function Header({
             <LayoutGrid className="h-3.5 w-3.5 text-neutral-500 group-hover:text-emerald-500 dark:group-hover:text-emerald-400 transition-colors" />
             <span className="hidden sm:inline">All Countries</span>
             <span className="sm:hidden">All</span>
+          </Link>
+
+          {/* Insights / Blog Link */}
+          <Link
+            href="/blog"
+            className="flex items-center space-x-1.5 px-2 sm:px-2.5 py-1 bg-neutral-50 dark:bg-[#121215] hover:bg-neutral-100 dark:hover:bg-[#18181B] border border-neutral-200 dark:border-[#27272A] rounded text-xs font-semibold text-neutral-700 dark:text-neutral-300 transition shadow-xs group shrink-0"
+            title="Read Grid Insights & Engineering Notes"
+          >
+            <BookOpen className="h-3.5 w-3.5 text-amber-500 group-hover:text-emerald-500 transition-colors" />
+            <span className="hidden sm:inline">Insights</span>
+            <span className="sm:hidden">Blog</span>
           </Link>
 
           <div className="h-4 w-px bg-neutral-200 dark:bg-[#27272A] shrink-0" />
