@@ -61,16 +61,17 @@ export function formatMarketDate(
 
 /**
  * Calculates start_date and end_date (YYYY-MM-DD) for a given range,
- * anchoring end_date to yesterday (up to 00:00:00 of the current day)
- * so that only fully completed operational day data is queried across all countries.
+ * anchoring end_date to 2 days ago (now.getDate() - 2)
+ * so that only fully completed and published operational day data is queried across all countries
+ * accounting for upstream market operator publication schedules and ingestion lag (48h delay).
  */
-export function getDateRangeParams(range: TimeRange = "7d"): {
+export function getDateRangeParams(range: TimeRange = "7d", delayDays: number = 2): {
   startDate: string;
   endDate: string;
 } {
   const now = new Date();
-  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-  const endDate = format(yesterday, "yyyy-MM-dd");
+  const anchorDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - delayDays);
+  const endDate = format(anchorDate, "yyyy-MM-dd");
 
   let days = 1;
   if (range === "3d") days = 3;
@@ -79,9 +80,9 @@ export function getDateRangeParams(range: TimeRange = "7d"): {
   else if (range === "1y") days = 365;
 
   const startDateObj = new Date(
-    yesterday.getFullYear(),
-    yesterday.getMonth(),
-    yesterday.getDate() - (days - 1)
+    anchorDate.getFullYear(),
+    anchorDate.getMonth(),
+    anchorDate.getDate() - (days - 1)
   );
   const startDate = format(startDateObj, "yyyy-MM-dd");
 

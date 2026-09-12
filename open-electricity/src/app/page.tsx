@@ -26,6 +26,7 @@ import {
   Sun,
   Moon,
   RotateCw,
+  Clock,
 } from "lucide-react";
 
 const COUNTRY_CODES: CountryCode[] = ["PH", "SG", "MY", "TH", "VN", "ID"];
@@ -201,10 +202,19 @@ export default function SoutheastAsiaOverviewPage() {
                 </button>
               </div>
 
-              {/* Static Time Window Indicator */}
-              <span className="text-xs font-medium text-neutral-600 dark:text-neutral-400 px-2.5 py-1 sm:py-0.5 rounded-md bg-neutral-100 dark:bg-[#18181B] border border-neutral-200 dark:border-[#27272A]">
-                Past 30 Days
-              </span>
+              {/* Static Time Window Indicator & 48h Lag Pill */}
+              <div className="flex items-center space-x-1.5">
+                <span className="text-xs font-medium text-neutral-600 dark:text-neutral-400 px-2.5 py-1 sm:py-0.5 rounded-md bg-neutral-100 dark:bg-[#18181B] border border-neutral-200 dark:border-[#27272A]">
+                  Past 30 Days
+                </span>
+                <div
+                  className="flex items-center space-x-1 text-xs font-medium text-neutral-600 dark:text-neutral-300 px-2 py-1 sm:py-0.5 rounded-md bg-neutral-100 dark:bg-[#18181B] border border-neutral-200 dark:border-[#27272A]"
+                  title="Consolidated market telemetry is displayed with a 48-hour (2-day) operational lag to ensure fully finalized operational days"
+                >
+                  <Clock className="h-3 w-3 text-neutral-500 dark:text-neutral-400 shrink-0" />
+                  <span>48h lag</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -218,7 +228,7 @@ export default function SoutheastAsiaOverviewPage() {
             Southeast Asia Electricity Mix
           </h1>
           <p className="text-xs sm:text-[13px] text-neutral-600 dark:text-neutral-400 mt-0.5">
-            Electricity generation, grid scale, and carbon intensity across tracked markets
+            Electricity generation, grid scale, and carbon intensity across tracked markets (48-hour operational lag)
           </p>
         </div>
 

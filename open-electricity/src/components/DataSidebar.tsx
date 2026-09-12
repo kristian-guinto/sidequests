@@ -345,6 +345,11 @@ export function DataSidebar({
           <span className="font-semibold text-neutral-900 dark:text-white text-xs sm:text-[13px] truncate max-w-[240px]">
             {formattedTimeHeader}
           </span>
+          {!isHovered && (
+            <span className="text-[10px] text-neutral-400 dark:text-neutral-500">
+              Finalized data (48h lag)
+            </span>
+          )}
         </div>
 
         {isHovered ? (

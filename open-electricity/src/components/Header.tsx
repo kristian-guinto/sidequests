@@ -22,6 +22,7 @@ import {
   Moon,
   LayoutGrid,
   MapPin,
+  Clock,
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 
@@ -141,6 +142,15 @@ export function Header({
                 <span>cloud</span>
               </div>
             ) : null}
+
+            {/* 48h Operational Lag Indicator Pill */}
+            <div
+              className="flex items-center space-x-1 sm:space-x-1.5 bg-neutral-100 dark:bg-[#18181B] text-neutral-600 dark:text-neutral-300 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-md border border-neutral-200 dark:border-[#27272A] text-[10px] sm:text-[11px] font-medium"
+              title="Consolidated market telemetry is displayed with a 48-hour (2-day) operational lag to ensure fully finalized operational days"
+            >
+              <Clock className="h-3 w-3 text-neutral-500 dark:text-neutral-400 shrink-0" />
+              <span>48h lag</span>
+            </div>
 
             {/* Country Currency Pill */}
             <div className="hidden md:flex items-center space-x-1.5 bg-neutral-50 dark:bg-[#121215] px-2.5 py-1 rounded-md border border-neutral-200 dark:border-[#27272A] text-[11px] font-medium">
