@@ -1,6 +1,5 @@
 from datetime import datetime
 from dotenv import load_dotenv
-from numpy import polyfit
 from supabase import Client as SupabaseClient
 
 from pollmph.models import PropositionModel, SentimentModel, WeeklySummaryModel
@@ -100,9 +99,18 @@ def get_prior_context(
             )
 
             def get_trend(values, threshold=0.01):
-                if len(values) < 2:
+                n = len(values)
+                if n < 2:
                     return "stable"
-                slope = polyfit(range(len(values)), values, 1)[0]
+                mean_x = (n - 1) / 2.0
+                mean_y = sum(values) / n
+                denom = sum((i - mean_x) ** 2 for i in range(n))
+                if denom == 0:
+                    return "stable"
+                slope = (
+                    sum((i - mean_x) * (y - mean_y) for i, y in enumerate(values))
+                    / denom
+                )
                 return (
                     "increasing"
                     if slope > threshold
