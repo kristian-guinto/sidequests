@@ -213,3 +213,23 @@ def evaluate(
         )
     else:
         typer.echo("\nThis proposition does not have enough traction yet.")
+
+
+@app.command()
+def serve(
+    host: Annotated[
+        str, typer.Option("--host", "-h", help="Bind host for FastAPI server.")
+    ] = "0.0.0.0",
+    port: Annotated[
+        int, typer.Option("--port", "-p", help="Port for FastAPI server.")
+    ] = 8000,
+    reload: Annotated[
+        bool, typer.Option("--reload", "-r", help="Enable auto-reload on code change.")
+    ] = False,
+):
+    """Start the pollmph FastAPI application server."""
+    import uvicorn
+    from pollmph.settings import settings
+
+    typer.echo(f"Starting pollmph FastAPI server on {host}:{port}...")
+    uvicorn.run("pollmph.api.app:app", host=host, port=port, reload=reload)
