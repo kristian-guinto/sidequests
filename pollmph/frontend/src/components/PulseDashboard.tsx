@@ -1,56 +1,29 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
 import { LineChart, Line, XAxis, YAxis, ReferenceLine, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts';
 import { Activity } from 'lucide-react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { VirtualPollCard } from '@/components/VirtualPollCard';
+import { PropositionDashboardCardData } from '@/types';
+import { apiClient } from '@/api/client';
 
 // ============================================================================
-// 1. DATA GENERATION & MOVING AVERAGE LOGIC
+// 1. TOOLTIP SUB-COMPONENT
 // ============================================================================
 
-const calculateMovingAverage = (data, windowSize = 7) => {
-    // Ensure data is sorted by date before calculating MA
-    const sortedData = [...data].sort((a, b) => new Date(a.date_generated) - new Date(b.date_generated));
+interface CustomTooltipProps {
+    active?: boolean;
+    payload?: any[];
+    label?: string;
+}
 
-    return sortedData.map((val, idx, arr) => {
-        // Create date object for formatting
-        const dateObj = new Date(val.date_generated);
-        const shortDate = dateObj.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
-
-        const base = {
-            ...val,
-            shortDate,
-            ma_consensus: val.consensus_value,
-            ma_attention: val.attention_value
-        };
-
-        if (idx < windowSize - 1) return base;
-
-        const window = arr.slice(idx - windowSize + 1, idx + 1);
-        const sumC = window.reduce((acc, curr) => acc + curr.consensus_value, 0);
-        const sumA = window.reduce((acc, curr) => acc + curr.attention_value, 0);
-
-        return {
-            ...base,
-            ma_consensus: Number((sumC / windowSize).toFixed(3)),
-            ma_attention: Number((sumA / windowSize).toFixed(3))
-        };
-    });
-};
-
-// ============================================================================
-// 2. SUB-COMPONENTS
-// ============================================================================
-
-const CustomTooltip = ({ active, payload, label }) => {
+const CustomTooltip: React.FC<CustomTooltipProps> = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
-        // Access data directly from the data point
         const dataPoint = payload[0]?.payload;
-        const maConsensus = dataPoint?.ma_consensus;
-        const maAttention = dataPoint?.ma_attention;
+        const maConsensus = dataPoint?.ma_consensus ?? dataPoint?.consensus_value;
+        const maAttention = dataPoint?.ma_attention ?? dataPoint?.attention_value;
 
         const isMajority = maConsensus >= 0.5;
         const lineColor = isMajority ? 'rgb(5, 150, 105)' : 'rgb(225, 29, 72)';
@@ -88,13 +61,38 @@ const CustomTooltip = ({ active, payload, label }) => {
     return null;
 };
 
-const PropositionCard = ({ proposition, onClick }) => {
+// ============================================================================
+// 2. PROPOSITION CARD
+// ============================================================================
+
+interface PropositionCardProps {
+    proposition: PropositionDashboardCardData;
+    onClick: () => void;
+}
+
+const PropositionCard: React.FC<PropositionCardProps> = ({ proposition, onClick }) => {
     const { proposition_text, evaluations } = proposition;
     const latest = evaluations[evaluations.length - 1];
     const previous = evaluations[evaluations.length - 2] || latest;
 
+    if (!latest) {
+        return (
+            <Card
+                className="group cursor-pointer hover:border-primary/50 transition-colors duration-200 bg-muted/30"
+                onClick={onClick}
+            >
+                <CardHeader className="pb-4 space-y-2">
+                    <CardTitle className="text-base font-medium leading-snug line-clamp-2">
+                        {proposition_text}
+                    </CardTitle>
+                    <p className="text-xs text-muted-foreground">Awaiting sentiment run</p>
+                </CardHeader>
+            </Card>
+        );
+    }
+
     const currentMA = latest.ma_consensus;
-    const delta = currentMA - previous.ma_consensus;
+    const delta = previous ? currentMA - previous.ma_consensus : 0;
     const isMajority = currentMA >= 0.5;
 
     return (
@@ -107,7 +105,7 @@ const PropositionCard = ({ proposition, onClick }) => {
                     {proposition_text}
                 </CardTitle>
                 <p className="text-xs text-muted-foreground">
-                    Tracking since {evaluations[0].shortDate}
+                    Tracking since {evaluations[0]?.shortDate || 'recent'}
                 </p>
             </CardHeader>
 
@@ -206,96 +204,29 @@ const PropositionCard = ({ proposition, onClick }) => {
 };
 
 // ============================================================================
-// 3. MAIN EXPORTED COMPONENT
+// 3. MAIN EXPORTED DASHBOARD
 // ============================================================================
 
-const PulseDashboard = () => {
+export const PulseDashboard: React.FC = () => {
     const navigate = useNavigate();
-    const [propositions, setPropositions] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+    const [propositions, setPropositions] = useState<PropositionDashboardCardData[]>([]);
+    const [loading, setLoading] = useState<boolean>(true);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        const fetchData = async () => {
-            if (!supabase) {
-                setError("Supabase client not initialized. Check environment variables.");
-                setLoading(false);
-                return;
-            }
-
+        const loadDashboard = async () => {
             try {
-                // 1. Fetch Propositions (text and ID) - only non-archived
-                const { data: propsData, error: propsError } = await supabase
-                    .from('propositions')
-                    .select('proposition_id, proposition_text')
-                    .eq('is_archived', false);
-
-                if (propsError) throw propsError;
-
-                if (!propsData || propsData.length === 0) {
-                    setPropositions([]);
-                    setLoading(false);
-                    return;
-                }
-
-                // Extract proposition IDs for filtering sentiments
-                const propositionIds = propsData.map(p => p.proposition_id);
-
-                const propositionMap = propsData.reduce((acc, curr) => {
-                    acc[curr.proposition_id] = curr.proposition_text;
-                    return acc;
-                }, {});
-
-                // 2. Fetch all sentiments for non-archived propositions
-                const { data: sentimentsData, error: sentimentsError } = await supabase
-                    .from('sentiments')
-                    .select('proposition_id, consensus_value, attention_value, date_generated')
-                    .in('proposition_id', propositionIds)
-                    .order('date_generated', { ascending: true });
-
-                if (sentimentsError) throw sentimentsError;
-
-                if (!sentimentsData || sentimentsData.length === 0) {
-                    setPropositions([]);
-                    return;
-                }
-
-                // Group by proposition_id
-                const grouped = sentimentsData.reduce((acc, curr) => {
-                    if (!acc[curr.proposition_id]) {
-                        acc[curr.proposition_id] = [];
-                    }
-                    acc[curr.proposition_id].push(curr);
-                    return acc;
-                }, {});
-
-                // Transform to component format
-                const formattedPropositions = Object.entries(grouped)
-                    .map(([id, evaluations]) => {
-                        // Use text from propositions table, fallback to ID if not found
-                        const text = propositionMap[id] || id;
-
-                        // Sort evaluations by date
-                        evaluations.sort((a, b) => new Date(a.date_generated) - new Date(b.date_generated));
-
-                        return {
-                            id,
-                            proposition_text: text,
-                            evaluations: calculateMovingAverage(evaluations, 7)
-                        };
-                    });
-
-                setPropositions(formattedPropositions);
-
-            } catch (err) {
-                console.error("Error fetching data:", err);
-                setError(err.message);
+                const data = await apiClient.getDashboardCards();
+                setPropositions(data);
+            } catch (err: any) {
+                console.error("Error loading dashboard data:", err);
+                setError(err.message || 'Failed to fetch propositions data');
             } finally {
                 setLoading(false);
             }
         };
 
-        fetchData();
+        loadDashboard();
     }, []);
 
     if (loading) {
@@ -310,7 +241,7 @@ const PulseDashboard = () => {
                             <p className="text-muted-foreground text-sm italic">poll-em PH</p>
                             <p className="text-muted-foreground text-xs mt-2 max-w-sm">
                                 Tracks public consensus and media attention on Philippine political propositions.
-                                Scores generated by Google Gemini via live Google Search grounding.
+                                Scores generated via FastAPI backend architecture and Google Gemini grounding.
                             </p>
                         </div>
                         <ThemeToggle />
@@ -360,14 +291,22 @@ const PulseDashboard = () => {
                         <p className="text-muted-foreground text-sm italic">poll-em PH</p>
                         <p className="text-muted-foreground text-xs mt-2 max-w-sm">
                             Tracks public consensus and media attention on Philippine political propositions.
-                            Scores generated by Google Gemini via live Google Search grounding.
+                            Scores generated via FastAPI backend architecture and Google Gemini grounding.
                         </p>
                     </div>
                     <ThemeToggle />
                 </header>
 
+                {/* Virtual Polling Showcase Panel */}
+                <VirtualPollCard topicId="vp-2028-presidential" />
+
+                <div className="mb-4 flex items-center justify-between">
+                    <h2 className="text-lg font-semibold tracking-tight text-foreground">Tracked Propositions</h2>
+                    <Badge variant="outline" className="text-xs font-mono">{propositions.length} Active</Badge>
+                </div>
+
                 {propositions.length === 0 ? (
-                    <div className="text-center text-muted-foreground py-20">No data available</div>
+                    <div className="text-center text-muted-foreground py-20">No proposition data available</div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {propositions.map(p => (
@@ -385,3 +324,4 @@ const PulseDashboard = () => {
 };
 
 export default PulseDashboard;
+

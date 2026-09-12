@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -13,125 +12,90 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Dot,
   ReferenceLine
 } from 'recharts';
+import { Proposition, Sentiment, WeeklySummary, MovingAveragePoint } from '@/types';
+import { apiClient } from '@/api/client';
 
 export default function PropositionDetail() {
-  const { id } = useParams();
-  const [proposition, setProposition] = useState(null);
-  const [sentiments, setSentiments] = useState([]);
-  const [weeklySummary, setWeeklySummary] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [visibleCount, setVisibleCount] = useState(5);
+  const { id } = useParams<{ id: string }>();
+  const [proposition, setProposition] = useState<Proposition | null>(null);
+  const [sentiments, setSentiments] = useState<Sentiment[]>([]);
+  const [movingAverages, setMovingAverages] = useState<MovingAveragePoint[]>([]);
+  const [weeklySummary, setWeeklySummary] = useState<WeeklySummary | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [visibleCount, setVisibleCount] = useState<number>(5);
 
   useEffect(() => {
-    fetchData();
+    if (id) {
+      fetchData(id);
+    }
   }, [id]);
 
-  async function fetchData() {
+  async function fetchData(propId: string) {
     setLoading(true);
 
-    // Fetch proposition details
-    const { data: propData, error: propError } = await supabase
-      .from('propositions')
-      .select('*')
-      .eq('proposition_id', id)
-      .single();
+    try {
+      const [propData, sentResult, summaryData] = await Promise.all([
+        apiClient.getProposition(propId),
+        apiClient.getSentimentHistory(propId),
+        apiClient.getLatestSummary(propId),
+      ]);
 
-    if (propError) {
-      console.error('Error fetching proposition:', propError);
+      setProposition(propData);
+      setSentiments(sentResult.items);
+      setMovingAverages(sentResult.moving_averages);
+      setWeeklySummary(summaryData);
+    } catch (err) {
+      console.error('Error fetching proposition detail:', err);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    // Fetch sentiments - show last 30 days by default for efficiency
-    const { data: sentData, error: sentError } = await supabase
-      .from('sentiments')
-      .select('*')
-      .eq('proposition_id', id)
-      .order('date_generated', { ascending: false })
-      .limit(30);
-
-    if (sentError) {
-      console.error('Error fetching sentiments:', sentError);
-      setLoading(false);
-      return;
-    }
-
-    setProposition(propData);
-    // Sort in ascending order (oldest to newest) for chart calculations
-    const sortedData = (sentData || []).sort((a, b) =>
-      new Date(a.date_generated) - new Date(b.date_generated)
-    );
-    setSentiments(sortedData);
-
-    // Fetch latest weekly summary
-    const { data: summaryData, error: summaryError } = await supabase
-      .from('weekly_summaries')
-      .select('*')
-      .eq('proposition_id', id)
-      .order('week_end', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (summaryError) {
-      console.error('Error fetching weekly summary:', summaryError);
-    }
-    setWeeklySummary(summaryData);
-
-    setLoading(false);
-  }
-
-  // Calculate 7-day moving average
-  function calculateMovingAverage(data, key) {
-    return data.map((item, index) => {
-      if (index < 6) return null;
-      const sum = data.slice(index - 6, index + 1).reduce((acc, curr) => acc + curr[key], 0);
-      return sum / 7;
-    });
   }
 
   if (loading) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="text-center">Loading...</div>
+      <div className="container mx-auto p-6 max-w-6xl">
+        <div className="text-center py-20 text-muted-foreground animate-pulse">
+          Loading proposition telemetry...
+        </div>
       </div>
     );
   }
 
   if (!proposition) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="text-center">Proposition not found</div>
-        <Link to="/">
-          <Button className="mt-4">Back to Dashboard</Button>
-        </Link>
+      <div className="container mx-auto p-6 max-w-6xl">
+        <div className="text-center py-20">
+          <h2 className="text-2xl font-bold mb-2">Proposition Not Found</h2>
+          <p className="text-muted-foreground mb-6">Could not locate proposition data for ID: {id}</p>
+          <Link to="/">
+            <Button>Back to Dashboard</Button>
+          </Link>
+        </div>
       </div>
     );
   }
 
-  const chartData = sentiments.map((s, index) => ({
-    date: new Date(s.date_generated).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-    consensus: s.consensus_value * 100,
-    attention: s.attention_value * 100,
-    consensusMA: index >= 6 ? calculateMovingAverage(sentiments, 'consensus_value')[index] * 100 : null,
-    attentionMA: index >= 6 ? calculateMovingAverage(sentiments, 'attention_value')[index] * 100 : null
+  const chartData = movingAverages.map((m) => ({
+    date: m.shortDate,
+    rawDate: m.date_generated,
+    consensus: m.consensus_value * 100,
+    attention: m.attention_value * 100,
+    consensusMA: m.ma_consensus * 100,
+    attentionMA: m.ma_attention * 100,
   }));
 
-  const consensusMA = chartData[chartData.length - 1]?.consensusMA;
-  const attentionMA = chartData[chartData.length - 1]?.attentionMA;
-  const isMajority = consensusMA >= 50;
+  const latestMA = chartData[chartData.length - 1]?.consensusMA ?? 50;
+  const isMajority = latestMA >= 50;
 
   // Show newest first in the timeline
   const visibleSentiments = [...sentiments].reverse().slice(0, visibleCount);
   const hasMore = visibleCount < sentiments.length;
 
-  const CustomTooltip = ({ active, payload }) => {
+  const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
-      // Access the data point directly from payload
       const dataPoint = payload[0]?.payload;
-
       const maConsensus = dataPoint?.consensusMA;
       const rawConsensus = dataPoint?.consensus;
       const rawAttention = dataPoint?.attention;
@@ -146,7 +110,7 @@ export default function PropositionDetail() {
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-1.5">
                 <div className="w-2.5 h-0.5 rounded-full" style={{ backgroundColor: lineColor }}></div>
-                <span className="text-[10px] font-medium text-foreground">Consensus</span>
+                <span className="text-[10px] font-medium text-foreground">Consensus (7d MA)</span>
               </div>
               <span className="text-sm font-bold tabular-nums" style={{ color: lineColor }}>
                 {maConsensus?.toFixed(1)}%
@@ -156,7 +120,7 @@ export default function PropositionDetail() {
             <div className="flex items-center justify-between gap-3 pl-4">
               <div className="flex items-center gap-1.5">
                 <div className="w-1 h-1 rounded-full opacity-40" style={{ backgroundColor: lineColor }}></div>
-                <span className="text-[10px] text-muted-foreground">Raw</span>
+                <span className="text-[10px] text-muted-foreground">Daily Raw</span>
               </div>
               <span className="text-[10px] font-medium tabular-nums text-muted-foreground">
                 {rawConsensus?.toFixed(1)}%
@@ -188,7 +152,7 @@ export default function PropositionDetail() {
             Back to Dashboard
           </Button>
         </Link>
-        <h1 className="text-3xl font-bold mb-2">{proposition.proposition_text}</h1>
+        <h1 className="text-3xl font-bold mb-2 text-foreground">{proposition.proposition_text}</h1>
         {proposition.search_queries && proposition.search_queries.length > 0 && (
           <div className="flex gap-2 flex-wrap mt-3">
             {proposition.search_queries.map((query, idx) => (
@@ -222,14 +186,14 @@ export default function PropositionDetail() {
               <p className="text-sm text-muted-foreground">{weeklySummary.summary}</p>
             )}
             {weeklySummary.key_drivers && (
-              <div className="pt-4 border-t">
-                <div className="text-sm font-semibold mb-2">Key Drivers</div>
+              <div className="pt-4 border-t border-border/50">
+                <div className="text-sm font-semibold mb-2 text-foreground">Key Drivers</div>
                 <p className="text-sm text-muted-foreground">{weeklySummary.key_drivers}</p>
               </div>
             )}
             {weeklySummary.outlook && (
-              <div className="pt-4 border-t">
-                <div className="text-sm font-semibold mb-2">Outlook</div>
+              <div className="pt-4 border-t border-border/50">
+                <div className="text-sm font-semibold mb-2 text-foreground">Outlook</div>
                 <p className="text-sm text-muted-foreground">{weeklySummary.outlook}</p>
               </div>
             )}
@@ -243,60 +207,54 @@ export default function PropositionDetail() {
           <CardDescription>7-day moving average with attention levels</CardDescription>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={400}>
-            <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.3} />
-              <XAxis
-                dataKey="date"
-                className="text-xs"
-                tick={{ fontSize: 12 }}
-              />
-              <YAxis
-                domain={[0, 100]}
-                className="text-xs"
-                tick={{ fontSize: 12 }}
-              />
-              <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'hsl(var(--border))', strokeWidth: 1 }} isAnimationActive={false} />
-              <ReferenceLine y={0} stroke="hsl(var(--border))" strokeWidth={1} opacity={0.4} />
-              <ReferenceLine y={100} stroke="hsl(var(--border))" strokeWidth={1} opacity={0.4} />
-              <ReferenceLine y={50} stroke="hsl(var(--muted-foreground))" strokeWidth={1} strokeDasharray="5 5" opacity={0.5} />
-              <Line
-                type="monotone"
-                dataKey="consensus"
-                stroke="transparent"
-                strokeWidth={0}
-                dot={{ r: 3, fill: isMajority ? 'rgb(5, 150, 105)' : 'rgb(225, 29, 72)', stroke: 'none', opacity: 0.5 }}
-                activeDot={false}
-                isAnimationActive={false}
-              />
-              <Line
-                type="monotone"
-                dataKey="attention"
-                stroke="hsl(var(--muted-foreground))"
-                strokeWidth={1.5}
-                strokeOpacity={0.5}
-                strokeDasharray="5 5"
-                dot={false}
-                activeDot={{ r: 3, stroke: 'hsl(var(--card))', strokeWidth: 2, fill: 'hsl(var(--muted-foreground))' }}
-                isAnimationActive={false}
-              />
-              <Line
-                type="monotone"
-                dataKey="consensusMA"
-                stroke={isMajority ? 'rgb(5, 150, 105)' : 'rgb(225, 29, 72)'}
-                strokeWidth={2.5}
-                dot={false}
-                activeDot={{ r: 4, stroke: 'hsl(var(--card))', strokeWidth: 2, fill: isMajority ? 'rgb(5, 150, 105)' : 'rgb(225, 29, 72)' }}
-                connectNulls
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          <div className="h-[380px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.3} />
+                <XAxis dataKey="date" className="text-xs" tick={{ fontSize: 12 }} />
+                <YAxis domain={[0, 100]} className="text-xs" tick={{ fontSize: 12 }} />
+                <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'hsl(var(--border))', strokeWidth: 1 }} isAnimationActive={false} />
+                <ReferenceLine y={0} stroke="hsl(var(--border))" strokeWidth={1} opacity={0.4} />
+                <ReferenceLine y={100} stroke="hsl(var(--border))" strokeWidth={1} opacity={0.4} />
+                <ReferenceLine y={50} stroke="hsl(var(--muted-foreground))" strokeWidth={1} strokeDasharray="5 5" opacity={0.5} />
+                <Line
+                  type="monotone"
+                  dataKey="consensus"
+                  stroke="transparent"
+                  strokeWidth={0}
+                  dot={{ r: 3, fill: isMajority ? 'rgb(5, 150, 105)' : 'rgb(225, 29, 72)', stroke: 'none', opacity: 0.5 }}
+                  activeDot={false}
+                  isAnimationActive={false}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="attention"
+                  stroke="hsl(var(--muted-foreground))"
+                  strokeWidth={1.5}
+                  strokeOpacity={0.5}
+                  strokeDasharray="5 5"
+                  dot={false}
+                  activeDot={{ r: 3, stroke: 'hsl(var(--card))', strokeWidth: 2, fill: 'hsl(var(--muted-foreground))' }}
+                  isAnimationActive={false}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="consensusMA"
+                  stroke={isMajority ? 'rgb(5, 150, 105)' : 'rgb(225, 29, 72)'}
+                  strokeWidth={2.5}
+                  dot={false}
+                  activeDot={{ r: 4, stroke: 'hsl(var(--card))', strokeWidth: 2, fill: isMajority ? 'rgb(5, 150, 105)' : 'rgb(225, 29, 72)' }}
+                  connectNulls
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         </CardContent>
       </Card>
 
       {sentiments.length > 0 && (
         <div className="space-y-4">
-          <h2 className="text-2xl font-bold">Daily Analysis Timeline</h2>
+          <h2 className="text-2xl font-bold text-foreground">Daily Analysis Timeline</h2>
           <p className="text-sm text-muted-foreground mb-4">
             Showing {visibleCount} of {sentiments.length} day{sentiments.length !== 1 ? 's' : ''}
           </p>
@@ -340,7 +298,7 @@ export default function PropositionDetail() {
                   <CardContent className="space-y-4">
                     <div className="grid gap-4 md:grid-cols-2">
                       <div>
-                        <div className="text-sm font-semibold mb-2 flex items-center gap-2">
+                        <div className="text-sm font-semibold mb-2 flex items-center gap-2 text-foreground">
                           <TrendingUp className="h-4 w-4" />
                           Consensus Rationale
                         </div>
@@ -349,7 +307,7 @@ export default function PropositionDetail() {
                         </p>
                       </div>
                       <div>
-                        <div className="text-sm font-semibold mb-2 flex items-center gap-2">
+                        <div className="text-sm font-semibold mb-2 flex items-center gap-2 text-foreground">
                           <Activity className="h-4 w-4" />
                           Attention Rationale
                         </div>
@@ -360,8 +318,8 @@ export default function PropositionDetail() {
                     </div>
 
                     {sentiment.movement_analysis && (
-                      <div className="pt-4 border-t">
-                        <div className="text-sm font-semibold mb-2">Movement Analysis</div>
+                      <div className="pt-4 border-t border-border/50">
+                        <div className="text-sm font-semibold mb-2 text-foreground">Movement Analysis</div>
                         <p className="text-sm text-muted-foreground whitespace-pre-wrap">
                           {sentiment.movement_analysis}
                         </p>
@@ -388,3 +346,4 @@ export default function PropositionDetail() {
     </div>
   );
 }
+
