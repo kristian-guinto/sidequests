@@ -4,9 +4,9 @@ Monorepo for my side projects.
 
 | Project | What it is |
 | --- | --- |
-| [`open-electricity/`](open-electricity) | Electricity data pipeline + dashboard (OpenElectricity → MotherDuck, Next.js frontend) |
-| [`pollmph/`](pollmph) | Philippine political sentiment pipeline (Supabase + Gemini) with a frontend |
-| [`nem-battery/`](nem-battery) | Australian NEM battery dispatch ingestion and analysis (MotherDuck) |
+| [`open-electricity/`](open-electricity) | OpenNEM-style electricity market tracker for the Philippines WESM (IEMOP data → MotherDuck, Next.js dashboard) |
+| [`pollmph/`](pollmph) | AI-powered sentiment oracle tracking Philippine socio-political discourse (Supabase + Gemini, Next.js frontend) |
+| [`nem-battery/`](nem-battery) | NEM battery market analyzer: AEMO data pipeline + unsupervised clustering of battery trading strategies (DuckDB/MotherDuck) |
 
 ## Layout
 
