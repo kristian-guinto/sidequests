@@ -1,4 +1,4 @@
-name: Ingest Daily Dispatch
+name: "nem-battery: Ingest Daily Dispatch"
 
 # Runs once per day to ingest yesterday's full trading day (288 intervals).
 #
@@ -20,6 +20,10 @@ on:
         description: "Trading day to ingest (YYYY-MM-DD). Leave blank for yesterday."
         required: false
         default: ""
+
+defaults:
+  run:
+    working-directory: nem-battery
 
 jobs:
   ingest:

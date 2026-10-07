@@ -1,4 +1,4 @@
-name: Daily OpenElectricity Ingestion Pipeline
+name: "open-electricity: Daily OpenElectricity Ingestion Pipeline"
 
 on:
   schedule:
@@ -45,6 +45,10 @@ concurrency:
   group: motherduck-ingest
   cancel-in-progress: false
 
+defaults:
+  run:
+    working-directory: open-electricity
+
 jobs:
   ingest:
     name: Ingest OpenElectricity Data
@@ -65,6 +69,7 @@ jobs:
         with:
           version: "latest"
           enable-cache: true
+          cache-dependency-glob: "open-electricity/uv.lock"
 
       - name: Set up Python
         run: uv python install 3.12

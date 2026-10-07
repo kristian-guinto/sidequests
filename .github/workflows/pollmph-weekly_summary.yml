@@ -1,14 +1,18 @@
-name: Daily Sentiment Analysis
+name: "pollmph: Weekly Summary Report"
 
-on:
+on: 
   schedule:
-    # Runs at 15:59 UTC daily (11:59 PM Philippine Standard Time is UTC+8)
-    # 23:59 PHT = 15:59 UTC
-    - cron: '59 15 * * *'
+    # Runs at 06:00 PH time every Monday
+    # 06:00 PHT = 22:00 UTC (previous day)
+    - cron: '0 22 * * 1'
   workflow_dispatch: # Allows manual triggering
 
+defaults:
+  run:
+    working-directory: pollmph
+
 jobs:
-  run-pipeline:
+  generate-summary:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -18,11 +22,12 @@ jobs:
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
+          cache-dependency-glob: "pollmph/uv.lock"
 
-      - name: Run Sentiment Analysis Pipeline
+      - name: Run Weekly Summary Pipeline
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          uv run pollmph run-today --limit 5 --llm gemini
+          uv run pollmph weekly-summary --llm gemini
