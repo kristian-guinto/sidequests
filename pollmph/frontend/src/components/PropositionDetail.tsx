@@ -1,0 +1,349 @@
+import React, { useState, useEffect } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Badge } from './ui/badge';
+import { Button } from './ui/button';
+import { ArrowLeft, Calendar, TrendingUp, Activity } from 'lucide-react';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  ReferenceLine
+} from 'recharts';
+import { Proposition, Sentiment, WeeklySummary, MovingAveragePoint } from '@/types';
+import { apiClient } from '@/api/client';
+
+export default function PropositionDetail() {
+  const { id } = useParams<{ id: string }>();
+  const [proposition, setProposition] = useState<Proposition | null>(null);
+  const [sentiments, setSentiments] = useState<Sentiment[]>([]);
+  const [movingAverages, setMovingAverages] = useState<MovingAveragePoint[]>([]);
+  const [weeklySummary, setWeeklySummary] = useState<WeeklySummary | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [visibleCount, setVisibleCount] = useState<number>(5);
+
+  useEffect(() => {
+    if (id) {
+      fetchData(id);
+    }
+  }, [id]);
+
+  async function fetchData(propId: string) {
+    setLoading(true);
+
+    try {
+      const [propData, sentResult, summaryData] = await Promise.all([
+        apiClient.getProposition(propId),
+        apiClient.getSentimentHistory(propId),
+        apiClient.getLatestSummary(propId),
+      ]);
+
+      setProposition(propData);
+      setSentiments(sentResult.items);
+      setMovingAverages(sentResult.moving_averages);
+      setWeeklySummary(summaryData);
+    } catch (err) {
+      console.error('Error fetching proposition detail:', err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="container mx-auto p-6 max-w-6xl">
+        <div className="text-center py-20 text-muted-foreground animate-pulse">
+          Loading proposition telemetry...
+        </div>
+      </div>
+    );
+  }
+
+  if (!proposition) {
+    return (
+      <div className="container mx-auto p-6 max-w-6xl">
+        <div className="text-center py-20">
+          <h2 className="text-2xl font-bold mb-2">Proposition Not Found</h2>
+          <p className="text-muted-foreground mb-6">Could not locate proposition data for ID: {id}</p>
+          <Link to="/">
+            <Button>Back to Dashboard</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const chartData = movingAverages.map((m) => ({
+    date: m.shortDate,
+    rawDate: m.date_generated,
+    consensus: m.consensus_value * 100,
+    attention: m.attention_value * 100,
+    consensusMA: m.ma_consensus * 100,
+    attentionMA: m.ma_attention * 100,
+  }));
+
+  const latestMA = chartData[chartData.length - 1]?.consensusMA ?? 50;
+  const isMajority = latestMA >= 50;
+
+  // Show newest first in the timeline
+  const visibleSentiments = [...sentiments].reverse().slice(0, visibleCount);
+  const hasMore = visibleCount < sentiments.length;
+
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const dataPoint = payload[0]?.payload;
+      const maConsensus = dataPoint?.consensusMA;
+      const rawConsensus = dataPoint?.consensus;
+      const rawAttention = dataPoint?.attention;
+      const isMajorityLocal = maConsensus >= 50;
+      const lineColor = isMajorityLocal ? 'rgb(5, 150, 105)' : 'rgb(225, 29, 72)';
+
+      return (
+        <div className="bg-card border shadow-xl rounded-md p-2 min-w-[160px]">
+          <div className="text-[10px] font-semibold text-foreground mb-2 pb-1.5 border-b">{dataPoint?.date}</div>
+
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-0.5 rounded-full" style={{ backgroundColor: lineColor }}></div>
+                <span className="text-[10px] font-medium text-foreground">Consensus (7d MA)</span>
+              </div>
+              <span className="text-sm font-bold tabular-nums" style={{ color: lineColor }}>
+                {maConsensus?.toFixed(1)}%
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 pl-4">
+              <div className="flex items-center gap-1.5">
+                <div className="w-1 h-1 rounded-full opacity-40" style={{ backgroundColor: lineColor }}></div>
+                <span className="text-[10px] text-muted-foreground">Daily Raw</span>
+              </div>
+              <span className="text-[10px] font-medium tabular-nums text-muted-foreground">
+                {rawConsensus?.toFixed(1)}%
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 pt-1 mt-1 border-t border-border/50">
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-0.5 rounded-full bg-muted-foreground opacity-50"></div>
+                <span className="text-[10px] font-medium text-foreground">Attention</span>
+              </div>
+              <span className="text-xs font-semibold tabular-nums text-foreground">
+                {rawAttention?.toFixed(0)}%
+              </span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  return (
+    <div className="container mx-auto p-6 max-w-6xl">
+      <div className="mb-6">
+        <Link to="/">
+          <Button variant="outline" size="sm" className="mb-4">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Dashboard
+          </Button>
+        </Link>
+        <h1 className="text-3xl font-bold mb-2 text-foreground">{proposition.proposition_text}</h1>
+        {proposition.search_queries && proposition.search_queries.length > 0 && (
+          <div className="flex gap-2 flex-wrap mt-3">
+            {proposition.search_queries.map((query, idx) => (
+              <Badge key={idx} variant="outline" className="text-xs">
+                {query}
+              </Badge>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {weeklySummary && (
+        <Card className="mb-6 bg-muted/30">
+          <CardHeader>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <CardTitle>Weekly Summary</CardTitle>
+                <CardDescription>
+                  {new Date(weeklySummary.week_start).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                  {' – '}
+                  {new Date(weeklySummary.week_end).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                </CardDescription>
+              </div>
+              {weeklySummary.trend_verdict && (
+                <Badge className="text-sm shrink-0">{weeklySummary.trend_verdict}</Badge>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {weeklySummary.summary && (
+              <p className="text-sm text-muted-foreground">{weeklySummary.summary}</p>
+            )}
+            {weeklySummary.key_drivers && (
+              <div className="pt-4 border-t border-border/50">
+                <div className="text-sm font-semibold mb-2 text-foreground">Key Drivers</div>
+                <p className="text-sm text-muted-foreground">{weeklySummary.key_drivers}</p>
+              </div>
+            )}
+            {weeklySummary.outlook && (
+              <div className="pt-4 border-t border-border/50">
+                <div className="text-sm font-semibold mb-2 text-foreground">Outlook</div>
+                <p className="text-sm text-muted-foreground">{weeklySummary.outlook}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      <Card className="mb-6 bg-muted/30">
+        <CardHeader>
+          <CardTitle>Consensus Trend</CardTitle>
+          <CardDescription>7-day moving average with attention levels</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[380px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.3} />
+                <XAxis dataKey="date" className="text-xs" tick={{ fontSize: 12 }} />
+                <YAxis domain={[0, 100]} className="text-xs" tick={{ fontSize: 12 }} />
+                <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'hsl(var(--border))', strokeWidth: 1 }} isAnimationActive={false} />
+                <ReferenceLine y={0} stroke="hsl(var(--border))" strokeWidth={1} opacity={0.4} />
+                <ReferenceLine y={100} stroke="hsl(var(--border))" strokeWidth={1} opacity={0.4} />
+                <ReferenceLine y={50} stroke="hsl(var(--muted-foreground))" strokeWidth={1} strokeDasharray="5 5" opacity={0.5} />
+                <Line
+                  type="monotone"
+                  dataKey="consensus"
+                  stroke="transparent"
+                  strokeWidth={0}
+                  dot={{ r: 3, fill: isMajority ? 'rgb(5, 150, 105)' : 'rgb(225, 29, 72)', stroke: 'none', opacity: 0.5 }}
+                  activeDot={false}
+                  isAnimationActive={false}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="attention"
+                  stroke="hsl(var(--muted-foreground))"
+                  strokeWidth={1.5}
+                  strokeOpacity={0.5}
+                  strokeDasharray="5 5"
+                  dot={false}
+                  activeDot={{ r: 3, stroke: 'hsl(var(--card))', strokeWidth: 2, fill: 'hsl(var(--muted-foreground))' }}
+                  isAnimationActive={false}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="consensusMA"
+                  stroke={isMajority ? 'rgb(5, 150, 105)' : 'rgb(225, 29, 72)'}
+                  strokeWidth={2.5}
+                  dot={false}
+                  activeDot={{ r: 4, stroke: 'hsl(var(--card))', strokeWidth: 2, fill: isMajority ? 'rgb(5, 150, 105)' : 'rgb(225, 29, 72)' }}
+                  connectNulls
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
+      {sentiments.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-2xl font-bold text-foreground">Daily Analysis Timeline</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            Showing {visibleCount} of {sentiments.length} day{sentiments.length !== 1 ? 's' : ''}
+          </p>
+
+          <div className="space-y-4">
+            {visibleSentiments.map((sentiment, index) => {
+              const consensusValue = (sentiment.consensus_value * 100).toFixed(1);
+              const attentionValue = (sentiment.attention_value * 100).toFixed(0);
+              const dateStr = new Date(sentiment.date_generated).toLocaleDateString('en-US', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+              });
+
+              return (
+                <Card key={sentiment.id || index} className="bg-muted/30">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Calendar className="h-5 w-5" />
+                        {dateStr}
+                      </CardTitle>
+                      <div className="flex items-center gap-3">
+                        <Badge variant="secondary" className="text-sm">
+                          <TrendingUp className="h-3 w-3 mr-1" />
+                          {consensusValue}%
+                        </Badge>
+                        <Badge variant="secondary" className="text-sm">
+                          <Activity className="h-3 w-3 mr-1" />
+                          {attentionValue}%
+                        </Badge>
+                        {sentiment.data_quality && (
+                          <Badge variant="outline" className="text-xs">
+                            Quality: {(sentiment.data_quality * 100).toFixed(0)}%
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <div className="text-sm font-semibold mb-2 flex items-center gap-2 text-foreground">
+                          <TrendingUp className="h-4 w-4" />
+                          Consensus Rationale
+                        </div>
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                          {sentiment.rationale_consensus || 'No rationale available'}
+                        </p>
+                      </div>
+                      <div>
+                        <div className="text-sm font-semibold mb-2 flex items-center gap-2 text-foreground">
+                          <Activity className="h-4 w-4" />
+                          Attention Rationale
+                        </div>
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                          {sentiment.rationale_attention || 'No rationale available'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {sentiment.movement_analysis && (
+                      <div className="pt-4 border-t border-border/50">
+                        <div className="text-sm font-semibold mb-2 text-foreground">Movement Analysis</div>
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                          {sentiment.movement_analysis}
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          {hasMore && (
+            <div className="flex justify-center pt-4">
+              <Button
+                variant="outline"
+                onClick={() => setVisibleCount(prev => prev + 5)}
+              >
+                Load More ({sentiments.length - visibleCount} remaining)
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+

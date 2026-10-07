@@ -1,0 +1,1 @@
+alter table public.sentiments enable row level security;

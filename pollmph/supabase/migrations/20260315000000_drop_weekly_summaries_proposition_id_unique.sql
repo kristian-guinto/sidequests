@@ -1,0 +1,1 @@
+alter table public.weekly_summaries drop constraint weekly_summaries_proposition_id_key;
