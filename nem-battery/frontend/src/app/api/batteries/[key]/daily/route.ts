@@ -1,0 +1,29 @@
+import { getDailyRevenue } from "@/lib/db";
+import { NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
+
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ key: string }> }
+) {
+  const { key } = await params;
+  const { searchParams } = new URL(request.url);
+  const daysParam = searchParams.get("days");
+  const days = daysParam === null || daysParam === "all"
+    ? undefined
+    : Math.max(1, parseInt(daysParam, 10));
+
+  try {
+    const data = await getDailyRevenue(key, days);
+    return NextResponse.json(data);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    console.error("[api] /api/batteries/[key]/daily failed", {
+      key,
+      days,
+      error: message,
+    });
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
