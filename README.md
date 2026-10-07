@@ -7,11 +7,12 @@ Monorepo for my side projects.
 | [`open-electricity/`](open-electricity) | OpenNEM-style electricity market tracker for the Philippines WESM (IEMOP data → MotherDuck, Next.js dashboard) |
 | [`pollmph/`](pollmph) | AI-powered sentiment oracle tracking Philippine socio-political discourse (Supabase + Gemini, Next.js frontend) |
 | [`nem-battery/`](nem-battery) | NEM battery market analyzer: AEMO data pipeline + unsupervised clustering of battery trading strategies (DuckDB/MotherDuck) |
+| [`experiments/`](experiments) | Ad-hoc research, spikes, and model explorations (e.g. `timesfm3/`) |
 
 ## Layout
 
 Each project is self-contained (own `pyproject.toml` / `package.json`, lockfile, and README). `cd` into a project
-directory to work on it.
+directory to work on it. Ad-hoc and exploratory spikes live in [`experiments/`](experiments), each isolated in its own sub-folder.
 
 CI workflows live in [`.github/workflows/`](.github/workflows) (GitHub only reads them from the repo root). They are
 prefixed with the project name and run with `working-directory` set to that project.

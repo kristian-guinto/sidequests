@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[oc]
+build/
+dist/
+*.egg-info
+
+# Virtual environment
+.venv/
+
+# Environment variables
+*.env
+.env*
+!.env*.example
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data and model weights cache
+models/
+checkpoints/
+data/
+outputs/
+*.safetensors
+*.pt
+*.bin

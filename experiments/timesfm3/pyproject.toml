@@ -1,0 +1,15 @@
+[project]
+name = "timesfm3-exploration"
+version = "0.1.0"
+description = "Local exploration of Google TimesFM 3.0 foundation model for time series forecasting"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "matplotlib>=3.11.2",
+    "pandas>=3.0.6",
+    "timesfm[torch]>=3.0.2",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.10,<0.13.0"]
+build-backend = "uv_build"
