@@ -17,6 +17,13 @@ build-backend = "hatchling.build"
 nem-battery = "nem_battery.cli:main"
 
 [project.optional-dependencies]
+api = [
+    "fastapi>=0.110.0",
+    "uvicorn>=0.29.0",
+    "duckdb>=0.10",
+    "pydantic>=2.7.0",
+    "python-dotenv>=1.0.1",
+]
 dataframes = ["polars>=1.0"]
 pipeline = [
     "duckdb>=0.10,<1.5",   # MotherDuck requires duckdb <1.5; raise cap when support lands
