@@ -1,0 +1,31 @@
+[project]
+name = "open-electricity"
+version = "0.1.0"
+description = "OpenElectricity market tracker & analytics pipeline"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn>=0.29.0",
+    "duckdb>=1.1.0",
+    "pydantic>=2.7.0",
+    "python-dotenv>=1.0.1",
+    "pytz>=2024.1",
+    "pipeline",
+    "ducklembic",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+ducklembic = { workspace = true }
+pipeline = { workspace = true }
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]

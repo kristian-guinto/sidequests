@@ -1,0 +1,174 @@
+# OpenNEM Philippines (OpenElectricity PH)
+
+An open-source electricity market tracker and power system analytics platform for the **Philippines Wholesale Electricity Spot Market (WESM)**, inspired by [OpenNEM / OpenElectricity Australia](https://explore.openelectricity.org.au/).
+
+![Dashboard Preview](https://raw.githubusercontent.com/opennem/opennem/master/docs/img/screenshot.png)
+
+---
+
+## ⚡ Overview
+
+OpenNEM-PH tracks the electricity transition in the Philippines by ingesting and visualizing official market and dispatch data published by **IEMOP (Independent Electricity Market Operator of the Philippines)**:
+
+- 📊 **Generation Fuel Mix**: 5-minute and hourly interval stacked area charts across **Solar**, **Wind**, **Hydro**, **Geothermal**, **Biomass**, **Natural Gas**, **Black Coal**, **Oil / Diesel**, and **Battery Storage (BESS)**.
+- 📈 **Wholesale Spot Prices**: 5-minute Locational Marginal Prices (LMP) and Market Clearing Prices across the grid.
+- ⚡ **Macro Grid Demand & Losses**: Real-time system load, transmission losses, and net flows.
+- 🔌 **Interconnector Flows**: Physical transfers across the **Luzon–Visayas HVDC** and **Mindanao–Visayas Interconnection Project (MVIP)** submarine links.
+- 🌿 **Emissions & Renewables Tracking**: Carbon intensity (gCO₂/kWh) and renewable energy penetration percentage.
+- 🏝️ **Regional Breakdown**: Philippines Total (NEM), Luzon, Visayas, and Mindanao grids.
+
+---
+
+## 🏗️ Architecture
+
+```
+open-electricity/
+├── .github/
+│   └── workflows/
+│       └── daily_pipeline.yml      # Automated daily GitHub Actions cron (uv run ingest)
+├── api/
+│   ├── index.py                    # FastAPI Backend (Vercel Serverless Function)
+│   └── pyproject.toml              # FastAPI Python dependencies
+├── migrations/                     # Versioned SQL migrations (managed by ducklembic)
+│   ├── 001_initial_schema.up.sql
+│   └── 001_initial_schema.down.sql
+├── packages/
+│   ├── ducklembic/                 # Reusable DuckDB + MotherDuck migration & sync library
+│   └── pipeline/                   # Python data ingestion & ETL engine package (uv)
+│       ├── pyproject.toml          # Pipeline package definition & CLI entry points
+│       └── pipeline/
+│           ├── config.py           # Configuration & constants
+│           ├── iemop_client.py     # IEMOP AJAX downloader & ZIP/CSV unpacker
+│           ├── generator_registry.py # Generator fuel tech mapper & heuristic resolver
+│           ├── data_processor.py   # 5-minute dispatch & regional aggregator
+│           ├── db.py               # DuckDB & MotherDuck storage layer (uses ducklembic)
+│           ├── ingest.py           # CLI tool for daily sync & backfills
+│           └── data/
+│               └── generators_master.json # Philippine power plant catalog
+├── src/                            # Next.js 14 Frontend
+│   ├── app/                        # Next.js App Router (Dashboard)
+│   ├── components/                 # Charts, KPI cards, Fuel table, Interconnectors
+│   └── lib/                        # Types, color palette, mock generator
+├── package.json                    # Frontend dependencies & scripts
+├── next.config.mjs                 # Next.js rewrites configuration
+├── tailwind.config.ts              # Tailwind CSS configuration
+├── open_nem_ph.duckdb              # Embedded OLAP DuckDB database (local)
+├── vercel.json                     # Vercel deployment routing configuration
+├── pyproject.toml                  # Python package configuration
+└── README.md
+```
+
+---
+
+## 🚀 Quick Start
+
+### 1. Ingestion Pipeline (`uv`)
+
+We use [`uv`](https://docs.astral.sh/uv/) for Python package management:
+
+```bash
+# Sync dependencies
+uv sync
+
+# Run daily sync (fetches latest market data)
+uv run ingest latest
+
+# Run historical backfill for custom date range
+uv run ingest backfill --start-date 2026-08-01 --end-date 2026-08-31
+
+# Sync local DuckDB data to MotherDuck Cloud
+uv run ingest sync-cloud
+
+# Inspect database tables, row counts, and data samples
+uv run ingest inspect
+uv run ingest inspect --table dispatch --region LUZON --limit 10
+uv run ingest inspect --table facilities --limit 10
+uv run ingest inspect --table regional --limit 10
+uv run ingest inspect --table daily --limit 10
+```
+
+> **Note**: For local development, the backend automatically connects to `open_nem_ph.duckdb`. When `MOTHERDUCK_TOKEN` is configured in `.env`, it seamlessly connects to MotherDuck Cloud (`md:open_electricity_db`).
+
+---
+
+### 2. Running Locally (FastAPI + Next.js)
+
+**Single Command (Recommended)**:
+```bash
+./dev.sh
+# or
+npm run dev:all
+```
+This starts both the FastAPI backend (`:8000`) and Next.js frontend (`:3000`) concurrently and handles graceful shutdown when pressing `Ctrl+C`.
+
+Alternatively, run them in separate terminals:
+
+**Terminal 1: FastAPI Backend**
+```bash
+# Start the Python FastAPI server on port 8000
+uv run uvicorn api.index:app --port 8000 --reload
+```
+Interactive API documentation will be available at [`http://localhost:8000/api/docs`](http://localhost:8000/api/docs).
+
+**Terminal 2: Next.js Frontend**
+```bash
+# Install frontend dependencies
+npm install
+
+# Start Next.js dev server on port 3000 (proxies /api requests to FastAPI)
+npm run dev
+```
+
+Visit [`http://localhost:3000`](http://localhost:3000) to view the live dashboard!
+
+---
+
+## 🗄️ Database Setup (DuckDB & MotherDuck)
+
+- **Local Development**: Runs out of the box using embedded [DuckDB](https://duckdb.org/) (`open_nem_ph.duckdb`). No database server installation required.
+- **Cloud Deployment (MotherDuck)**:
+  1. Create a database token on [MotherDuck](https://motherduck.com/).
+  2. Set your environment variable in `.env` (and Vercel / GitHub Actions secrets):
+     ```env
+     MOTHERDUCK_TOKEN=your-motherduck-token-here
+     MOTHERDUCK_DATABASE=open_electricity_db
+     ```
+  3. Run `uv run ducklembic sync push --yes` to sync your local DuckDB data directly to MotherDuck Cloud!
+
+---
+
+## 🤖 Daily Automated Pipeline (GitHub Actions)
+
+The repository includes a production-ready GitHub Action in [`.github/workflows/daily_pipeline.yml`](.github/workflows/daily_pipeline.yml):
+- **Schedule**: Automatically runs daily at `01:00 UTC` (`09:00 AM UTC+8` Manila / Singapore / Kuala Lumpur), right after regional markets finalize interval data.
+- **Multi-Country Coverage**: Synchronizes generation mix, fuel technology categorization, and spot prices across Philippines (IEMOP), Singapore (EMC), and Malaysia (Single Buyer).
+- **MotherDuck Ingestion**: Automatically writes and rolls up data in MotherDuck Cloud using the `MOTHERDUCK_TOKEN` secret.
+- **Automated Schema Evolution**: Runs Ducklembic migrations prior to ingestion so the cloud database schema is always in sync.
+- **Manual Trigger**: Can be manually triggered on demand (`workflow_dispatch`) with custom parameters:
+  - `mode`: `latest`, `backfill`, `sync-facilities`, `migrate`, or `inspect`.
+  - `country`: `ALL`, `PH`, `SG`, or `MY`.
+  - `days` or custom `start_date` / `end_date` ranges.
+- **Secrets Needed**: Add `MOTHERDUCK_TOKEN` under **Settings > Secrets and variables > Actions** in your GitHub repository.
+
+---
+
+## 🌐 Deploy to Vercel
+
+1. Import this repository into [Vercel](https://vercel.com).
+2. **Settings**:
+   - **Framework Preset**: `Next.js` (detected automatically)
+   - **Root Directory**: `./` (leave default)
+   - **Build Command** & **Output Directory**: Leave default (no custom commands needed)
+3. **Environment Variables** (under **Settings → Environment Variables**):
+   - `MOTHERDUCK_TOKEN`: Your MotherDuck Service Token
+   - `MOTHERDUCK_DATABASE`: `open_electricity_db`
+4. Deploy! Vercel will automatically build the Next.js React frontend and deploy the FastAPI serverless function at `/api/*`.
+
+---
+
+## 📄 License & Data Attribution
+
+- Inspired by the [OpenNEM project](https://explore.openelectricity.org.au/).
+- Philippine market data provided by [IEMOP (Independent Electricity Market Operator of the Philippines)](https://www.iemop.ph/).
+- Open source under the MIT License.
+

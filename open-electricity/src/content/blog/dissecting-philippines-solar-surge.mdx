@@ -1,0 +1,107 @@
+---
+title: "The Midday Inversion: What 5-Minute Telemetry Reveals About the Philippines Grid"
+slug: "dissecting-philippines-solar-surge"
+date: "2026-07-10"
+description: "When building OpenElectricity's real-time ingestion pipeline for the WESM spot market, we uncovered dramatic midday price collapses and evening ramps driven by over 3,100 MW of utility solar."
+country: "PH"
+author:
+  name: "Ian"
+  role: "Lead Systems Architect & Grid Researcher"
+tags: ["Philippines", "WESM", "Solar", "Negative Pricing", "Grid Stability"]
+featured: true
+published: true
+---
+
+While building the 5-minute dispatch telemetry pipeline for **OpenElectricity**, one of the questions I was most eager to answer was how distributed and utility-scale solar are altering the wholesale dynamics of island power grids like the Philippines.
+
+Standard monthly energy reports aggregate gigawatt-hours, smoothing out the violent volatility that happens inside single operational hours. But when you inspect the raw 5-minute dispatch intervals (`energy_interval` and `prices_interval`), a completely different story emerges.
+
+<StatCallout
+  value="-₱10,611"
+  label="Minimum Spot Price (WESM GWAP)"
+  trend="down"
+  change="Sub-zero settlement"
+  note="During midday peak solar hours, localized curtailment and zero-bid renewables pushed clearance prices negative."
+  variant="rose"
+/>
+
+## 1. The Anatomy of Midday Solar Infiltration
+
+Across the first week of July 2026, utility solar generation across Luzon and the Visayas repeatedly peaked above **3,170 MW** between 11:30 AM and 1:00 PM. 
+
+During these high-irradiance windows, solar was supplying over **25%** of active daytime demand. Because solar operates with zero marginal fuel cost and priority dispatch rules, it shifts the supply curve dramatically to the right, driving conventional coal and combined-cycle gas plants down to their technical minimum operating levels (Pmin).
+
+<BlogEnergyChart
+  country="PH"
+  startDate="2026-07-01"
+  endDate="2026-07-07"
+  range="7d"
+  type="both"
+  viewMode="stacked"
+  paletteMode="clean-fossil"
+  title="Philippines Dispatch & Spot Price: 1–7 July 2026"
+  caption="Toggle between Generation and Price tabs in the top right to see how midday solar peaks correspond with spot price suppression."
+/>
+
+Notice the synchronized rhythm in the chart above:
+- **06:00 AM – 11:00 AM**: Solar ramps upward at roughly **600 MW/hr**.
+- **11:30 AM – 01:00 PM**: Coal dispatch is compressed from its morning baseline of ~4,800 MW down toward baseload minimums.
+- **04:30 PM – 07:00 PM**: The steep evening "ramp cliff", where 3,000 MW of solar output vanishes in under 120 minutes just as household and commercial cooling loads peak.
+
+<DataCallout type="insight" title="The Merit-Order Reversal">
+When solar output surpasses regional transmission transfer limits between Northern Luzon solar farms and the Metro Manila demand center, transmission line congestion triggers localized negative clearing prices. In our database, prices bottomed out at **-₱10,611/MWh**.
+</DataCallout>
+
+---
+
+## 2. The Evening Ramp: The Fragile Hours
+
+The most vulnerable period in the Philippine grid isn't midday—it is the twilight window between **5:30 PM and 7:30 PM**. 
+
+As solar generation drops to zero, the system operator (NGCP) must dispatch fast-responding peaking units (diesel power barges, hydro, and flexible gas turbines) to bridge the generation gap.
+
+```
+Twilight Demand Bridge:
+  Lost Solar Generation:   -3,100 MW
+  Rising Evening Demand:   +1,200 MW
+  Net Fast-Ramp Required:  +4,300 MW within 120 minutes
+```
+
+When baseload coal units fail to ramp or suffer unscheduled forced outages during this critical window, spot market prices skyrocket. In this dataset, spot market prices touched a ceiling of **₱102,619/MWh**.
+
+<StatCallout
+  value="₱102,620"
+  label="Peak Ex-Ante Spot Price Spike"
+  trend="up"
+  change="+930% above 7-day average"
+  note="Occurred during an evening ramping shortage when fast-start peakers cleared the marginal bid."
+  variant="amber"
+/>
+
+---
+
+## 3. Comparing Clean vs. Fossil Contributions
+
+Switching the chart mode from the 2-tone *Clean/Fossil* view to the *Detailed* breakdown reveals an interesting dependency:
+
+<BlogEnergyChart
+  country="PH"
+  startDate="2026-07-03"
+  endDate="2026-07-05"
+  range="3d"
+  type="generation"
+  viewMode="percentage"
+  paletteMode="detailed"
+  title="Normalized Fuel Share (July 3–5, 2026)"
+  caption="Normalized 100% stacked percentage share showing how geothermal (pink) acts as an immovable baseload anchor while solar (yellow) spikes during noon."
+/>
+
+### Key Takeaways from the Data:
+1. **Geothermal as the Unsung Hero**: While solar gets the headlines for its peak volume, the Philippines' geothermal baseline (~350–400 MW steady) remains rock-solid 24 hours a day, providing continuous grid inertia.
+2. **Hydro's Peaking Role**: Large hydro in Northern Luzon and Mindanao is dispatched precisely between 6:00 PM and 9:00 PM to tame the evening price spike.
+3. **Battery Storage Pipeline Needed**: The massive spread between -₱10,600 midday prices and +₱100,000 evening prices demonstrates an immense economic arbitrage opportunity for Battery Energy Storage Systems (BESS).
+
+<DataCallout type="takeaway" title="Engineering Takeaway">
+Tracking electricity grids at 5-minute resolution isn't just about pretty charts—it exposes structural transmission bottlenecks, battery storage arbitrage opportunities, and the real-world operational challenges of the renewable transition.
+</DataCallout>
+

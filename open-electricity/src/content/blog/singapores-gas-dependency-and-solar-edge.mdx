@@ -1,0 +1,52 @@
+---
+title: "Singapore's 95% Gas Fortress and the Emerging Solar Peak"
+slug: "singapores-gas-dependency-and-solar-edge"
+date: "2026-07-15"
+description: "Examining Singapore's high-efficiency combined cycle gas dominance, USEP wholesale price bounds, and the rapid expansion of urban rooftop solar."
+country: "SG"
+author:
+  name: "Ian"
+  role: "Lead Systems Architect & Grid Researcher"
+tags: ["Singapore", "NEMS", "USEP", "Natural Gas", "Urban Solar"]
+featured: false
+published: true
+---
+
+Singapore presents one of the most unique electricity market architectures in the world. As a compact city-state with virtually no domestic fossil fuel extraction or hydro resources, Singapore has engineered one of the most reliable and gas-dependent grids globally.
+
+In our telemetry records for July 2026, natural gas accounted for **95.9%** of total generation, with Combined Cycle Gas Turbines (CCGT) setting the marginal price across nearly every half-hour trading interval in the National Electricity Market of Singapore (NEMS).
+
+<StatCallout
+  value="95.9%"
+  label="Natural Gas Share of Generation"
+  trend="neutral"
+  change="Baseload Dominance"
+  note="CCGT plants fueled primarily via piped natural gas (PNG) and liquefied natural gas (LNG) imports."
+  variant="blue"
+/>
+
+## The Midday Solar Expansion
+
+Despite land constraints, rooftop solar and floating solar arrays (such as the Tengeh Reservoir installation) are beginning to make visible dents in daytime dispatch.
+
+<BlogEnergyChart
+  country="SG"
+  startDate="2026-07-01"
+  endDate="2026-07-07"
+  range="7d"
+  type="both"
+  viewMode="stacked"
+  paletteMode="clean-fossil"
+  title="Singapore Generation Mix & USEP Spot Price"
+  caption="Notice how USEP wholesale spot prices (in SGD/MWh) remain relatively range-bound around $150–$300, with occasional peaker spikes reaching $1,470."
+/>
+
+### Key Market Observations:
+1. **Tight Spot Price Bounds**: Unlike the extreme swings seen in island grids like the Philippines, Singapore's Uniform Singapore Energy Price (USEP) stays tightly clustered between **S$88/MWh** and **S$350/MWh** for over 90% of intervals.
+2. **Peaker Scarcity Spikes**: During peak afternoon commercial cooling hours, if a gas turbine drops offline for maintenance, USEP can spike rapidly toward its regulatory ceiling (reaching **S$1,473.54/MWh** in our observation window).
+3. **Regional Interconnection as the Future**: With limited domestic solar acreage, Singapore's long-term decarbonization pathway hinges on regional electricity imports (such as the Lao PDR-Thailand-Malaysia-Singapore Power Integration Project).
+
+<DataCallout type="methodology" title="USEP Spot Market Modeling">
+Wholesale spot prices in Singapore are decoupled from retail electricity tariffs. While retail consumers pay a fixed EMA-regulated tariff or contracted retail rate, large industrial consumers and contestable market participants settle directly at the half-hourly USEP rate.
+</DataCallout>
+
