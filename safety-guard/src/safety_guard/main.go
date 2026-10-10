@@ -27,8 +27,9 @@ type ToolCall struct {
 
 // HookResponse defines the resolution output consumed by agy.
 type HookResponse struct {
-	Decision string `json:"decision"` // "allow" | "force_ask" | "deny"
-	Reason   string `json:"reason"`
+	Decision            string   `json:"decision"` // "allow" | "force_ask" | "deny"
+	Reason              string   `json:"reason"`
+	PermissionOverrides []string `json:"permissionOverrides,omitempty"`
 }
 
 var (
@@ -59,11 +60,15 @@ var (
 	envFilePattern = regexp.MustCompile(`(^|/)\.env(\.[a-zA-Z0-9_-]+)?$`)
 )
 
-func sendResponse(decision, reason string) {
-	out, _ := json.Marshal(HookResponse{
+func sendResponse(decision, reason string, overrides ...string) {
+	resp := HookResponse{
 		Decision: decision,
 		Reason:   reason,
-	})
+	}
+	if len(overrides) > 0 && overrides[0] != "" {
+		resp.PermissionOverrides = overrides
+	}
+	out, _ := json.Marshal(resp)
 	fmt.Println(string(out))
 	os.Exit(0)
 }
@@ -267,6 +272,10 @@ func main() {
 		return
 	}
 
+	if overallDecision == "allow" && cmdLine != "" {
+		sendResponse(overallDecision, overallReason, fmt.Sprintf("command(%s)", cmdLine))
+		return
+	}
 	sendResponse(overallDecision, overallReason)
 }
 

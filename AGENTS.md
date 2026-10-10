@@ -34,3 +34,12 @@ When implementing or maintaining Python serverless API handlers (`api/index.py`)
 - Run tests via: `uv run pytest`.
 - Manage dependencies via: `uv add <pkg>`, `uv remove <pkg>`, or `uv pip install <pkg>`.
 - Never execute bare `python`, `python3`, or `pip` directly.
+
+---
+
+## 4. Remote Colab GPU & ML Compute Invariants
+When running ML workloads, model training, or benchmarks on Google Colab (`google-colab-cli`):
+1. **Pre-Flight Credit Check**: Always run `colab usage` before provisioning to verify existing compute units balance. Never start sessions if credits <= 5.0 without user confirmation. Never purchase credits automatically.
+2. **Mandatory Lifecycle Shutdown**: Idle VMs continuously burn compute units. Either use ephemeral runs (`colab run --gpu L4 <script.py>`) or explicitly stop sessions (`colab stop -s <name>`). Always verify `Active assignments: 0` via `colab usage` before ending execution.
+3. **Download Artifacts**: Download generated plots, metrics, and models to the local project directory before terminating the instance.
+4. **Follow Skill**: Refer to the `colab-ml-compute` skill for complete recipes and tier selection guidelines.

@@ -1,27 +1,46 @@
 """TimesFM 3.0 local forecasting helper functions."""
 
-from typing import Optional
+from typing import Any, Dict, List, Optional
 import numpy as np
 import pandas as pd
+import torch
 from timesfm import TimesFM3Forecaster
 from timesfm3.torch.timesfm3_forecaster import ForecastOutput
 
 
+def get_device_info() -> Dict[str, Any]:
+    """Retrieve runtime accelerator information."""
+    cuda_available = torch.cuda.is_available()
+    info: Dict[str, Any] = {
+        "cuda_available": cuda_available,
+        "pytorch_version": torch.__version__,
+        "device": "cuda" if cuda_available else "cpu",
+    }
+    if cuda_available:
+        info["device_name"] = torch.cuda.get_device_name(0)
+        info["device_count"] = torch.cuda.device_count()
+        info["vram_total_gb"] = round(torch.cuda.get_device_properties(0).total_memory / (1024**3), 2)
+    return info
+
+
 def load_forecaster(
     model_name: str = "google/timesfm-3.0-pytorch",
-    device: str = "cpu",
+    device: Optional[str] = None,
     per_core_batch_size: int = 1,
 ) -> TimesFM3Forecaster:
-    """Load Google TimesFM 3.0 checkpoint on local device.
+    """Load Google TimesFM 3.0 checkpoint on local or accelerator device.
 
     Args:
         model_name: Hugging Face model repository ID.
-        device: Device to load model on ('cpu' or 'cuda').
+        device: Device to load model on ('cuda', 'cpu', or None for auto-detection).
         per_core_batch_size: Batch size per core.
 
     Returns:
         Loaded TimesFM3Forecaster instance.
     """
+    if device is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+
     return TimesFM3Forecaster.from_pretrained(
         pretrained_model_name_or_path=model_name,
         device=device,
@@ -56,6 +75,32 @@ def forecast_series(
         past_only_covariates=past_only_covariates,
         past_future_covariates=past_future_covariates,
         return_quantiles=return_quantiles,
+    )
+
+
+def forecast_batch(
+    forecaster: TimesFM3Forecaster,
+    contexts: List[np.ndarray],
+    horizon: int = 24,
+    return_quantiles: bool = True,
+) -> List[ForecastOutput]:
+    """Run zero-shot inference for a batch of time series contexts.
+
+    Args:
+        forecaster: Initialized TimesFM3Forecaster.
+        contexts: List of 1D numpy arrays of historical values.
+        horizon: Forecast horizon.
+        return_quantiles: Whether to return quantiles.
+
+    Returns:
+        List of ForecastOutput objects.
+    """
+    return list(
+        forecaster.predict_batch(
+            contexts,
+            horizon=horizon,
+            return_quantiles=return_quantiles,
+        )
     )
 
 

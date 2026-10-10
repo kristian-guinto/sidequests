@@ -14,3 +14,11 @@ CGO_ENABLED=0 go build -ldflags="-s -w" -o "${BIN_DIR}/safety_guard" main.go
 
 chmod +x "${BIN_DIR}/safety_guard"
 echo "Build complete: ${BIN_DIR}/safety_guard"
+
+if [[ "${1:-}" == "--install" || "${1:-}" == "install" ]]; then
+  INSTALL_DIR="${HOME}/.local/bin"
+  mkdir -p "${INSTALL_DIR}"
+  cp "${BIN_DIR}/safety_guard" "${INSTALL_DIR}/safety_guard"
+  chmod +x "${INSTALL_DIR}/safety_guard"
+  echo "Installed to: ${INSTALL_DIR}/safety_guard"
+fi

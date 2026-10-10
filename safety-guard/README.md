@@ -38,11 +38,16 @@ safety-guard/
 - Go 1.22+ (Linux, macOS, or Windows)
 - Python 3 (for running test suite)
 
-### 2. Build the Static Binary
+### 2. Build and Install Binary
+Compile the static binary to `bin/safety_guard` and optionally install directly to `~/.local/bin`:
 ```bash
+# Build only
 ./build.sh
+
+# Build and install to ~/.local/bin/safety_guard
+./build.sh --install
 ```
-This produces a static, stripped binary at `bin/safety_guard` (~2.1MB, ~1.5ms execution latency).
+This produces a static, stripped binary (~2.1MB, ~1.5ms execution latency).
 
 ### 3. Run Tests
 ```bash
@@ -50,7 +55,9 @@ This produces a static, stripped binary at `bin/safety_guard` (~2.1MB, ~1.5ms ex
 ```
 
 ### 4. Configure Antigravity Hook
-Add the hook to your project's `.agents/hooks.json` (or globally at `~/.gemini/config/hooks.json`):
+
+#### Global Setup (Recommended - Machine-Wide)
+To protect all projects and workspaces on your machine, configure the hook in `~/.gemini/config/hooks.json`:
 
 ```json
 {
@@ -62,7 +69,7 @@ Add the hook to your project's `.agents/hooks.json` (or globally at `~/.gemini/c
         "hooks": [
           {
             "type": "command",
-            "command": "/absolute/path/to/safety-guard/bin/safety_guard"
+            "command": "~/.local/bin/safety_guard"
           }
         ]
       }
@@ -71,30 +78,125 @@ Add the hook to your project's `.agents/hooks.json` (or globally at `~/.gemini/c
 }
 ```
 
-Antigravity will now pass every `run_command` invocation through `safety_guard` before execution.
+> **Why Global?** Antigravity discovers project-level hooks by searching `.agents/hooks.json` up to the repository root (`.git`). If `hooks.json` is placed outside a project's repository root without being in `~/.gemini/config/hooks.json`, it will not be loaded. Placing the configuration in `~/.gemini/config/hooks.json` ensures it applies across all repositories and subdirectories.
+
+#### Project-Level Setup
+Alternatively, check `hooks.json` into a specific repository at `.agents/hooks.json` (at the project's root) to version-control it with your team.
 
 ---
 
-## Autonomous Operation (Always Allow / Skip Permissions)
+---
 
-Because `PreToolUse` hooks execute **before** permissions are granted, `safety_guard` serves as an active gatekeeper. Even in auto-approve mode, `"deny"` commands are immediately blocked, and `"force_ask"` commands will still halt for manual confirmation.
+## Continuous Unattended Execution Architecture
 
-### 1. Recommended CLI Settings (`~/.gemini/antigravity-cli/settings.json`)
+To achieve a workflow where the agent **runs continuously on standard dev tasks without interruption** while **strictly halting or blocking dangerous actions**, Antigravity relies on three cooperating layers:
+
+```
+┌────────────────────────────────────────────────────────┐
+│                   Tool Call Invoked                    │
+└───────────────────────────┬────────────────────────────┘
+                            │
+                            ▼
+              ┌───────────────────────────┐
+              │  1. PreToolUse Hook       │
+              │     (safety_guard AST)    │
+              └─────────────┬─────────────┘
+                            │
+       ┌────────────────────┼─────────────────────┐
+       ▼                    ▼                     ▼
+┌──────────────┐    ┌──────────────┐      ┌──────────────┐
+│    "deny"    │    │ "force_ask"  │      │   "allow"    │
+└──────┬───────┘    └──────┬───────┘      └──────┬───────┘
+       │                   │                     │
+       ▼                   ▼                     ▼
+  HARD BLOCKED       Forces Prompt         ┌──────────────┐
+  (Fail-closed)     in request-review      │ 2. Perms     │
+                    (curl, pip install,    │    Checker   │
+                     rm file.txt)          └──────┬───────┘
+                                                  │
+                                 ┌────────────────┴────────────────┐
+                                 ▼                                 ▼
+                         In allow grants                    Not in grants
+                         (git, python, pytest)             (Unlisted tool)
+                                 │                                 │
+                                 ▼                                 ▼
+                           Auto-Proceeds                     Prompts User
+                           (Uninterrupted)                   for Review
+```
+
+### 1. The Configuration Blueprint
+
+#### A. Set Review Mode in `~/.gemini/antigravity-cli/settings.json`
 ```json
 {
   "agentMode": "accept-edits",
-  "artifactReviewPolicy": "always-proceed",
-  "enableTerminalSandbox": true
+  "toolPermission": "request-review",
+  "artifactReviewPolicy": "always-proceed"
+}
+```
+> **Note**: Setting `"toolPermission": "always-proceed"` auto-approves all tool confirmation prompts client-side (bypassing `force_ask`). Setting `"request-review"` ensures that when the safety hook or permission system flags an action for review, the CLI surfaces the interactive prompt to you.
+
+#### B. Pre-Approve Safe Tool Prefixes in `~/.gemini/config/config.json`
+Grant prefix permissions for standard safe developer tools so they execute without interactive prompts:
+
+```json
+{
+  "userSettings": {
+    "globalPermissionGrants": {
+      "allow": [
+        "command(python3)",
+        "command(python)",
+        "command(pytest)",
+        "command(uv)",
+        "command(git)",
+        "command(cargo)",
+        "command(npm)",
+        "command(node)",
+        "command(npx)",
+        "command(go)",
+        "command(ruff)",
+        "command(black)",
+        "command(cat)",
+        "command(ls)",
+        "command(grep)",
+        "command(find)",
+        "command(echo)",
+        "command(mkdir)",
+        "command(touch)"
+      ]
+    }
+  }
 }
 ```
 
-### 2. Launching in Unattended Mode
-To run tasks autonomously without interactive TUI pauses for standard tooling:
-```bash
-agy --dangerously-skip-permissions
+#### C. Register Global Safety Hook in `~/.gemini/config/hooks.json`
+```json
+{
+  "go-auto-mode-safety-guard": {
+    "enabled": true,
+    "PreToolUse": [
+      {
+        "matcher": "run_command",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/root/.local/bin/safety_guard"
+          }
+        ]
+      }
+    ]
+  }
+}
 ```
-- Safe developer tools run unattended with zero prompt friction.
-- Destructive commands (`rm -rf`, `sudo`, `git reset --hard`) fail-closed instantly.
-- Sensitive access (`.env*`) is hard-blocked.
-- Ambiguous actions (`pip install`, `curl`) still escalate to an interactive prompt.
+
+---
+
+### 2. How the 3-Tier Boundary Behaves
+
+| Category | Example Commands | Security Action | User Experience |
+| :--- | :--- | :--- | :--- |
+| **Safe Developer Tools** | `pytest`, `uv run test`, `git status`, `git diff`, `python3 script.py`, `npm run build` | Verified by AST $\rightarrow$ `"allow"`; matched in prefix grants | **Executes continuously & unattended** with zero prompts. |
+| **Ambiguous / Network Tools** | `curl`, `wget`, `pip install`, `npm i`, standalone `rm file.txt`, unlisted binaries | AST returns `"force_ask"`; not in prefix grants | **Halts execution and prompts user** in UI with rationale. |
+| **Destructive Primitives** | `rm -rf`, `sudo`, `git reset --hard`, `git push --force`, `dd`, `mkfs` | AST returns `"deny"` | **Immediately hard-blocked fail-closed**; tool call aborted before running. |
+| **Secrets & Credentials** | `cat .env`, `echo foo > .env.prod`, reading tokens | AST returns `"deny"` | **Immediately hard-blocked fail-closed**. |
 

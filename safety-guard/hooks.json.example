@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "./bin/safety_guard"
+            "command": "~/.local/bin/safety_guard"
           }
         ]
       }

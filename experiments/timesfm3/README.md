@@ -27,17 +27,61 @@ Tested and verified on this device:
 
 ```
 experiments/timesfm3/
-├── explore.py                 # Runnable demo script with synthetic time series & plotting
-├── pyproject.toml             # uv project configuration and dependencies
-├── README.md                  # This document
+├── timesfm3_colab_exploration.ipynb  # Interactive Google Colab notebook for GPU testing
+├── colab_runner.py                   # Standalone accelerator & Colab benchmark suite
+├── explore.py                        # Local exploration script with synthetic time series
+├── pyproject.toml                    # uv project configuration and dependencies
+├── README.md                         # This document
 ├── src/
 │   └── timesfm3_exploration/
-│       ├── __init__.py        # Package exports
-│       └── forecast.py        # Helper utilities for loading & forecasting
-└── outputs/                   # Generated forecast plots (git-ignored)
+│       ├── __init__.py               # Package exports (forecast_series, forecast_batch, etc.)
+│       └── forecast.py               # Helper utilities for loading & forecasting (CUDA/CPU)
+└── outputs/                          # Generated forecast & benchmark plots (git-ignored)
 ```
 
-## Quickstart
+## Running on Google Colab (Google AI Pro Plan)
+
+With your **Google AI Pro** plan, you receive monthly Colab compute credits to use on high-performance accelerators (NVIDIA T4, L4, or A100 GPUs).
+
+### Option 1: Interactive Colab Notebook (`timesfm3_colab_exploration.ipynb`)
+1. Open [Google Colab](https://colab.research.google.com/).
+2. Select **Upload** and upload `experiments/timesfm3/timesfm3_colab_exploration.ipynb`.
+3. In the top menu, go to **Runtime > Change runtime type**:
+   - **Hardware accelerator**: Select **GPU**.
+   - **GPU class**: Choose **Standard** (T4) or **Premium** (L4 / A100) to utilize your Pro compute credits.
+4. Run all cells sequentially. The notebook includes:
+   - GPU / VRAM status checks
+   - Dependency installation (`timesfm[torch]>=3.0.2`)
+   - **Scenario 1**: 48h zero-shot electricity demand forecast with p10–p90 quantiles
+   - **Scenario 2**: Dynamic past-future covariates (heatwave / peak price spikes)
+   - **Scenario 3**: Multi-batch GPU throughput benchmark (measuring series/second)
+   - Visualizations plotted directly inline.
+
+### Option 2: Headless GPU Execution via Colab CLI (`colab run` / `colab exec`)
+We have installed the official Google Colab CLI (`google-colab-cli`). Once authenticated, you can rent a GPU VM, run the benchmarks, and automatically tear down the VM directly from your terminal:
+
+```bash
+# Ephemeral GPU run (provisions VM, executes benchmark, tears down VM)
+colab run --gpu L4 experiments/timesfm3/colab_runner.py
+
+# Or with high-RAM / A100 GPU
+colab run --gpu A100 --high-mem experiments/timesfm3/colab_runner.py
+
+# Or create a persistent session to run commands interactively
+colab new -s timesfm-bench --gpu L4
+colab exec -s timesfm-bench -f experiments/timesfm3/colab_runner.py
+colab stop -s timesfm-bench
+```
+
+### Option 3: Local Script Benchmark (`colab_runner.py`)
+To run the automated benchmark suite locally on CPU or local GPU:
+
+```bash
+cd experiments/timesfm3
+uv run python colab_runner.py
+```
+
+## Local Quickstart
 
 Run the exploration script using `uv`:
 
