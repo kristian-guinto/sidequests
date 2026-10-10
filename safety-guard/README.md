@@ -72,3 +72,29 @@ Add the hook to your project's `.agents/hooks.json` (or globally at `~/.gemini/c
 ```
 
 Antigravity will now pass every `run_command` invocation through `safety_guard` before execution.
+
+---
+
+## Autonomous Operation (Always Allow / Skip Permissions)
+
+Because `PreToolUse` hooks execute **before** permissions are granted, `safety_guard` serves as an active gatekeeper. Even in auto-approve mode, `"deny"` commands are immediately blocked, and `"force_ask"` commands will still halt for manual confirmation.
+
+### 1. Recommended CLI Settings (`~/.gemini/antigravity-cli/settings.json`)
+```json
+{
+  "agentMode": "accept-edits",
+  "artifactReviewPolicy": "always-proceed",
+  "enableTerminalSandbox": true
+}
+```
+
+### 2. Launching in Unattended Mode
+To run tasks autonomously without interactive TUI pauses for standard tooling:
+```bash
+agy --dangerously-skip-permissions
+```
+- Safe developer tools run unattended with zero prompt friction.
+- Destructive commands (`rm -rf`, `sudo`, `git reset --hard`) fail-closed instantly.
+- Sensitive access (`.env*`) is hard-blocked.
+- Ambiguous actions (`pip install`, `curl`) still escalate to an interactive prompt.
+
