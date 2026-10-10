@@ -25,3 +25,12 @@ When implementing or maintaining Python serverless API handlers (`api/index.py`)
    - Avoid using `Query(default=...)` for optional query parameters if endpoint functions are called directly in unit tests; prefer native type hints with defaults (e.g., `param: Optional[str] = None`) so direct function calls behave identically to HTTP queries.
 3. **Timezone Representation**:
    - For NEM operational time series, maintain naive ISO timestamp strings (AEST) without UTC `Z` offsets to prevent client-side chart phase shifts.
+
+---
+
+## 3. Python Environment & Execution Standard
+- Always use `uv` for all Python tooling, environment management, package management, and script execution across this repository.
+- Run Python scripts and modules via: `uv run python <script>` or `uv run <command>`.
+- Run tests via: `uv run pytest`.
+- Manage dependencies via: `uv add <pkg>`, `uv remove <pkg>`, or `uv pip install <pkg>`.
+- Never execute bare `python`, `python3`, or `pip` directly.

@@ -35,7 +35,7 @@ var (
 	// Root binaries permitted to run fully unattended
 	safeRootBinaries = map[string]bool{
 		"pytest": true, "cargo": true, "npm": true, "pnpm": true, "yarn": true,
-		"python": true, "python3": true, "node": true, "go": true,
+		"python": true, "python3": true, "node": true, "go": true, "uv": true,
 		"ruff": true, "black": true, "mypy": true, "flake8": true,
 		"eslint": true, "tsc": true, "cat": true, "ls": true,
 		"pwd": true, "grep": true, "find": true, "head": true, "tail": true,
