@@ -6,6 +6,7 @@ import {
   CompletionStats,
   EvaluationResult,
   GroupedAnswersPrompt,
+  TierId,
   UserAnswerRecord,
 } from '@/lib/types';
 import {
@@ -17,6 +18,7 @@ import {
 import { DepthTracker } from './DepthTracker';
 import { ActivePromptCard } from './ActivePromptCard';
 import { ResultsModal } from './ResultsModal';
+import { OceanEnvironment } from './OceanEnvironment';
 
 interface GameContainerProps {
   dayNumber: number;
@@ -41,6 +43,8 @@ export function GameContainer({
   const [stats, setStats] = useState<CompletionStats | null>(null);
   const [answersPrompts, setAnswersPrompts] = useState<GroupedAnswersPrompt[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isPlunging, setIsPlunging] = useState(false);
+  const [lastTier, setLastTier] = useState<TierId | null>(null);
 
   // Check saved state for daily dives
   useEffect(() => {
@@ -67,6 +71,14 @@ export function GameContainer({
     } catch {
       // ignore
     }
+  };
+
+  const handlePlungeStart = (evalResult: EvaluationResult) => {
+    setIsPlunging(true);
+    setLastTier(evalResult.tier);
+    setTimeout(() => {
+      setIsPlunging(false);
+    }, 1400);
   };
 
   const handleEvaluateAnswer = async (rawAnswer: string): Promise<EvaluationResult> => {
@@ -174,46 +186,70 @@ export function GameContainer({
 
   if (isCompleted) {
     return (
-      <ResultsModal
-        dayNumber={dayNumber}
-        dateStr={dateStr}
-        totalScore={currentScore}
-        userAnswers={answers}
-        stats={stats}
-        answersPrompts={answersPrompts}
-        onPlayAgain={onPlayAgain}
-        isUnlimited={isUnlimited}
-      />
+      <>
+        <OceanEnvironment
+          depthMeters={currentScore * 10}
+          isPlunging={isPlunging}
+          lastTier={lastTier}
+        />
+        <ResultsModal
+          dayNumber={dayNumber}
+          dateStr={dateStr}
+          totalScore={currentScore}
+          userAnswers={answers}
+          prompts={prompts}
+          stats={stats}
+          answersPrompts={answersPrompts}
+          onPlayAgain={onPlayAgain}
+          isUnlimited={isUnlimited}
+        />
+      </>
     );
   }
 
   if (!activePrompt) {
     return (
-      <div className="text-center py-12 text-slate-400">
-        Preparing dive equipment...
-      </div>
+      <>
+        <OceanEnvironment
+          depthMeters={currentScore * 10}
+          isPlunging={isPlunging}
+          lastTier={lastTier}
+        />
+        <div className="text-center py-12 text-slate-400 font-arcade text-lg tracking-wider">
+          PREPARING DIVE EQUIPMENT & SONAR SENSORS...
+        </div>
+      </>
     );
   }
 
   return (
-    <div className="w-full max-w-2xl mx-auto space-y-4">
-      {/* Visual Depth Tracker */}
-      <DepthTracker
-        currentPromptIndex={currentIndex}
-        totalPrompts={prompts.length}
-        userAnswers={answers}
-        currentScore={currentScore}
+    <>
+      <OceanEnvironment
+        depthMeters={currentScore * 10}
+        isPlunging={isPlunging}
+        lastTier={lastTier}
       />
+      <div className="w-full max-w-2xl mx-auto space-y-4 relative z-10">
+        {/* Visual Depth Tracker */}
+        <DepthTracker
+          currentPromptIndex={currentIndex}
+          totalPrompts={prompts.length}
+          userAnswers={answers}
+          currentScore={currentScore}
+          isPlunging={isPlunging}
+        />
 
-      {/* Active Question Card */}
-      <ActivePromptCard
-        key={activePrompt.id}
-        prompt={activePrompt}
-        promptNumber={currentIndex + 1}
-        totalPrompts={prompts.length}
-        onEvaluate={handleEvaluateAnswer}
-        onNext={handleNextPrompt}
-      />
-    </div>
+        {/* Active Question Card */}
+        <ActivePromptCard
+          key={activePrompt.id}
+          prompt={activePrompt}
+          promptNumber={currentIndex + 1}
+          totalPrompts={prompts.length}
+          onEvaluate={handleEvaluateAnswer}
+          onNext={handleNextPrompt}
+          onPlungeStart={handlePlungeStart}
+        />
+      </div>
+    </>
   );
 }
