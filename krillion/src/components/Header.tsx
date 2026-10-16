@@ -44,38 +44,38 @@ export function Header({ onOpenHowToPlay, dayNumber, dateStr }: HeaderProps) {
         <div className="flex items-center gap-1 sm:gap-2">
           <Link
             href="/"
-            className={`px-3 py-1.5 rounded-lg text-xs font-arcade font-bold tracking-wider flex items-center gap-1.5 transition-all ${
+            className={`min-h-[38px] px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-arcade font-bold tracking-wider flex items-center gap-1.5 transition-all select-none touch-manipulation ${
               pathname === '/'
                 ? 'bg-cyan-950/60 text-krillion-cyan border border-krillion-cyan/60 glow-cyan'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
             }`}
           >
-            <Waves className="w-3.5 h-3.5 text-krillion-cyan" />
+            <Waves className="w-3.5 h-3.5 text-krillion-cyan flex-shrink-0" />
             <span className="hidden sm:inline">DAILY DIVE</span>
             {dayNumber && <span className="text-xs font-mono text-krillion-gold">#{dayNumber}</span>}
           </Link>
 
           <Link
             href="/unlimited"
-            className={`px-3 py-1.5 rounded-lg text-xs font-arcade font-bold tracking-wider flex items-center gap-1.5 transition-all ${
+            className={`min-h-[38px] px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-arcade font-bold tracking-wider flex items-center gap-1.5 transition-all select-none touch-manipulation ${
               pathname === '/unlimited'
                 ? 'bg-purple-950/60 text-krillion-purple border border-krillion-purple/60 glow-purple'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
             }`}
           >
-            <Compass className="w-3.5 h-3.5 text-krillion-purple" />
+            <Compass className="w-3.5 h-3.5 text-krillion-purple flex-shrink-0" />
             <span className="hidden sm:inline">UNLIMITED</span>
           </Link>
 
           <Link
             href="/archive"
-            className={`px-3 py-1.5 rounded-lg text-xs font-arcade font-bold tracking-wider flex items-center gap-1.5 transition-all ${
+            className={`min-h-[38px] px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-arcade font-bold tracking-wider flex items-center gap-1.5 transition-all select-none touch-manipulation ${
               pathname.startsWith('/archive')
                 ? 'bg-amber-950/60 text-krillion-gold border border-krillion-gold/60 glow-gold'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
             }`}
           >
-            <Archive className="w-3.5 h-3.5 text-krillion-orange" />
+            <Archive className="w-3.5 h-3.5 text-krillion-orange flex-shrink-0" />
             <span className="hidden sm:inline">ARCHIVE</span>
           </Link>
 
@@ -83,9 +83,9 @@ export function Header({ onOpenHowToPlay, dayNumber, dateStr }: HeaderProps) {
             <button
               onClick={onOpenHowToPlay}
               aria-label="How to play"
-              className="p-1.5 rounded-lg text-slate-400 hover:text-krillion-cyan hover:bg-slate-900/60 transition-colors border border-transparent hover:border-slate-800"
+              className="min-h-[38px] min-w-[38px] p-2 rounded-lg text-slate-400 hover:text-krillion-cyan hover:bg-slate-900/60 transition-colors border border-transparent hover:border-slate-800 flex items-center justify-center select-none touch-manipulation"
             >
-              <HelpCircle className="w-4 h-4" />
+              <HelpCircle className="w-4 h-4 flex-shrink-0" />
             </button>
           )}
         </div>

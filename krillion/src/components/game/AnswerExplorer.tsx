@@ -46,7 +46,7 @@ export function AnswerExplorer({ prompts }: AnswerExplorerProps) {
               setSelectedPromptIndex(idx);
               setSearchTerm('');
             }}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+            className={`min-h-[38px] px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all select-none touch-manipulation flex items-center justify-center ${
               idx === selectedPromptIndex
                 ? 'bg-krillion-gold text-slate-950 shadow-md'
                 : 'bg-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-700/80'
@@ -70,13 +70,18 @@ export function AnswerExplorer({ prompts }: AnswerExplorerProps) {
       {/* Search and Tier filter */}
       <div className="flex flex-col sm:flex-row gap-2 mb-4">
         <div className="relative flex-1">
-          <Search className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+          <Search className="w-4 h-4 text-slate-500 absolute left-3 top-3.5" />
           <input
             type="text"
+            inputMode="search"
+            enterKeyHint="search"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search accepted answers or aliases..."
-            className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-krillion-cyan"
+            className="w-full min-h-[44px] pl-9 pr-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-base sm:text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-krillion-cyan touch-manipulation"
           />
         </div>
 
@@ -84,7 +89,7 @@ export function AnswerExplorer({ prompts }: AnswerExplorerProps) {
           value={selectedTierFilter}
           onChange={(e) => setSelectedTierFilter(e.target.value as any)}
           aria-label="Filter answers by rarity tier"
-          className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-krillion-cyan"
+          className="min-h-[44px] px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-base sm:text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-krillion-cyan touch-manipulation"
         >
           <option value="all">All Tiers ({activePrompt.totalAnswersCount})</option>
           <option value="krillion">🌟 One in a Krillion ({activePrompt.tiers.krillion.length})</option>

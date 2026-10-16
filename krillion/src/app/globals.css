@@ -23,7 +23,7 @@ body {
   shape-rendering: crispEdges;
 }
 
-/* Retro CRT / Sonar Scanline Overlay */
+/* Retro CRT / Sonar Scanline Overlay - NEVER use pointer-events: none here as it cascades to child elements */
 .crt-scanlines {
   background: linear-gradient(
     rgba(18, 16, 16, 0) 50%,
@@ -35,7 +35,6 @@ body {
     rgba(157, 123, 255, 0.02)
   );
   background-size: 100% 3px, 6px 100%;
-  pointer-events: none;
 }
 
 /* Retro Arcade Push-Button */

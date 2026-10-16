@@ -120,8 +120,8 @@ export function OceanEnvironment({
       }}
     >
       {/* 1. Subtle Sonar Grid & CRT Scanlines */}
-      <div className="absolute inset-0 sonar-grid opacity-60" />
-      <div className="absolute inset-0 crt-scanlines opacity-40" />
+      <div className="absolute inset-0 sonar-grid opacity-60 pointer-events-none" />
+      <div className="absolute inset-0 crt-scanlines opacity-40 pointer-events-none" />
 
       {/* 2. Sunlight Zone: Diagonal Pixel Sunbeams from surface */}
       {zone.showSunbeams && (

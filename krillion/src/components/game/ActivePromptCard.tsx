@@ -228,38 +228,44 @@ export function ActivePromptCard({
       {/* Input Form or Plunge Celebration Feedback */}
       {!result ? (
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="relative">
+          <div
+            className="relative cursor-text"
+            onClick={() => inputRef.current?.focus()}
+          >
             <input
               ref={inputRef}
               type="text"
+              inputMode="text"
+              enterKeyHint="send"
+              autoCapitalize="off"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               disabled={isSubmitting}
               placeholder="Type your deepest pull here..."
-              autoComplete="off"
-              autoCorrect="off"
-              spellCheck="false"
-              className="w-full px-5 py-4 rounded-xl bg-slate-900/90 border-2 border-slate-700 text-white placeholder-slate-500 text-base sm:text-lg font-mono focus:outline-none focus:ring-2 focus:ring-krillion-cyan focus:border-krillion-cyan transition-all shadow-inner"
+              className="w-full px-4 sm:px-5 py-3.5 sm:py-4 rounded-xl bg-slate-900/90 border-2 border-slate-700 text-white placeholder-slate-500 text-base sm:text-lg font-mono focus:outline-none focus:ring-2 focus:ring-krillion-cyan focus:border-krillion-cyan transition-all shadow-inner touch-manipulation"
             />
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <button
               type="submit"
               disabled={isSubmitting || !input.trim()}
-              className="flex-1 py-3.5 px-6 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-600 text-slate-950 font-arcade font-bold text-base sm:text-lg tracking-wider uppercase flex items-center justify-center gap-2 btn-arcade hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              className="flex-1 min-h-[48px] py-3 px-3 sm:px-6 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-600 text-slate-950 font-arcade font-bold text-sm sm:text-lg tracking-wider uppercase flex items-center justify-center gap-1.5 sm:gap-2 btn-arcade hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all select-none touch-manipulation"
             >
-              <Send className="w-4 h-4" />
-              <span>{isSubmitting ? 'TRANSMITTING SONAR...' : 'LAUNCH PLUNGE'}</span>
+              <Send className="w-4 h-4 flex-shrink-0" />
+              <span className="truncate">{isSubmitting ? 'TRANSMITTING...' : 'LAUNCH PLUNGE'}</span>
             </button>
 
             <button
               type="button"
               onClick={handlePass}
               disabled={isSubmitting}
-              className="py-3.5 px-4 sm:px-5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 font-arcade font-bold text-xs sm:text-sm tracking-wider uppercase flex items-center gap-1.5 transition-colors border border-slate-700 btn-arcade"
+              className="min-h-[48px] py-3 px-3 sm:px-5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 font-arcade font-bold text-xs sm:text-sm tracking-wider uppercase flex items-center justify-center gap-1 sm:gap-1.5 transition-colors border border-slate-700 btn-arcade flex-shrink-0 select-none touch-manipulation whitespace-nowrap"
             >
-              <FastForward className="w-3.5 h-3.5 text-slate-400" />
+              <FastForward className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
               <span>FLOAT / PASS</span>
             </button>
           </div>
@@ -352,10 +358,10 @@ export function ActivePromptCard({
           <button
             onClick={onNext}
             autoFocus
-            className="w-full py-4 rounded-xl bg-gradient-to-r from-krillion-gold to-amber-500 text-slate-950 font-arcade font-black text-lg sm:text-xl uppercase tracking-wider flex items-center justify-center gap-2 hover:brightness-110 btn-arcade transition-all shadow-[0_0_20px_rgba(255,209,102,0.4)]"
+            className="w-full min-h-[50px] py-3.5 sm:py-4 px-3 sm:px-4 rounded-xl bg-gradient-to-r from-krillion-gold to-amber-500 text-slate-950 font-arcade font-black text-base sm:text-xl uppercase tracking-wider flex items-center justify-center gap-2 hover:brightness-110 btn-arcade transition-all shadow-[0_0_20px_rgba(255,209,102,0.4)] select-none touch-manipulation"
           >
-            <span>{promptNumber < totalPrompts ? 'SUBMARINE DIVE TO NEXT DEPTH' : 'SURFACE & VIEW EXPEDITION LOG'}</span>
-            <ArrowRight className="w-5 h-5" />
+            <span className="truncate">{promptNumber < totalPrompts ? 'SUBMARINE DIVE TO NEXT DEPTH' : 'SURFACE & VIEW EXPEDITION LOG'}</span>
+            <ArrowRight className="w-5 h-5 flex-shrink-0" />
           </button>
         </div>
       )}
