@@ -5,6 +5,7 @@ The `sidequests` repository houses multiple independent projects deployed to Ver
 - `nem-battery` (root: `nem-battery`)
 - `open-electricity` (root: `open-electricity`)
 - `pollmph` (root: `pollmph/frontend`)
+- `krillion` (root: `krillion`)
 
 Whenever creating, modifying, or refactoring subprojects:
 1. **Ignored Build Step**:
