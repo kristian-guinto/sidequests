@@ -25,8 +25,6 @@ interface GameContainerProps {
   dateStr: string;
   prompts: ClientPromptItem[];
   title?: string;
-  isUnlimited?: boolean;
-  onPlayAgain?: () => void;
 }
 
 export function GameContainer({
@@ -34,8 +32,6 @@ export function GameContainer({
   dateStr,
   prompts,
   title,
-  isUnlimited = false,
-  onPlayAgain,
 }: GameContainerProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<UserAnswerRecord[]>([]);
@@ -46,20 +42,32 @@ export function GameContainer({
   const [isPlunging, setIsPlunging] = useState(false);
   const [lastTier, setLastTier] = useState<TierId | null>(null);
 
-  // Check saved state for daily dives
+  // Check saved state for today's daily dive
   useEffect(() => {
-    if (isUnlimited) return;
+    const saved = getSavedDailyState(dayNumber, dateStr);
+    if (!saved) return;
 
-    const saved = getSavedDailyState(dayNumber);
-    if (saved && saved.completed) {
+    if (saved.completed) {
       setAnswers(saved.answers || []);
       setIsCompleted(true);
       if (saved.stats) {
         setStats(saved.stats);
       }
       fetchAnswerExplorer(dayNumber);
+    } else if (Array.isArray(saved.answers) && saved.answers.length > 0) {
+      // In-progress dive: resume where the player left off!
+      setAnswers(saved.answers);
+      const nextIdx = typeof saved.currentIndex === 'number'
+        ? saved.currentIndex
+        : saved.answers.length;
+
+      if (nextIdx >= prompts.length && prompts.length > 0) {
+        completeDiveWithAnswers(saved.answers);
+      } else {
+        setCurrentIndex(Math.max(0, Math.min(nextIdx, prompts.length - 1)));
+      }
     }
-  }, [dayNumber, isUnlimited]);
+  }, [dayNumber, dateStr, prompts.length]);
 
   const fetchAnswerExplorer = async (dayNum: number) => {
     try {
@@ -112,10 +120,19 @@ export function GameContainer({
       canonicalAnswer: data.canonicalAnswer,
     };
 
-    setAnswers((prev) => {
-      const copy = [...prev];
-      copy[currentIndex] = record;
-      return copy;
+    const updatedAnswers = [...answers];
+    updatedAnswers[currentIndex] = record;
+    setAnswers(updatedAnswers);
+
+    const updatedScore = updatedAnswers.reduce((sum, a) => sum + (a?.score || 0), 0);
+    // Persist in-progress round
+    saveDailyState({
+      dayNumber,
+      date: dateStr,
+      completed: false,
+      score: updatedScore,
+      answers: updatedAnswers,
+      currentIndex,
     });
 
     return data;
@@ -123,7 +140,17 @@ export function GameContainer({
 
   const handleNextPrompt = async () => {
     if (currentIndex + 1 < prompts.length) {
-      setCurrentIndex((prev) => prev + 1);
+      const nextIdx = currentIndex + 1;
+      setCurrentIndex(nextIdx);
+      const curScore = answers.reduce((sum, a) => sum + (a?.score || 0), 0);
+      saveDailyState({
+        dayNumber,
+        date: dateStr,
+        completed: false,
+        score: curScore,
+        answers,
+        currentIndex: nextIdx,
+      });
     } else {
       // Dive completed!
       await handleCompleteDive();
@@ -131,8 +158,12 @@ export function GameContainer({
   };
 
   const handleCompleteDive = async () => {
+    await completeDiveWithAnswers(answers);
+  };
+
+  const completeDiveWithAnswers = async (finalAnswers: UserAnswerRecord[]) => {
     setIsLoading(true);
-    const totalScore = answers.reduce((sum, a) => sum + (a?.score || 0), 0);
+    const totalScore = finalAnswers.reduce((sum, a) => sum + (a?.score || 0), 0);
     const playerId = getPlayerId();
 
     try {
@@ -144,7 +175,7 @@ export function GameContainer({
           date: dateStr,
           playerId,
           score: totalScore,
-          answers,
+          answers: finalAnswers,
         }),
       });
 
@@ -159,18 +190,16 @@ export function GameContainer({
         setStats(compStats);
       }
 
-      if (!isUnlimited) {
-        saveDailyState({
-          dayNumber,
-          date: dateStr,
-          completed: true,
-          score: totalScore,
-          answers,
-          stats: compStats || undefined,
-          completedAt: new Date().toISOString(),
-        });
-        updateUserStatsOnComplete(dateStr, totalScore);
-      }
+      saveDailyState({
+        dayNumber,
+        date: dateStr,
+        completed: true,
+        score: totalScore,
+        answers: finalAnswers,
+        stats: compStats || undefined,
+        completedAt: new Date().toISOString(),
+      });
+      updateUserStatsOnComplete(dateStr, totalScore);
 
       await fetchAnswerExplorer(dayNumber);
       setIsCompleted(true);
@@ -200,8 +229,6 @@ export function GameContainer({
           prompts={prompts}
           stats={stats}
           answersPrompts={answersPrompts}
-          onPlayAgain={onPlayAgain}
-          isUnlimited={isUnlimited}
         />
       </>
     );

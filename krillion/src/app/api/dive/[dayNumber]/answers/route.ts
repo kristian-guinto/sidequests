@@ -18,14 +18,17 @@ export async function GET(
     }
 
     const repo = getRepository();
-    const dive = await repo.getDiveByDayNumber(dayNumber);
+    const todayDive = await repo.getDailyDive();
 
-    if (!dive) {
+    // Restrict answers strictly to today's active dive to prevent peeking at future or unplayed days
+    if (dayNumber !== todayDive.dayNumber) {
       return NextResponse.json(
-        { error: `Dive for Day #${dayNumber} not found` },
-        { status: 404 }
+        { error: "Only answers for today's active dive are accessible" },
+        { status: 403 }
       );
     }
+
+    const dive = todayDive;
 
     const promptsWithGroupedAnswers: GroupedAnswersPrompt[] = dive.prompts.map((p) => {
       const tiers: TierGroupedAnswers = {

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ClientPromptItem,
   CompletionStats,
@@ -10,10 +10,11 @@ import {
   UserAnswerRecord,
   getScoreBand,
 } from '@/lib/types';
-import { Share2, Check, RefreshCw, Trophy, Sparkles, Radio, Anchor } from 'lucide-react';
+import { Share2, Check, Trophy, Sparkles, Radio, Timer } from 'lucide-react';
 import { SubmarineSprite, TierPixelSprite } from '@/components/sprites/PixelSprites';
 import { DepthOdometer } from './DepthOdometer';
 import { AnswerExplorer } from './AnswerExplorer';
+import { getNextManilaMidnight } from '@/lib/date';
 
 interface ResultsModalProps {
   dayNumber?: number;
@@ -23,8 +24,6 @@ interface ResultsModalProps {
   prompts?: ClientPromptItem[];
   stats?: CompletionStats | null;
   answersPrompts?: GroupedAnswersPrompt[] | null;
-  onPlayAgain?: () => void;
-  isUnlimited?: boolean;
 }
 
 export function ResultsModal({
@@ -35,15 +34,37 @@ export function ResultsModal({
   prompts,
   stats,
   answersPrompts,
-  onPlayAgain,
-  isUnlimited = false,
 }: ResultsModalProps) {
   const [copied, setCopied] = useState(false);
   const [showExplorer, setShowExplorer] = useState(false);
+  const [timeLeftStr, setTimeLeftStr] = useState('--:--:--');
 
   const totalPossible = (userAnswers.length || 7) * 100;
   const depthMeters = totalScore * 10;
   const band = getScoreBand(totalScore);
+
+  // Live countdown to next midnight Manila Time (PST / UTC+8)
+  useEffect(() => {
+    const updateCountdown = () => {
+      const nextMidnightIso = getNextManilaMidnight();
+      const target = new Date(nextMidnightIso).getTime();
+      const diff = Math.max(0, target - Date.now());
+
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+      const hStr = hours.toString().padStart(2, '0');
+      const mStr = minutes.toString().padStart(2, '0');
+      const sStr = seconds.toString().padStart(2, '0');
+
+      setTimeLeftStr(`${hStr}:${mStr}:${sStr}`);
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Generate tier emoji row
   const emojiRow = userAnswers
@@ -53,9 +74,7 @@ export function ResultsModal({
     })
     .join('');
 
-  const shareText = isUnlimited
-    ? `Krillion PH (Practice) 🦐\nDepth: -${depthMeters.toLocaleString()}m (${totalScore}/${totalPossible} pts)\n${emojiRow}\nhttps://krillion.guinto.org`
-    : `Krillion PH #${dayNumber} 🦐\nDepth: -${depthMeters.toLocaleString()}m (${totalScore}/${totalPossible} pts)\n${emojiRow}\nhttps://krillion.guinto.org`;
+  const shareText = `Krillion PH #${dayNumber} 🦐\nDepth: -${depthMeters.toLocaleString()}m (${totalScore}/${totalPossible} pts)\n${emojiRow}\nhttps://krillion.guinto.org`;
 
   const handleShare = async () => {
     try {
@@ -96,7 +115,7 @@ export function ResultsModal({
 
           <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-amber-950/40 border border-krillion-gold/40 text-xs font-arcade font-bold text-krillion-gold">
             <Trophy className="w-3.5 h-3.5" />
-            <span>{isUnlimited ? 'PRACTICE DIVE COMPLETED' : `DAILY DIVE #${dayNumber}`}</span>
+            <span>{`DAILY DIVE #${dayNumber} COMPLETED`}</span>
           </div>
         </div>
 
@@ -110,87 +129,61 @@ export function ResultsModal({
           </div>
 
           <div className="text-center sm:text-left">
-            <div className="text-[11px] font-arcade tracking-widest text-slate-400 uppercase">
+            <div className="text-xs font-arcade tracking-widest text-slate-400 uppercase mb-1">
               FINAL BATHYMETRIC DEPTH
             </div>
-            <DepthOdometer
-              value={depthMeters}
-              prefix="-"
-              suffix="m"
-              className="text-4xl sm:text-5xl font-black font-arcade text-krillion-cyan glow-cyan tracking-wider"
-              glowColor="#4de3ff"
-            />
-            <div className="flex items-center justify-center sm:justify-start gap-2 mt-0.5">
-              <span className="text-xs font-arcade text-slate-400">TOTAL LOGGED:</span>
+            <div className="flex items-baseline justify-center sm:justify-start gap-1">
               <DepthOdometer
-                value={totalScore}
-                suffix={` / ${totalPossible} PTS`}
-                className="text-base font-bold font-arcade text-krillion-gold glow-gold tracking-wide"
-                glowColor="#ffd166"
+                value={depthMeters}
+                prefix="-"
+                suffix="m"
+                className="text-4xl sm:text-5xl font-black font-arcade text-krillion-cyan glow-cyan tracking-wider"
+                glowColor="#4de3ff"
               />
+            </div>
+            <div className="text-xs font-mono text-slate-400 mt-1">
+              Total Points: <strong className="text-krillion-gold glow-gold font-arcade">{totalScore}</strong> / {totalPossible} PTS
             </div>
           </div>
         </div>
 
-        {/* Verdict Badge */}
-        <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-700/80 mb-6 max-w-md mx-auto shadow-inner">
+        {/* Rank & Score Band Celebration Badge */}
+        <div className="my-5 p-4 rounded-xl bg-slate-900/80 border border-slate-700/80 inline-block w-full max-w-md mx-auto shadow-inner">
           <div className="flex items-center justify-center gap-2 mb-1">
-            <span className="text-3xl">{band.emoji}</span>
-            <span className="text-xl font-arcade font-bold text-white tracking-wider uppercase glow-gold">
+            <span className="text-2xl">{band.emoji}</span>
+            <span className="text-lg font-black font-arcade tracking-wider uppercase text-krillion-gold glow-gold">
               {band.name}
             </span>
           </div>
-          <p className="text-xs font-mono text-slate-400">{band.description}</p>
+          <p className="text-xs font-mono text-slate-300 italic">
+            &ldquo;{band.description}&rdquo;
+          </p>
         </div>
 
-        {/* Emoji Breakdown Belt */}
-        <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 inline-flex items-center gap-2 text-2xl tracking-widest font-mono mb-6">
-          {userAnswers.map((a, i) => (
-            <span key={i} title={`${a.answer || 'Miss'} (${a.score} pts)`}>
-              {a.tier === 'miss' ? '💨' : TIERS[a.tier]?.emoji || '🐟'}
-            </span>
-          ))}
-        </div>
-
-        {/* 7 Chambers Detailed Log */}
-        <div className="mb-6 text-left">
-          <div className="text-xs font-arcade font-bold tracking-widest text-slate-400 uppercase mb-2 flex items-center justify-between">
-            <span>CHAMBER TELEMETRY REPORT</span>
-            <span className="text-[10px] text-slate-500 font-mono">7 ROUNDS LOGGED</span>
+        {/* 7 Chambers Round Breakdown Badges */}
+        <div className="mb-6">
+          <div className="text-[11px] font-arcade font-bold tracking-wider text-slate-400 uppercase mb-2 text-left">
+            CHAMBER TELEMETRY SUMMARY
           </div>
-
-          <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+          <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
             {userAnswers.map((ans, idx) => {
-              const promptText =
-                prompts?.[idx]?.text || answersPrompts?.[idx]?.text || `Question #${idx + 1}`;
-              const isMiss = ans.tier === 'miss';
-              const tierConfig = ans.tier !== 'miss' ? TIERS[ans.tier] : null;
-              const tierColor = tierConfig?.color || '#ef4444';
-
+              const tierInfo = ans.tier !== 'miss' ? TIERS[ans.tier] : null;
               return (
                 <div
                   key={idx}
-                  className="p-2.5 rounded-lg bg-slate-900/70 border border-slate-800 flex items-center justify-between gap-3 text-xs"
+                  className="rounded-lg bg-slate-900/80 border border-slate-800 p-1 flex flex-col items-center justify-between h-16 sm:h-20"
+                  style={{
+                    borderColor: tierInfo ? tierInfo.color : '#7f1d1d',
+                  }}
                 >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="text-[10px] font-mono text-slate-500 w-5">#{idx + 1}</span>
-                    <div className="flex-shrink-0">
-                      <TierPixelSprite tier={ans.tier} size={24} />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-slate-300 font-mono text-[11px] truncate max-w-[200px] sm:max-w-xs">
-                        {promptText}
-                      </div>
-                      <div className="text-[11px] font-bold text-white truncate">
-                        {ans.answer ? `"${ans.answer}"` : <span className="text-slate-500 italic">No Answer</span>}
-                      </div>
-                    </div>
+                  <span className="text-[9px] font-mono text-slate-500">#{idx + 1}</span>
+                  <div className="my-0.5">
+                    <TierPixelSprite tier={ans.tier} size={24} />
                   </div>
-
-                  <div className="text-right flex-shrink-0">
+                  <div className="text-center w-full">
                     <div
-                      className="text-[11px] font-arcade font-bold tracking-wider uppercase"
-                      style={{ color: tierColor }}
+                      className="text-[8px] font-arcade font-bold truncate"
+                      style={{ color: tierInfo ? tierInfo.color : '#ef4444' }}
                     >
                       {ans.tier === 'krillion' ? '★ KRILLION' : ans.tier.toUpperCase()}
                     </div>
@@ -234,41 +227,56 @@ export function ResultsModal({
           )}
         </div>
 
+        {/* Retro Submarine Next Dive Countdown HUD */}
+        <div className="p-4 sm:p-5 rounded-xl bg-slate-900/90 border border-slate-700/80 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-inner relative overflow-hidden">
+          <div className="flex items-center gap-3">
+            <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-cyan-950/80 border border-krillion-cyan/60 flex-shrink-0">
+              <Timer className="w-5 h-5 text-krillion-cyan animate-pulse" />
+              <span className="absolute inset-0 rounded-xl border border-krillion-cyan/40 animate-ping opacity-30 pointer-events-none" />
+            </div>
+            <div className="text-left">
+              <div className="text-[11px] font-arcade font-bold tracking-widest text-slate-300 uppercase">
+                NEXT TRENCH EXPEDITION
+              </div>
+              <div className="text-xs font-mono text-slate-400">
+                Chambers reset at 00:00 Manila Time (PST / UTC+8)
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-black/70 border border-krillion-cyan/50 shadow-[0_0_20px_rgba(77,227,255,0.15)]">
+            <span className="text-xs font-arcade text-slate-400">IN:</span>
+            <span className="font-arcade font-black text-2xl sm:text-3xl text-krillion-cyan tracking-widest glow-cyan">
+              {timeLeftStr}
+            </span>
+          </div>
+        </div>
+
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row items-center gap-3">
           <button
             onClick={handleShare}
-            className="w-full sm:flex-1 py-3.5 px-6 rounded-xl bg-gradient-to-r from-krillion-gold to-amber-500 text-slate-950 font-arcade font-bold text-lg tracking-wider uppercase flex items-center justify-center gap-2 hover:opacity-95 transition-all shadow-lg shadow-amber-950/40 glow-gold cursor-pointer"
+            className="w-full sm:flex-1 min-h-[48px] py-3.5 px-6 rounded-xl bg-gradient-to-r from-krillion-gold to-amber-500 text-slate-950 font-arcade font-bold text-base sm:text-lg tracking-wider uppercase flex items-center justify-center gap-2 hover:opacity-95 transition-all shadow-lg shadow-amber-950/40 glow-gold cursor-pointer select-none touch-manipulation"
           >
             {copied ? (
               <>
-                <Check className="w-5 h-5 text-slate-950" />
+                <Check className="w-5 h-5 text-slate-950 flex-shrink-0" />
                 <span>COPIED TO CLIPBOARD!</span>
               </>
             ) : (
               <>
-                <Share2 className="w-5 h-5 text-slate-950" />
+                <Share2 className="w-5 h-5 text-slate-950 flex-shrink-0" />
                 <span>TRANSMIT DIVE LOG (SHARE)</span>
               </>
             )}
           </button>
 
-          {isUnlimited && onPlayAgain && (
-            <button
-              onClick={onPlayAgain}
-              className="w-full sm:w-auto py-3.5 px-5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-arcade font-bold text-base tracking-wider uppercase flex items-center justify-center gap-2 transition-colors border border-slate-700"
-            >
-              <RefreshCw className="w-4 h-4 text-krillion-cyan" />
-              <span>DIVE AGAIN</span>
-            </button>
-          )}
-
           {answersPrompts && answersPrompts.length > 0 && (
             <button
               onClick={() => setShowExplorer(!showExplorer)}
-              className="w-full sm:w-auto py-3.5 px-5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-krillion-cyan font-arcade font-bold text-base tracking-wider uppercase flex items-center justify-center gap-2 transition-colors border border-slate-700 glow-cyan"
+              className="w-full sm:w-auto min-h-[48px] py-3.5 px-5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-krillion-cyan font-arcade font-bold text-sm sm:text-base tracking-wider uppercase flex items-center justify-center gap-2 transition-colors border border-slate-700 glow-cyan select-none touch-manipulation"
             >
-              <Sparkles className="w-4 h-4" />
+              <Sparkles className="w-4 h-4 flex-shrink-0" />
               <span>{showExplorer ? 'HIDE ANSWERS' : 'EXPLORE ALL ANSWERS'}</span>
             </button>
           )}

@@ -6,6 +6,7 @@ export interface SavedDailyState {
   completed: boolean;
   score: number;
   answers: UserAnswerRecord[];
+  currentIndex?: number;
   stats?: CompletionStats;
   completedAt?: string;
 }
@@ -36,12 +37,22 @@ export function getPlayerId(): string {
   return id;
 }
 
-export function getSavedDailyState(dayNumber: number): SavedDailyState | null {
+export function getSavedDailyState(dayNumber: number, dateStr?: string): SavedDailyState | null {
   if (typeof window === 'undefined') return null;
-  const raw = localStorage.getItem(`${STORAGE_KEYS.DIVE_PREFIX}${dayNumber}`);
+
+  // Try date-keyed first if dateStr provided, then dayNumber-keyed
+  const rawDate = dateStr ? localStorage.getItem(`${STORAGE_KEYS.DIVE_PREFIX}date_${dateStr}`) : null;
+  const rawDay = localStorage.getItem(`${STORAGE_KEYS.DIVE_PREFIX}${dayNumber}`);
+  const raw = rawDate || rawDay;
   if (!raw) return null;
+
   try {
-    return JSON.parse(raw);
+    const parsed: SavedDailyState = JSON.parse(raw);
+    // If dateStr was provided, verify it matches
+    if (dateStr && parsed.date && parsed.date !== dateStr) {
+      return null;
+    }
+    return parsed;
   } catch {
     return null;
   }
@@ -49,10 +60,17 @@ export function getSavedDailyState(dayNumber: number): SavedDailyState | null {
 
 export function saveDailyState(state: SavedDailyState): void {
   if (typeof window === 'undefined') return;
+  const serialized = JSON.stringify(state);
   localStorage.setItem(
     `${STORAGE_KEYS.DIVE_PREFIX}${state.dayNumber}`,
-    JSON.stringify(state)
+    serialized
   );
+  if (state.date) {
+    localStorage.setItem(
+      `${STORAGE_KEYS.DIVE_PREFIX}date_${state.date}`,
+      serialized
+    );
+  }
 }
 
 export function getUserStats(): UserStats {
