@@ -9,10 +9,8 @@ or dumping static JSON snapshots for blog posts.
 
 import argparse
 import json
-import os
 import sys
 from pathlib import Path
-from datetime import datetime
 
 import duckdb
 

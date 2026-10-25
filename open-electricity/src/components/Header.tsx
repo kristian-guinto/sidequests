@@ -24,6 +24,7 @@ import {
   MapPin,
   Clock,
   BookOpen,
+  Database,
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 
@@ -41,6 +42,7 @@ interface HeaderProps {
   onRefresh: () => void;
   isLoading: boolean;
   dataSource?: string;
+  onOpenProModal?: () => void;
 }
 
 const RANGES: { id: TimeRange; label: string }[] = [
@@ -65,6 +67,7 @@ export function Header({
   onRefresh,
   isLoading,
   dataSource = "connected",
+  onOpenProModal,
 }: HeaderProps) {
   const { isDark, toggleTheme } = useTheme();
   const [copied, setCopied] = useState(false);
@@ -234,6 +237,21 @@ export function Header({
             <span className="hidden sm:inline">Insights</span>
             <span className="sm:hidden">Blog</span>
           </Link>
+
+          {/* Pro Data & Reports Trigger Button */}
+          <button
+            type="button"
+            onClick={onOpenProModal}
+            className="flex items-center space-x-1.5 px-2 sm:px-2.5 py-1 bg-gradient-to-r from-emerald-500/10 to-amber-500/10 hover:from-emerald-500/20 hover:to-amber-500/20 border border-emerald-500/30 dark:border-emerald-400/30 rounded text-xs font-semibold text-neutral-800 dark:text-neutral-200 transition shadow-xs group shrink-0 cursor-pointer"
+            title="Wholesale Market Datasets, Parquet Bundles & Reports"
+          >
+            <Database className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform" />
+            <span className="hidden sm:inline">Data & Reports</span>
+            <span className="sm:hidden">Data</span>
+            <span className="px-1 py-0.2 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 uppercase tracking-wider">
+              Pro
+            </span>
+          </button>
 
           <div className="h-4 w-px bg-neutral-200 dark:bg-[#27272A] shrink-0" />
 

@@ -105,17 +105,27 @@ class IEMOPClient:
         )
 
     @staticmethod
-    def extract_csv_from_bytes(raw_bytes: bytes) -> List[str]:
+    def extract_csv_from_bytes(
+        raw_bytes: bytes, max_uncompressed_bytes: int = 200 * 1024 * 1024
+    ) -> List[str]:
         """Extracts CSV content lines from zip or raw CSV bytes."""
         csv_lines = []
         try:
             with zipfile.ZipFile(io.BytesIO(raw_bytes)) as z:
                 for name in z.namelist():
                     if name.endswith(".csv"):
+                        info = z.getinfo(name)
+                        if info.file_size > max_uncompressed_bytes:
+                            raise ValueError(
+                                f"Decompressed file {name} exceeds 200MB safety limit ({info.file_size} bytes)"
+                            )
                         with z.open(name) as f:
-                            text = io.TextIOWrapper(
-                                f, encoding="utf-8", errors="replace"
-                            ).read()
+                            chunk = f.read(max_uncompressed_bytes + 1)
+                            if len(chunk) > max_uncompressed_bytes:
+                                raise ValueError(
+                                    f"Decompressed file {name} exceeds 200MB safety limit"
+                                )
+                            text = chunk.decode("utf-8", errors="replace")
                             csv_lines.extend(text.splitlines())
         except zipfile.BadZipFile:
             text = raw_bytes.decode("utf-8", errors="replace")

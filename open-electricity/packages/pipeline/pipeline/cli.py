@@ -55,6 +55,11 @@ def latest(
     db_path: Optional[str] = typer.Option(
         None, "--db-path", help="Path to local DuckDB file"
     ),
+    archive_nodal: bool = typer.Option(
+        True,
+        "--archive-nodal/--no-archive-nodal",
+        help="Archive raw 5-minute nodal dispatch to compressed Parquet",
+    ),
 ) -> None:
     """Ingest latest market data across active countries."""
     try:
@@ -124,6 +129,7 @@ def latest(
                 end_date=end_d,
                 days=c_days,
                 sync_facilities_flag=True,
+                archive_nodal=archive_nodal,
             )
             reports.append(report)
 
@@ -198,6 +204,11 @@ def backfill(
     skip_facilities: bool = typer.Option(
         False, "--skip-facilities", help="Skip catalog sync"
     ),
+    archive_nodal: bool = typer.Option(
+        True,
+        "--archive-nodal/--no-archive-nodal",
+        help="Archive raw 5-minute nodal dispatch to compressed Parquet",
+    ),
 ) -> None:
     """Historical backfill for a custom date range."""
     try:
@@ -228,6 +239,7 @@ def backfill(
                 end_date=end_d,
                 sync_facilities_flag=not skip_facilities,
                 max_files=max_files,
+                archive_nodal=archive_nodal,
             )
         console.print(
             "\n[bold green]✓ OpenElectricity Backfill Complete![/bold green]\n"

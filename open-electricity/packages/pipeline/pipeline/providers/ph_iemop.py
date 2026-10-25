@@ -2,10 +2,17 @@
 
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from pipeline.archiver import NodalParquetArchiver
 from pipeline.generator_registry import GeneratorRegistry
 from pipeline.iemop_client import IEMOPClient
-from pipeline.models import EnergyIntervalRecord, FacilityRecord, PriceIntervalRecord
+from pipeline.models import (
+    EnergyIntervalRecord,
+    FacilityRecord,
+    PriceIntervalRecord,
+    NodalDispatchRecord,
+)
 from pipeline.parsers.iemop import IEMOPParser
 from pipeline.providers.base import BaseProvider
 
@@ -35,11 +42,14 @@ class PhilippinesIEMOPProvider(BaseProvider):
         on_batch: Optional[Callable[[List[EnergyIntervalRecord]], None]] = None,
         batch_size: int = 24,
         max_workers: int = 6,
+        archive_nodal: bool = False,
+        archive_dir: Optional[Path] = None,
         **kwargs: Any,
     ) -> List[EnergyIntervalRecord]:
         """Downloads RTD dispatch archives from IEMOP and parses into EnergyIntervalRecord and PriceIntervalRecord objects."""
         if conn is not None:
             self.registry.load_from_database(conn)
+        initial_facility_count = len(self.registry.get_all_facilities())
 
         s_date = start_date or (date.today() - timedelta(days=days))
         e_date = end_date or date.today()
@@ -65,6 +75,8 @@ class PhilippinesIEMOPProvider(BaseProvider):
         )
 
         all_records: List[EnergyIntervalRecord] = []
+        all_prices: List[PriceIntervalRecord] = []
+        all_nodal: List[NodalDispatchRecord] = []
         total_synced = 0
         global_idx = 0
 
@@ -73,17 +85,28 @@ class PhilippinesIEMOPProvider(BaseProvider):
         db_instance = (
             Database(conn=conn, validate_schema=False) if conn is not None else None
         )
+        archiver = (
+            NodalParquetArchiver(archive_dir=archive_dir) if archive_nodal else None
+        )
 
         def _download_and_parse(
             f_info: Dict[str, Any],
-        ) -> Tuple[List[EnergyIntervalRecord], List[PriceIntervalRecord]]:
+        ) -> Tuple[
+            List[EnergyIntervalRecord],
+            List[PriceIntervalRecord],
+            List[NodalDispatchRecord],
+        ]:
             csv_lines = self.client.download_rtd_dispatch_csv(f_info["file_id"])
-            return self.parser.parse_rtd_dispatch(csv_lines)
+            if archive_nodal:
+                return self.parser.parse_rtd_dispatch_with_nodal(csv_lines)
+            records, price_records = self.parser.parse_rtd_dispatch(csv_lines)
+            return records, price_records, []
 
         for chunk_start in range(0, total_files, batch_size):
             chunk = disp_files[chunk_start : chunk_start + batch_size]
             batch_records: List[EnergyIntervalRecord] = []
             batch_prices: List[PriceIntervalRecord] = []
+            batch_nodal: List[NodalDispatchRecord] = []
 
             with ThreadPoolExecutor(
                 max_workers=min(max_workers, len(chunk))
@@ -100,13 +123,16 @@ class PhilippinesIEMOPProvider(BaseProvider):
                         f"  -> [{global_idx}/{total_files}] ({pct:4.1f}%) Unpacking {filename}..."
                     )
                     try:
-                        records, price_records = future.result()
+                        records, price_records, nodal_records = future.result()
                         batch_records.extend(records)
                         batch_prices.extend(price_records)
+                        batch_nodal.extend(nodal_records)
                     except Exception as e:
                         print(f"    ⚠️ Failed to process {filename}: {e}")
 
             all_records.extend(batch_records)
+            all_prices.extend(batch_prices)
+            all_nodal.extend(batch_nodal)
 
             if on_batch and batch_records:
                 on_batch(batch_records)
@@ -115,9 +141,20 @@ class PhilippinesIEMOPProvider(BaseProvider):
                     f"     [Saved batch: +{len(batch_records)} interval records (Total: {total_synced})]"
                 )
 
-            if db_instance is not None and batch_prices:
-                db_instance.upsert_price_intervals(
-                    batch_prices, country_code=self.country_code
-                )
+        if db_instance is not None and all_prices:
+            db_instance.upsert_price_intervals(
+                all_prices, country_code=self.country_code
+            )
+
+        if archiver is not None and all_nodal:
+            archiver.archive_records(all_nodal, country_code=self.country_code)
+
+        if (
+            db_instance is not None
+            and len(self.registry.get_all_facilities()) > initial_facility_count
+        ):
+            db_instance.upsert_facilities(
+                self.registry.get_all_facilities(), country_code=self.country_code
+            )
 
         return all_records

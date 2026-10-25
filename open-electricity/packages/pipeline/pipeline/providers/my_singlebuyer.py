@@ -234,7 +234,7 @@ class MalaysiaSingleBuyerProvider(BaseProvider):
             from pipeline.db import Database
             from pipeline.models import PriceIntervalRecord
 
-            db = Database(conn=conn)
+            db = Database(conn=conn, validate_schema=False)
             p_recs = [
                 PriceIntervalRecord(
                     country_code="MY",

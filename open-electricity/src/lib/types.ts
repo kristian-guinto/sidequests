@@ -204,6 +204,11 @@ export interface SummaryMetrics {
   currencyCode?: string;
   emissionsIntensityGPerKWh: number;
   totalEmissionsTonnes: number;
+  solarCapturePriceLocal?: number | null;
+  solarCapturePriceUSD?: number | null;
+  solarCaptureRatio?: number | null;
+  bessSpreadLocal?: number | null;
+  bessSpreadUSD?: number | null;
 }
 
 export interface FuelBreakdownRow {
@@ -215,4 +220,23 @@ export interface FuelBreakdownRow {
   percentage: number;
   isRenewable: boolean;
   emissionsTonnes: number;
+  capturePriceLocal?: number | null;
+  capturePriceUSD?: number | null;
+  captureRatio?: number | null;
+}
+
+export interface ProProductItem {
+  id: string;
+  name: string;
+  priceUSD: number;
+  cadence: string;
+  description: string;
+  features: string[];
+  sampleFiles: string[];
+  stripePaymentUrl?: string | null;
+  targetAudience: string;
+}
+
+export interface ProCatalogResponse {
+  products: ProProductItem[];
 }

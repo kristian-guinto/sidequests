@@ -19,6 +19,9 @@
 *.duckdb.*
 /data/downloads/
 /data/temp/
+# Cold storage Parquet archive
+/data/archive/
+*.parquet
 *.zip
 *.csv
 

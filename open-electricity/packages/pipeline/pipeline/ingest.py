@@ -1,12 +1,12 @@
 """Runner and execution engine for OpenElectricity data ingestion pipeline."""
 
 from datetime import date, timedelta
-from typing import Optional, List
+from typing import Optional, List, Any
 from rich.console import Console
 from rich.panel import Panel
 
 from pipeline.db import Database
-from pipeline.models import IngestRunReport, EnergyIntervalRecord
+from pipeline.models import IngestRunReport
 from pipeline.fx import sync_exchange_rates, COUNTRY_TO_CURRENCY
 from pipeline.providers.base import BaseProvider
 from pipeline.providers import PROVIDERS
@@ -22,6 +22,8 @@ def run_country_pipeline(
     days: int = 2,
     sync_facilities_flag: bool = True,
     max_files: Optional[int] = None,
+    archive_nodal: bool = True,
+    **kwargs: Any,
 ) -> IngestRunReport:
     """Executes the standard 4-step pipeline lifecycle for a single market provider."""
     country = provider.country_code
@@ -86,26 +88,17 @@ def run_country_pipeline(
     console.print(
         f"\n[bold blue][3/4][/bold blue] Ingesting Energy Intervals & Spot Prices ({country})..."
     )
-    batched_intervals_count = 0
-
-    def on_batch_handler(batch: List[EnergyIntervalRecord]) -> None:
-        nonlocal batched_intervals_count
-        count = db.upsert_energy_interval(batch, country_code=country)
-        batched_intervals_count += count
-
     intervals = provider.fetch_energy_intervals(
         start_date=start_date,
         end_date=end_date,
         days=days,
         conn=db.conn,
         max_files=max_files,
-        on_batch=on_batch_handler,
+        archive_nodal=archive_nodal,
+        **kwargs,
     )
 
-    if batched_intervals_count > 0:
-        synced_intervals = batched_intervals_count
-    else:
-        synced_intervals = db.upsert_energy_interval(intervals, country_code=country)
+    synced_intervals = db.upsert_energy_interval(intervals, country_code=country)
 
     console.print(
         f"  [green]✓[/green] Synced {synced_intervals} interval records into energy_interval."

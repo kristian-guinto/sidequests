@@ -85,8 +85,13 @@ export function BlogEnergyChart({
       })
       .then((json) => {
         if (isMounted) {
-          if (json.history && Array.isArray(json.history)) {
-            setData(json.history);
+          const rawPoints = Array.isArray(json?.points)
+            ? json.points
+            : Array.isArray(json?.history)
+            ? json.history
+            : null;
+          if (rawPoints) {
+            setData(rawPoints);
           } else {
             setData([]);
           }

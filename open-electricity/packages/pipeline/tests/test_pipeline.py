@@ -11,6 +11,7 @@ from pipeline.models import (
     EnergyIntervalRecord,
     PriceIntervalRecord,
     ExchangeRateRecord,
+    NodalDispatchRecord,
 )
 from pipeline.schema import validate_database_schema, SchemaMismatchError
 from pipeline.generator_registry import GeneratorRegistry
@@ -699,3 +700,304 @@ def test_thailand_egat_provider():
     assert len(intervals) > 0
     assert all(r.country_code == "TH" for r in intervals)
     assert all(r.region == "THAILAND" for r in intervals)
+
+
+def test_iemop_parser_parse_timestamp_invalid():
+    """Verify parse_timestamp raises ValueError on unparseable timestamp instead of silent fallback."""
+    with pytest.raises(ValueError, match="Unparseable IEMOP timestamp"):
+        IEMOPParser.parse_timestamp("invalid-date-string-xyz")
+
+
+def test_iemop_parser_with_nodal_and_capture_prices():
+    """Verify parse_rtd_dispatch_with_nodal computes fuel capture price, LWAP, and returns nodal records."""
+    registry = GeneratorRegistry()
+    parser = IEMOPParser(registry)
+
+    csv_data = [
+        "TIME_INTERVAL,RESOURCE_NAME,RESOURCE_TYPE,REGION_NAME,SCHED_MW,LMP",
+        # Solar unit dispatched at 1500 PHP/MWh
+        "03/01/2026 00:05:00 AM,01ARAYSOL_G01,G,CLUZ,40.0,1500.0",
+        # Coal unit dispatched at 3500 PHP/MWh
+        "03/01/2026 00:05:00 AM,01CALACA_G01,G,CLUZ,100.0,3500.0",
+        # Load node with 120 MW at 2800 PHP/MWh
+        "03/01/2026 00:05:00 AM,LOAD_NODE_1,L,CLUZ,120.0,2800.0",
+    ]
+
+    records, price_records, nodal_records = parser.parse_rtd_dispatch_with_nodal(
+        csv_data
+    )
+
+    # 2 regional records (solar, coal) + 2 ALL records = 4
+    assert len(records) == 4
+    solar_rec = next(
+        r for r in records if r.fuel_tech == "solar" and r.region == "LUZON"
+    )
+    assert solar_rec.generation_mw == 40.0
+    assert solar_rec.capture_price_local == 1500.0
+
+    coal_rec = next(r for r in records if r.fuel_tech == "coal" and r.region == "LUZON")
+    assert coal_rec.generation_mw == 100.0
+    assert coal_rec.capture_price_local == 3500.0
+
+    # Regional GWAP from generators: (40*1500 + 100*3500) / 140 = (60000 + 350000) / 140 = 410000 / 140 = 2928.57
+    luzon_price = next(p for p in price_records if p.region == "LUZON")
+    assert luzon_price.price_local == 2928.57
+    assert luzon_price.lwap_local == 2800.0
+    assert luzon_price.demand_mw == 120.0
+
+    # Nodal records: 2 generators + 1 load = 3 records
+    assert len(nodal_records) == 3
+    solar_nodal = next(n for n in nodal_records if n.resource_id == "01ARAYSOL_G01")
+    assert solar_nodal.resource_type == "G"
+    assert solar_nodal.sched_mw == 40.0
+    assert solar_nodal.lmp == 1500.0
+
+    load_nodal = next(n for n in nodal_records if n.resource_id == "LOAD_NODE_1")
+    assert load_nodal.resource_type == "L"
+    assert load_nodal.fuel_tech == "load"
+    assert load_nodal.sched_mw == 120.0
+    assert load_nodal.lmp == 2800.0
+
+
+def test_nodal_parquet_archiver(tmp_path: Path):
+    """Verify NodalParquetArchiver writes compressed Parquet and deduplicates on existing records."""
+    from pipeline.archiver import NodalParquetArchiver
+
+    archiver = NodalParquetArchiver(archive_dir=tmp_path / "archive")
+    dt1 = datetime(2026, 3, 1, 0, 5, tzinfo=timezone(timedelta(hours=8)))
+
+    records1 = [
+        NodalDispatchRecord(
+            country_code="PH",
+            interval_start=dt1,
+            resource_id="01ARAYSOL_G01",
+            resource_type="G",
+            region="LUZON",
+            fuel_tech="solar",
+            sched_mw=50.0,
+            lmp=2500.0,
+        ),
+        NodalDispatchRecord(
+            country_code="PH",
+            interval_start=dt1,
+            resource_id="LOAD_NODE_1",
+            resource_type="L",
+            region="LUZON",
+            fuel_tech="load",
+            sched_mw=100.0,
+            lmp=2500.0,
+        ),
+    ]
+
+    # First write
+    paths = archiver.archive_records(records1, country_code="PH")
+    assert len(paths) == 1
+    parquet_path = paths[0]
+    assert parquet_path.exists()
+    assert parquet_path.name == "PH_2026-03-01.parquet"
+
+    # Query with DuckDB
+    con = duckdb.connect()
+    rows = con.execute(
+        f"SELECT count(*), max(sched_mw) FROM read_parquet('{parquet_path.as_posix()}')"
+    ).fetchone()
+    assert rows is not None
+    assert rows[0] == 2
+    assert rows[1] == 100.0
+
+    # Second write with duplicate and updated record
+    records2 = [
+        # Duplicate with updated sched_mw = 55.0 (should deduplicate)
+        NodalDispatchRecord(
+            country_code="PH",
+            interval_start=dt1,
+            resource_id="01ARAYSOL_G01",
+            resource_type="G",
+            region="LUZON",
+            fuel_tech="solar",
+            sched_mw=55.0,
+            lmp=2500.0,
+        ),
+        # New resource
+        NodalDispatchRecord(
+            country_code="PH",
+            interval_start=dt1,
+            resource_id="01BURGOS_W01",
+            resource_type="G",
+            region="LUZON",
+            fuel_tech="wind",
+            sched_mw=30.0,
+            lmp=2500.0,
+        ),
+    ]
+    paths2 = archiver.archive_records(records2, country_code="PH")
+    assert len(paths2) == 1
+
+    # Should have 3 records (2 original deduplicated + 1 new)
+    rows2 = con.execute(
+        f"SELECT count(*), max(sched_mw) FROM read_parquet('{parquet_path.as_posix()}')"
+    ).fetchone()
+    assert rows2 is not None
+    assert rows2[0] == 3
+    # 01ARAYSOL_G01 has mw=55.0
+    solar_row = con.execute(
+        f"SELECT sched_mw FROM read_parquet('{parquet_path.as_posix()}') WHERE resource_id = '01ARAYSOL_G01'"
+    ).fetchone()
+    assert solar_row is not None
+    assert solar_row[0] == 55.0
+    con.close()
+
+
+def test_nodal_parquet_archiver_outage_curtailment_preservation(tmp_path: Path):
+    """Verify NodalParquetArchiver deduplication overwrites older 100.0 MW record with newer 0.0 MW record (P0-4)."""
+    from pipeline.archiver import NodalParquetArchiver
+
+    archiver = NodalParquetArchiver(archive_dir=tmp_path / "archive")
+    dt1 = datetime(2026, 3, 1, 1, 0, tzinfo=timezone(timedelta(hours=8)))
+
+    # Initial dispatch at 100.0 MW
+    initial_records = [
+        NodalDispatchRecord(
+            country_code="PH",
+            interval_start=dt1,
+            resource_id="01PLANT_G01",
+            resource_type="G",
+            region="LUZON",
+            fuel_tech="coal",
+            sched_mw=100.0,
+            lmp=3000.0,
+        )
+    ]
+    paths = archiver.archive_records(initial_records, country_code="PH")
+    assert len(paths) == 1
+    p_file = paths[0]
+
+    # Re-ingest / update where unit tripped to 0.0 MW (outage / curtailment)
+    updated_records = [
+        NodalDispatchRecord(
+            country_code="PH",
+            interval_start=dt1,
+            resource_id="01PLANT_G01",
+            resource_type="G",
+            region="LUZON",
+            fuel_tech="coal",
+            sched_mw=0.0,
+            lmp=3000.0,
+        )
+    ]
+    paths2 = archiver.archive_records(updated_records, country_code="PH")
+    assert len(paths2) == 1
+
+    con = duckdb.connect()
+    row = con.execute(
+        f"SELECT sched_mw FROM read_parquet('{p_file.as_posix()}') WHERE resource_id = '01PLANT_G01'"
+    ).fetchone()
+    con.close()
+    assert row is not None
+    assert row[0] == 0.0
+
+
+def test_iemop_client_zip_size_safety_limit(monkeypatch):
+    """Verify IEMOPClient raises ValueError when uncompressed file exceeds 200MB safety limit (X5)."""
+    import zipfile
+    import io
+    from pipeline.iemop_client import IEMOPClient
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("huge_data.csv", b"col1,col2\n1,2\n")
+    zip_bytes = buf.getvalue()
+
+    fake_info = zipfile.ZipInfo("huge_data.csv")
+    fake_info.file_size = 201 * 1024 * 1024
+    monkeypatch.setattr(zipfile.ZipFile, "getinfo", lambda self, name: fake_info)
+
+    with pytest.raises(ValueError, match="exceeds 200MB safety limit"):
+        IEMOPClient.extract_csv_from_bytes(zip_bytes)
+
+
+def test_migration_005_and_database_columns(tmp_path: Path):
+    """Verify migration 005 adds capture_price, lwap, and demand columns to DuckDB."""
+    test_db_path = tmp_path / "test_migration_005.duckdb"
+
+    # 1. Run migrations through ducklembic
+    duck_inst = DucklembicDB(local_path=test_db_path, mode="local")
+    migrator = Migrator(duck_inst, migrations_dir=MIGRATIONS_DIR)
+    migrator.init()
+    migrator.migrate()
+    duck_inst.close()
+
+    # 2. Open Database with schema validation (verifies models.py fields match schema)
+    db = Database(target="local", local_path=test_db_path, validate_schema=True)
+
+    # 3. Seed exchange rate
+    db.upsert_exchange_rates(
+        [ExchangeRateRecord(date=date(2026, 3, 1), currency="PHP", rate_to_usd=50.0)]
+    )
+
+    # 4. Upsert energy_interval with capture price
+    dt1 = datetime(2026, 3, 1, 0, 5, tzinfo=timezone(timedelta(hours=8)))
+    e_rec = EnergyIntervalRecord(
+        country_code="PH",
+        interval_start=dt1,
+        region="LUZON",
+        fuel_tech="solar",
+        generation_mw=50.0,
+        energy_mwh=4.1667,
+        capture_price_local=2500.0,
+        capture_price_dollar=None,  # should convert via FX 50.0 -> 50.0 USD
+    )
+    db.upsert_energy_interval([e_rec], country_code="PH")
+
+    # 5. Upsert prices_interval with LWAP and demand
+    p_rec = PriceIntervalRecord(
+        country_code="PH",
+        interval_start=dt1,
+        region="LUZON",
+        price_local=2500.0,
+        price_dollar=50.0,
+        lwap_local=2400.0,
+        lwap_dollar=None,  # should convert via FX 50.0 -> 48.0 USD
+        demand_mw=150.0,
+    )
+    db.upsert_price_intervals([p_rec], country_code="PH")
+
+    # Verify interval tables have the new columns populated
+    e_row = db.conn.execute(
+        "SELECT capture_price_local, capture_price_dollar FROM energy_interval WHERE country_code = 'PH'"
+    ).fetchone()
+    assert e_row is not None
+    assert e_row[0] == 2500.0
+    assert e_row[1] == 50.0
+
+    p_row = db.conn.execute(
+        "SELECT lwap_local, lwap_dollar, demand_mw FROM prices_interval WHERE country_code = 'PH'"
+    ).fetchone()
+    assert p_row is not None
+    assert p_row[0] == 2400.0
+    assert p_row[1] == 48.0
+    assert p_row[2] == 150.0
+
+    # 6. Populate daily rollups
+    db.populate_energy_daily(
+        country_code="PH", start_date=date(2026, 3, 1), end_date=date(2026, 3, 1)
+    )
+
+    # Verify daily tables have capture_price, lwap_price, and demand metrics
+    ed_row = db.conn.execute(
+        "SELECT capture_price_local, capture_price_dollar FROM energy_daily WHERE country_code = 'PH' AND fuel_tech = 'solar'"
+    ).fetchone()
+    assert ed_row is not None
+    assert ed_row[0] == 2500.0
+    assert ed_row[1] == 50.0
+
+    pd_row = db.conn.execute(
+        "SELECT lwap_price_local, lwap_price_dollar, avg_demand_mw, peak_demand_mw FROM prices_daily WHERE country_code = 'PH' AND region = 'LUZON'"
+    ).fetchone()
+    assert pd_row is not None
+    assert pd_row[0] == 2400.0
+    assert pd_row[1] == 48.0
+    assert pd_row[2] == 150.0
+    assert pd_row[3] == 150.0
+
+    db.close()

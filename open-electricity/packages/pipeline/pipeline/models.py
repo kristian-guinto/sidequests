@@ -41,6 +41,8 @@ class EnergyIntervalRecord:
     fuel_tech: str
     generation_mw: float
     energy_mwh: float
+    capture_price_local: Optional[float] = None
+    capture_price_dollar: Optional[float] = None
 
 
 @dataclass(frozen=True)
@@ -59,6 +61,9 @@ class PriceIntervalRecord:
     region: str
     price_local: Optional[float] = None
     price_dollar: Optional[float] = None
+    lwap_local: Optional[float] = None
+    lwap_dollar: Optional[float] = None
+    demand_mw: Optional[float] = None
 
 
 @dataclass(frozen=True)
@@ -80,6 +85,8 @@ class EnergyDailyRecord:
     energy_mwh: float
     avg_generation_mw: float
     peak_generation_mw: float
+    capture_price_local: Optional[float] = None
+    capture_price_dollar: Optional[float] = None
 
 
 @dataclass(frozen=True)
@@ -110,6 +117,24 @@ class PriceDailyRecord:
     price_median_dollar: Optional[float] = None
     price_p95_dollar: Optional[float] = None
     price_max_dollar: Optional[float] = None
+    lwap_price_local: Optional[float] = None
+    lwap_price_dollar: Optional[float] = None
+    avg_demand_mw: Optional[float] = None
+    peak_demand_mw: Optional[float] = None
+
+
+@dataclass(frozen=True)
+class NodalDispatchRecord:
+    """Represents raw 5-minute nodal generator or load dispatch for cold Parquet archiving."""
+
+    country_code: str
+    interval_start: datetime
+    resource_id: str
+    resource_type: str
+    region: str
+    fuel_tech: str
+    sched_mw: float
+    lmp: float
 
 
 @dataclass(frozen=True)

@@ -339,7 +339,7 @@ class ThailandEGATProvider(BaseProvider):
         if DEFAULT_THB_PRICE_MWH is not None and all_records and conn is not None:
             from pipeline.db import Database
 
-            db = Database(conn=conn)
+            db = Database(conn=conn, validate_schema=False)
             unique_dts = {r.interval_start for r in all_records}
             p_recs = [
                 PriceIntervalRecord(

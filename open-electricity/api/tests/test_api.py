@@ -1,17 +1,25 @@
 """Integration tests for OpenElectricity FastAPI Serverless API."""
 
+import asyncio
+
 import pytest
-from fastapi import Response, HTTPException
-from api.index import get_energy, get_health
+from fastapi import HTTPException, Response
+from api.index import get_energy, get_health, get_pro_catalog, http_exception_handler
 
 
 def test_api_health():
-    health = get_health(response=Response())
+    resp = Response()
+    health = get_health(response=resp)
     assert health["status"] == "healthy"
     assert "energy_interval" in health["tables"]
     assert "energy_daily" in health["tables"]
     assert "exchange_rates" in health["tables"]
     assert health["tables"]["energy_interval"] > 0
+    assert "s-maxage=300" in resp.headers["Cache-Control"]
+    assert "database" not in health  # Redacted for security
+    # Second call returns from memory TTL cache
+    health_cached = get_health(response=Response())
+    assert health_cached == health
 
 
 def test_api_get_energy_ranges_and_filters():
@@ -253,3 +261,142 @@ def test_api_intervals_1w_and_1m():
     assert len(res_1m.points) == 8  # Jan to Aug 2026 (8 calendar months)
     assert res_1m.points[0].timestamp == "2026-01"
     assert res_1m.points[-1].timestamp == "2026-08"
+
+
+def test_api_tiered_cache_control_and_capture_prices():
+    """Verify tiered Cache-Control headers and diurnal capture price/BESS spread metrics."""
+    # 1. 1d range -> s-maxage=300
+    resp_1d = Response()
+    res_1d = get_energy(
+        response=resp_1d,
+        country="PH",
+        start_date="2026-09-06",
+        end_date="2026-09-06",
+    )
+    assert "s-maxage=300" in resp_1d.headers["Cache-Control"]
+    assert "stale-while-revalidate=900" in resp_1d.headers["Cache-Control"]
+
+    # Verify SummaryMetrics capture prices and BESS spread
+    assert res_1d.summary.solarCapturePriceLocal is not None
+    assert res_1d.summary.solarCapturePriceLocal > 0
+    assert res_1d.summary.solarCaptureRatio is not None
+    assert res_1d.summary.solarCaptureRatio > 0
+    assert res_1d.summary.bessSpreadLocal is not None
+    assert res_1d.summary.bessSpreadLocal > 0
+
+    # Verify FuelBreakdownRow capture prices
+    solar_row = next((r for r in res_1d.breakdown if r.fuelTech == "solar"), None)
+    assert solar_row is not None
+    assert solar_row.capturePriceLocal is not None
+    assert solar_row.captureRatio is not None
+
+    # 2. 30d range -> s-maxage=3600
+    resp_30d = Response()
+    res_30d = get_energy(
+        response=resp_30d,
+        country="PH",
+        start_date="2026-08-08",
+        end_date="2026-09-06",
+    )
+    assert res_30d.range == "30d"
+    assert "s-maxage=3600" in resp_30d.headers["Cache-Control"]
+    assert "stale-while-revalidate=86400" in resp_30d.headers["Cache-Control"]
+
+
+def test_api_pro_catalog_endpoint():
+    """Verify the /api/pro/catalog metadata endpoint returns the 3 commercial B2B packs."""
+    resp = Response()
+    catalog = get_pro_catalog(response=resp)
+    assert "s-maxage=3600" in resp.headers["Cache-Control"]
+    assert len(catalog.products) == 3
+
+    product_ids = [p.id for p in catalog.products]
+    assert "wesm-nodal-parquet" in product_ids
+    assert "solar-bess-capture-pack" in product_ids
+    assert "scope2-carbon-intensity-pack" in product_ids
+
+    prices = {p.id: p.priceUSD for p in catalog.products}
+    assert prices["wesm-nodal-parquet"] == 399
+    assert prices["solar-bess-capture-pack"] == 149
+    assert prices["scope2-carbon-intensity-pack"] == 99
+
+
+def test_api_invalid_region_raises_400():
+    """Verify invalid region raises HTTP 400 with allowed regions list before hitting DB."""
+    with pytest.raises(HTTPException) as excinfo:
+        get_energy(
+            response=Response(),
+            country="PH",
+            region="INVALID_REGION",
+            start_date="2026-09-06",
+            end_date="2026-09-06",
+        )
+    assert excinfo.value.status_code == 400
+    assert (
+        "Unsupported region 'INVALID_REGION' for country 'PH'" in excinfo.value.detail
+    )
+    assert "Allowed: ALL, LUZON, VISAYAS, MINDANAO" in excinfo.value.detail
+
+
+def test_api_out_of_bounds_dates_raise_400():
+    """Verify historical date < 2020-01-01 or date span > 1100 days raises HTTP 400."""
+    # 1. Historical date before 2020-01-01
+    with pytest.raises(HTTPException) as exc1:
+        get_energy(
+            response=Response(),
+            country="PH",
+            start_date="1990-01-01",
+            end_date="1990-01-02",
+        )
+    assert exc1.value.status_code == 400
+    assert "minimum allowed date" in exc1.value.detail
+
+    # 2. Span > 1100 days (~3 years)
+    with pytest.raises(HTTPException) as exc2:
+        get_energy(
+            response=Response(),
+            country="PH",
+            start_date="2020-01-01",
+            end_date="2024-01-01",
+        )
+    assert exc2.value.status_code == 400
+    assert "exceeds maximum allowed span of 1100 days" in exc2.value.detail
+
+
+def test_api_native_default_arguments():
+    """Verify calling get_energy without passing interval works cleanly with native defaults."""
+    res = get_energy(
+        response=Response(),
+        country="PH",
+        start_date="2026-09-06",
+        end_date="2026-09-06",
+    )
+    assert res.country == "PH"
+    assert res.region == "ALL"
+    assert res.interval == "5m"
+    assert len(res.points) > 0
+
+
+def test_api_http_exception_handler_cache_headers():
+    """Verify exception handler attaches edge Cache-Control headers to 400 and 404 responses."""
+    resp_400 = asyncio.run(
+        http_exception_handler(
+            None, HTTPException(status_code=400, detail="Invalid parameter")
+        )
+    )
+    assert resp_400.status_code == 400
+    assert resp_400.headers.get("Cache-Control") == "public, s-maxage=300"
+
+    resp_404 = asyncio.run(
+        http_exception_handler(None, HTTPException(status_code=404, detail="Not found"))
+    )
+    assert resp_404.status_code == 404
+    assert resp_404.headers.get("Cache-Control") == "public, s-maxage=300"
+
+    resp_500 = asyncio.run(
+        http_exception_handler(
+            None, HTTPException(status_code=500, detail="Internal server error")
+        )
+    )
+    assert resp_500.status_code == 500
+    assert "Cache-Control" not in resp_500.headers

@@ -1,13 +1,16 @@
 import os
+import threading
+import time
 from dataclasses import dataclass
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import date, datetime, time as dt_time, timedelta, timezone
 from pathlib import Path
-from typing import Dict, List, Optional, Any, TypedDict
+from typing import Any, Dict, List, Optional, Tuple, TypedDict
 from zoneinfo import ZoneInfo
 
 import duckdb
-from fastapi import FastAPI, HTTPException, Query, Response
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
@@ -31,32 +34,62 @@ MOTHERDUCK_TOKEN = os.getenv("MOTHERDUCK_TOKEN", "")
 MOTHERDUCK_DATABASE = os.getenv("MOTHERDUCK_DATABASE", "open_electricity_db")
 DUCKDB_PATH = BASE_DIR / "open_nem_ph.duckdb"
 
+# Module-level connection cache and thread lock for MotherDuck serverless reuse
+_MD_LOCK = threading.Lock()
+_MD_CONN: Optional[duckdb.DuckDBPyConnection] = None
+_DUCKDB_CONFIG: dict[str, Any] = {
+    "extension_directory": "/tmp/.duckdb/extensions",
+}
+
+# Module-level TTL cache for health check endpoint (5 minutes TTL)
+_HEALTH_CACHE: Optional[Tuple[float, Dict[str, Any]]] = None
+_HEALTH_CACHE_TTL = 300.0
+
+_IS_PROD = os.environ.get("VERCEL_ENV") == "production"
 app = FastAPI(
-    title="OpenElectricity API",
-    version="1.0.0",
-    docs_url="/api/docs",
-    openapi_url="/api/openapi.json",
+    title="OpenElectricity SEA API",
+    description="Multi-country Southeast Asia electricity market telemetry API (Serverless DuckDB)",
+    version="2.0.0",
+    docs_url=None if _IS_PROD else "/api/docs",
+    openapi_url=None if _IS_PROD else "/api/openapi.json",
 )
 
 # Enable CORS for Next.js frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_credentials=False,
+    allow_methods=["GET", "OPTIONS"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(
+    request: Optional[Request], exc: HTTPException
+) -> JSONResponse:
+    """Sets public edge cache headers on 400 and 404 responses for Vercel CDN caching."""
+    headers = dict(exc.headers) if exc.headers else {}
+    if exc.status_code in (400, 404):
+        headers["Cache-Control"] = "public, s-maxage=300"
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers=headers,
+    )
+
 
 # ---------------------------------------------------------
 # Metadata & Fuel Constants
 # ---------------------------------------------------------
 
-COUNTRIES_METADATA = {
+COUNTRIES_METADATA: Dict[str, Dict[str, Any]] = {
     "PH": {
         "name": "Philippines",
         "currencySymbol": "₱",
         "currencyCode": "PHP",
         "defaultRegion": "ALL",
+        "regions": ["ALL", "LUZON", "VISAYAS", "MINDANAO"],
         "minInterval": "5m",
         "timezone": "Asia/Manila",
         "tzOffset": "+08:00",
@@ -66,6 +99,7 @@ COUNTRIES_METADATA = {
         "currencySymbol": "S$",
         "currencyCode": "SGD",
         "defaultRegion": "SINGAPORE",
+        "regions": ["ALL", "SINGAPORE"],
         "minInterval": "30m",
         "timezone": "Asia/Singapore",
         "tzOffset": "+08:00",
@@ -75,6 +109,7 @@ COUNTRIES_METADATA = {
         "currencySymbol": "RM",
         "currencyCode": "MYR",
         "defaultRegion": "PENINSULAR",
+        "regions": ["ALL", "PENINSULAR", "SABAH", "SARAWAK"],
         "minInterval": "30m",
         "timezone": "Asia/Kuala_Lumpur",
         "tzOffset": "+08:00",
@@ -84,6 +119,7 @@ COUNTRIES_METADATA = {
         "currencySymbol": "฿",
         "currencyCode": "THB",
         "defaultRegion": "THAILAND",
+        "regions": ["ALL", "THAILAND", "CENTRAL", "NORTH", "NORTHEAST", "SOUTH"],
         "minInterval": "5m",
         "timezone": "Asia/Bangkok",
         "tzOffset": "+07:00",
@@ -93,6 +129,7 @@ COUNTRIES_METADATA = {
         "currencySymbol": "₫",
         "currencyCode": "VND",
         "defaultRegion": "VIETNAM",
+        "regions": ["ALL", "VIETNAM"],
         "minInterval": "30m",
         "timezone": "Asia/Ho_Chi_Minh",
         "tzOffset": "+07:00",
@@ -102,6 +139,7 @@ COUNTRIES_METADATA = {
         "currencySymbol": "Rp",
         "currencyCode": "IDR",
         "defaultRegion": "ALL",
+        "regions": ["ALL", "INDONESIA"],
         "minInterval": "1h",
         "timezone": "Asia/Jakarta",
         "tzOffset": "+07:00",
@@ -230,6 +268,11 @@ class SummaryMetrics(BaseModel):
     currencyCode: Optional[str] = "PHP"
     emissionsIntensityGPerKWh: float
     totalEmissionsTonnes: float
+    solarCapturePriceLocal: Optional[float] = None
+    solarCapturePriceUSD: Optional[float] = None
+    solarCaptureRatio: Optional[float] = None
+    bessSpreadLocal: Optional[float] = None
+    bessSpreadUSD: Optional[float] = None
 
 
 class FuelBreakdownRow(BaseModel):
@@ -241,6 +284,25 @@ class FuelBreakdownRow(BaseModel):
     percentage: float
     isRenewable: bool
     emissionsTonnes: float
+    capturePriceLocal: Optional[float] = None
+    capturePriceUSD: Optional[float] = None
+    captureRatio: Optional[float] = None
+
+
+class ProProductItem(BaseModel):
+    id: str
+    name: str
+    priceUSD: int
+    cadence: str
+    description: str
+    features: List[str]
+    sampleFiles: List[str]
+    stripePaymentUrl: Optional[str] = None
+    targetAudience: str
+
+
+class ProCatalogResponse(BaseModel):
+    products: List[ProProductItem]
 
 
 class EnergyResponse(BaseModel):
@@ -260,8 +322,21 @@ class EnergyResponse(BaseModel):
 # ---------------------------------------------------------
 
 
-def get_duckdb_connection():
-    """Returns a DuckDB connection to local file (or MotherDuck only if DB_MODE=motherduck)."""
+def reset_motherduck_connection() -> None:
+    """Safely closes the cached MotherDuck connection and resets it to None."""
+    global _MD_CONN
+    with _MD_LOCK:
+        if _MD_CONN is not None:
+            try:
+                _MD_CONN.close()
+            except Exception:
+                pass
+            _MD_CONN = None
+
+
+def get_duckdb_connection() -> tuple[Optional[duckdb.DuckDBPyConnection], str]:
+    """Returns a DuckDB connection to local file (or MotherDuck if DB_MODE=motherduck or local file missing)."""
+    global _MD_CONN
     mode = os.getenv("DB_MODE", "local").lower()
 
     if mode != "motherduck":
@@ -275,16 +350,28 @@ def get_duckdb_connection():
     token = os.getenv("MOTHERDUCK_TOKEN", MOTHERDUCK_TOKEN)
     database = os.getenv("MOTHERDUCK_DATABASE", MOTHERDUCK_DATABASE)
 
-    if token and mode == "motherduck":
-        try:
-            config: dict[str, str | float | list[str]] = {
-                "motherduck_token": token,
-                "extension_directory": "/tmp/.duckdb/extensions",
-            }
-            conn = duckdb.connect(f"md:{database}", config=config)
-            return conn, "motherduck_cloud"
-        except Exception as e:
-            print(f"[DuckDB] MotherDuck connection failed: {e}")
+    if token and (mode == "motherduck" or not DUCKDB_PATH.exists()):
+        with _MD_LOCK:
+            if _MD_CONN is None:
+                try:
+                    _MD_CONN = duckdb.connect(
+                        f"md:{database}?motherduck_token={token}",
+                        config=_DUCKDB_CONFIG,
+                    )
+                except Exception as e:
+                    print(f"[DuckDB] MotherDuck connection failed: {e}")
+                    _MD_CONN = None
+
+            if _MD_CONN is not None:
+                try:
+                    return _MD_CONN.cursor(), "motherduck_cloud"
+                except Exception as e:
+                    print(f"[DuckDB] MotherDuck cursor creation failed: {e}")
+                    try:
+                        _MD_CONN.close()
+                    except Exception:
+                        pass
+                    _MD_CONN = None
 
     if DUCKDB_PATH.exists():
         try:
@@ -306,7 +393,7 @@ def get_root():
     return {
         "status": "healthy",
         "service": "OpenElectricity API",
-        "version": "1.0.0",
+        "version": "2.0.0",
         "docs": "/api/docs",
     }
 
@@ -314,9 +401,19 @@ def get_root():
 @app.get("/api/health")
 def get_health(response: Response):
     """Health check endpoint and active database connection inspector."""
-    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    global _HEALTH_CACHE
+    response.headers["Cache-Control"] = (
+        "public, s-maxage=300, stale-while-revalidate=600"
+    )
+
+    now = time.monotonic()
+    if _HEALTH_CACHE is not None:
+        cached_time, cached_data = _HEALTH_CACHE
+        if now - cached_time < _HEALTH_CACHE_TTL:
+            return cached_data
+
     conn, source = get_duckdb_connection()
-    tables_count = {}
+    tables_count: Dict[str, Any] = {}
 
     if conn:
         try:
@@ -329,7 +426,8 @@ def get_health(response: Response):
                 "exchange_rates",
             ]:
                 try:
-                    c = conn.execute(f"SELECT COUNT(*) FROM {tbl}").fetchone()[0]
+                    row = conn.execute(f"SELECT COUNT(*) FROM {tbl}").fetchone()
+                    c = row[0] if row is not None else 0
                     tables_count[tbl] = c
                 except Exception:
                     tables_count[tbl] = 0
@@ -341,14 +439,15 @@ def get_health(response: Response):
             except Exception:
                 pass
 
-    return {
+    health_data = {
         "status": "healthy",
         "active_source": source,
-        "motherduck_configured": bool(os.getenv("MOTHERDUCK_TOKEN", MOTHERDUCK_TOKEN)),
-        "database": os.getenv("MOTHERDUCK_DATABASE", MOTHERDUCK_DATABASE),
+        "database_source": source,
         "tables": tables_count,
         "time": datetime.now(timezone.utc).isoformat(),
     }
+    _HEALTH_CACHE = (now, health_data)
+    return health_data
 
 
 # ---------------------------------------------------------
@@ -377,6 +476,14 @@ class EnergyQueryParams:
 class AggregatedEnergyData:
     time_buckets: Dict[str, Dict[str, Any]]
     fuel_totals_mwh: Dict[str, float]
+    fuel_capture_price_local: Dict[str, Optional[float]]
+    fuel_capture_price_usd: Dict[str, Optional[float]]
+    fuel_capture_ratio: Dict[str, Optional[float]]
+    solar_capture_price_local: Optional[float]
+    solar_capture_price_usd: Optional[float]
+    solar_capture_ratio: Optional[float]
+    bess_spread_local: Optional[float]
+    bess_spread_usd: Optional[float]
     grand_price_sum: float
     grand_price_cnt: int
     grand_usd_sum: float
@@ -401,7 +508,16 @@ def resolve_energy_query_params(
     tz_name = c_meta.get("timezone", "Asia/Manila")
     tz = ZoneInfo(tz_name)
     tz_offset = c_meta.get("tzOffset", "+08:00")
-    norm_region = region if isinstance(region, str) and region.strip() else "ALL"
+    norm_region = (
+        region.strip().upper() if isinstance(region, str) and region.strip() else "ALL"
+    )
+    allowed_regions = c_meta.get("regions", ["ALL"])
+    if norm_region not in allowed_regions:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported region '{norm_region}' for country '{norm_country}'. Allowed: {', '.join(allowed_regions)}",
+        )
+
     s_end_date = end_date if isinstance(end_date, str) and end_date.strip() else None
     s_start_date = (
         start_date if isinstance(start_date, str) and start_date.strip() else None
@@ -443,7 +559,27 @@ def resolve_energy_query_params(
             detail=f"start_date ({parsed_start}) must be on or before end_date ({parsed_end}).",
         )
 
+    MIN_ALLOWED_DATE = date(2020, 1, 1)
+    max_allowed_date = datetime.now(timezone.utc).date() + timedelta(days=2)
+
+    if parsed_start < MIN_ALLOWED_DATE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"start_date ({parsed_start}) is before minimum allowed date ({MIN_ALLOWED_DATE}).",
+        )
+
+    if parsed_end > max_allowed_date:
+        raise HTTPException(
+            status_code=400,
+            detail=f"end_date ({parsed_end}) is beyond maximum allowed date ({max_allowed_date}).",
+        )
+
     span_days = (parsed_end - parsed_start).days + 1
+    if (parsed_end - parsed_start).days > 1100:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Requested date span ({(parsed_end - parsed_start).days} days) exceeds maximum allowed span of 1100 days (~3 years).",
+        )
 
     # Determine range_val label
     computed_range = (
@@ -515,8 +651,8 @@ def resolve_energy_query_params(
     unit = "GWh" if span_days >= 30 or use_daily else "MW"
 
     # Calculate UTC datetime boundaries
-    start_local = datetime.combine(parsed_start, time(0, 0, 0), tzinfo=tz)
-    end_local = datetime.combine(parsed_end, time(23, 59, 59, 999999), tzinfo=tz)
+    start_local = datetime.combine(parsed_start, dt_time(0, 0, 0), tzinfo=tz)
+    end_local = datetime.combine(parsed_end, dt_time(23, 59, 59, 999999), tzinfo=tz)
     start_utc = start_local.astimezone(timezone.utc)
     end_utc = end_local.astimezone(timezone.utc)
 
@@ -784,6 +920,19 @@ def fetch_energy_data(
     return dispatch_rows
 
 
+def _calculate_percentile(sorted_vals: List[float], p: float) -> float:
+    """Calculate the p-th percentile (0.0 <= p <= 1.0) using linear interpolation."""
+    if not sorted_vals:
+        return 0.0
+    if len(sorted_vals) == 1:
+        return sorted_vals[0]
+    k = (len(sorted_vals) - 1) * p
+    f = int(k)
+    c = min(f + 1, len(sorted_vals) - 1)
+    d = k - f
+    return sorted_vals[f] + (sorted_vals[c] - sorted_vals[f]) * d
+
+
 def aggregate_energy_data(
     gen_rows: List[tuple[Any, ...]],
     price_rows: List[tuple[Any, ...]],
@@ -807,6 +956,7 @@ def aggregate_energy_data(
         if b_str not in time_buckets:
             time_buckets[b_str] = {
                 "fuels_val": {f: 0.0 for f in FUEL_META.keys()},
+                "fuels_mwh": {f: 0.0 for f in FUEL_META.keys()},
                 "price": None,
                 "price_dollar": None,
                 "price_min": None,
@@ -826,6 +976,7 @@ def aggregate_energy_data(
             time_buckets[b_str]["fuels_val"][fuel] = round(
                 val, 2 if is_energy_unit else 1
             )
+            time_buckets[b_str]["fuels_mwh"][fuel] = float(mwh_val)
 
         if fuel in fuel_totals_overall_mwh:
             fuel_totals_overall_mwh[fuel] += mwh_val
@@ -854,6 +1005,7 @@ def aggregate_energy_data(
         if b_str not in time_buckets:
             time_buckets[b_str] = {
                 "fuels_val": {f: 0.0 for f in FUEL_META.keys()},
+                "fuels_mwh": {f: 0.0 for f in FUEL_META.keys()},
                 "price": None,
                 "price_dollar": None,
                 "price_min": None,
@@ -888,9 +1040,91 @@ def aggregate_energy_data(
             grand_usd_sum += float(p_usd)
             grand_usd_cnt += 1
 
+    # Diurnal capture prices and spread calculations
+    fuel_revenue_loc = {f: 0.0 for f in FUEL_META.keys()}
+    fuel_revenue_usd = {f: 0.0 for f in FUEL_META.keys()}
+    fuel_weight_mwh = {f: 0.0 for f in FUEL_META.keys()}
+    all_prices_loc: List[float] = []
+    all_prices_usd: List[float] = []
+
+    for b_str, bucket in time_buckets.items():
+        p_val = bucket["price"]
+        p_usd = bucket["price_dollar"]
+
+        if p_val is not None:
+            all_prices_loc.append(float(p_val))
+            for f in FUEL_META.keys():
+                mwh = bucket["fuels_mwh"].get(f, 0.0)
+                if mwh <= 0:
+                    mwh = bucket["fuels_val"].get(f, 0.0)
+                if mwh > 0:
+                    fuel_revenue_loc[f] += mwh * float(p_val)
+                    fuel_weight_mwh[f] += mwh
+                    if p_usd is not None:
+                        fuel_revenue_usd[f] += mwh * float(p_usd)
+
+        if p_usd is not None:
+            all_prices_usd.append(float(p_usd))
+
+    avg_price_local = (
+        (grand_price_sum / grand_price_cnt) if grand_price_cnt > 0 else 0.0
+    )
+
+    fuel_capture_price_local: Dict[str, Optional[float]] = {}
+    fuel_capture_price_usd: Dict[str, Optional[float]] = {}
+    fuel_capture_ratio: Dict[str, Optional[float]] = {}
+
+    for f in FUEL_META.keys():
+        if fuel_weight_mwh[f] > 0:
+            cap_loc = round(fuel_revenue_loc[f] / fuel_weight_mwh[f], 2)
+            fuel_capture_price_local[f] = cap_loc
+            if fuel_revenue_usd[f] > 0:
+                fuel_capture_price_usd[f] = round(
+                    fuel_revenue_usd[f] / fuel_weight_mwh[f], 2
+                )
+            else:
+                fuel_capture_price_usd[f] = None
+
+            if avg_price_local > 0:
+                fuel_capture_ratio[f] = round(cap_loc / avg_price_local, 2)
+            else:
+                fuel_capture_ratio[f] = None
+        else:
+            fuel_capture_price_local[f] = None
+            fuel_capture_price_usd[f] = None
+            fuel_capture_ratio[f] = None
+
+    solar_capture_price_local = fuel_capture_price_local.get("solar")
+    solar_capture_price_usd = fuel_capture_price_usd.get("solar")
+    solar_capture_ratio = fuel_capture_ratio.get("solar")
+
+    # BESS Arbitrage Spread (P95 - P5)
+    bess_spread_local: Optional[float] = None
+    bess_spread_usd: Optional[float] = None
+
+    if len(all_prices_loc) >= 2:
+        sorted_loc = sorted(all_prices_loc)
+        p95_loc = _calculate_percentile(sorted_loc, 0.95)
+        p5_loc = _calculate_percentile(sorted_loc, 0.05)
+        bess_spread_local = round(max(0.0, p95_loc - p5_loc), 2)
+
+    if len(all_prices_usd) >= 2:
+        sorted_usd = sorted(all_prices_usd)
+        p95_usd = _calculate_percentile(sorted_usd, 0.95)
+        p5_usd = _calculate_percentile(sorted_usd, 0.05)
+        bess_spread_usd = round(max(0.0, p95_usd - p5_usd), 2)
+
     return AggregatedEnergyData(
         time_buckets=time_buckets,
         fuel_totals_mwh=fuel_totals_overall_mwh,
+        fuel_capture_price_local=fuel_capture_price_local,
+        fuel_capture_price_usd=fuel_capture_price_usd,
+        fuel_capture_ratio=fuel_capture_ratio,
+        solar_capture_price_local=solar_capture_price_local,
+        solar_capture_price_usd=solar_capture_price_usd,
+        solar_capture_ratio=solar_capture_ratio,
+        bess_spread_local=bess_spread_local,
+        bess_spread_usd=bess_spread_usd,
         grand_price_sum=grand_price_sum,
         grand_price_cnt=grand_price_cnt,
         grand_usd_sum=grand_usd_sum,
@@ -916,8 +1150,10 @@ def build_fuel_generation_points(
             else 60
         )
         step = timedelta(minutes=mins)
-        curr = datetime.combine(params.start_date, time(0, 0, 0), tzinfo=params.tz)
-        end_curr = datetime.combine(params.end_date, time(23, 59, 59), tzinfo=params.tz)
+        curr = datetime.combine(params.start_date, dt_time(0, 0, 0), tzinfo=params.tz)
+        end_curr = datetime.combine(
+            params.end_date, dt_time(23, 59, 59), tzinfo=params.tz
+        )
         while curr <= end_curr:
             expected_slots.append(curr.strftime(f"%Y-%m-%dT%H:%M:00{params.tz_offset}"))
             curr += step
@@ -1050,6 +1286,11 @@ def build_summary_metrics(
         if tot_mwh > 0
         else 0,
         totalEmissionsTonnes=round(tot_emissions),
+        solarCapturePriceLocal=agg_data.solar_capture_price_local,
+        solarCapturePriceUSD=agg_data.solar_capture_price_usd,
+        solarCaptureRatio=agg_data.solar_capture_ratio,
+        bessSpreadLocal=agg_data.bess_spread_local,
+        bessSpreadUSD=agg_data.bess_spread_usd,
     )
 
 
@@ -1058,6 +1299,9 @@ def build_fuel_breakdown(
     latest_point: Optional[FuelGenerationPoint],
     is_energy_unit: bool = False,
     span_days: int = 1,
+    fuel_capture_price_local: Optional[Dict[str, Optional[float]]] = None,
+    fuel_capture_price_usd: Optional[Dict[str, Optional[float]]] = None,
+    fuel_capture_ratio: Optional[Dict[str, Optional[float]]] = None,
 ) -> List[FuelBreakdownRow]:
     tot_mwh = sum(fuel_totals_mwh.values())
     breakdown: List[FuelBreakdownRow] = []
@@ -1075,6 +1319,10 @@ def build_fuel_breakdown(
             )
             else round(mwh / hours, 1)
         )
+        cap_loc = fuel_capture_price_local.get(f) if fuel_capture_price_local else None
+        cap_usd = fuel_capture_price_usd.get(f) if fuel_capture_price_usd else None
+        cap_rat = fuel_capture_ratio.get(f) if fuel_capture_ratio else None
+
         breakdown.append(
             FuelBreakdownRow(
                 fuelTech=f,
@@ -1085,6 +1333,9 @@ def build_fuel_breakdown(
                 percentage=pct,
                 isRenewable=meta["isRenewable"],
                 emissionsTonnes=round(mwh * meta["emissionsFactor"]),
+                capturePriceLocal=cap_loc,
+                capturePriceUSD=cap_usd,
+                captureRatio=cap_rat,
             )
         )
 
@@ -1095,24 +1346,31 @@ def build_fuel_breakdown(
 @app.get("/api/energy", response_model=EnergyResponse)
 def get_energy(
     response: Response,
-    country: str = Query(
-        default="PH", description="Country code (PH, SG, MY, TH, VN, ID)"
-    ),
-    start_date: Optional[str] = Query(
-        default=None, description="Start date (YYYY-MM-DD)"
-    ),
-    end_date: Optional[str] = Query(default=None, description="End date (YYYY-MM-DD)"),
-    interval: Optional[str] = Query(
-        default=None, description="Aggregation interval (5m, 30m, 1h, 1d, 1w, 1m)"
-    ),
-    region: str = Query(default="ALL", description="Region filter"),
-    range: Optional[str] = Query(
-        default=None, description="Preset range shorthand (1d, 3d, 7d, 30d, 1y)"
-    ),
+    country: str = "PH",
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    interval: Optional[str] = None,
+    region: str = "ALL",
+    range: Optional[str] = None,
 ) -> EnergyResponse:
-    response.headers["Cache-Control"] = (
-        "public, s-maxage=60, stale-while-revalidate=300"
+    query_params = resolve_energy_query_params(
+        country=country,
+        start_date=start_date,
+        end_date=end_date,
+        interval=interval,
+        region=region,
+        range_val=range,
     )
+
+    # Tiered Cache-Control headers
+    if query_params.range_val == "1d":
+        response.headers["Cache-Control"] = (
+            "public, s-maxage=300, stale-while-revalidate=900"
+        )
+    else:
+        response.headers["Cache-Control"] = (
+            "public, s-maxage=3600, stale-while-revalidate=86400"
+        )
 
     conn, source = get_duckdb_connection()
     if not conn:
@@ -1122,24 +1380,39 @@ def get_energy(
         )
 
     try:
-        query_params = resolve_energy_query_params(
-            country=country,
-            start_date=start_date,
-            end_date=end_date,
-            interval=interval,
-            region=region,
-            range_val=range,
-        )
-
         dispatch_sql, sql_params = build_energy_query(query_params)
-        dispatch_rows = fetch_energy_data(
-            conn,
-            dispatch_sql,
-            sql_params,
-            query_params.country,
-            query_params.start_date,
-            query_params.end_date,
-        )
+        try:
+            dispatch_rows = fetch_energy_data(
+                conn,
+                dispatch_sql,
+                sql_params,
+                query_params.country,
+                query_params.start_date,
+                query_params.end_date,
+            )
+        except duckdb.Error as db_err:
+            if source == "motherduck_cloud":
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+                reset_motherduck_connection()
+                conn, source = get_duckdb_connection()
+                if not conn:
+                    raise HTTPException(
+                        status_code=503,
+                        detail="Database connection unavailable after reconnect",
+                    ) from db_err
+                dispatch_rows = fetch_energy_data(
+                    conn,
+                    dispatch_sql,
+                    sql_params,
+                    query_params.country,
+                    query_params.start_date,
+                    query_params.end_date,
+                )
+            else:
+                raise
 
         price_sql, price_params = build_price_query(query_params)
         price_rows = conn.execute(price_sql, price_params).fetchall()
@@ -1164,6 +1437,9 @@ def get_energy(
             latest_point,
             is_energy_unit=is_energy_unit,
             span_days=span_days,
+            fuel_capture_price_local=agg_data.fuel_capture_price_local,
+            fuel_capture_price_usd=agg_data.fuel_capture_price_usd,
+            fuel_capture_ratio=agg_data.fuel_capture_ratio,
         )
 
         return EnergyResponse(
@@ -1178,7 +1454,76 @@ def get_energy(
             breakdown=breakdown,
         )
     finally:
-        try:
-            conn.close()
-        except Exception:
-            pass
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
+@app.get("/api/pro/catalog", response_model=ProCatalogResponse)
+def get_pro_catalog(response: Response) -> ProCatalogResponse:
+    """Returns catalog metadata and checkout options for OpenElectricity commercial B2B data products."""
+    response.headers["Cache-Control"] = (
+        "public, s-maxage=3600, stale-while-revalidate=86400"
+    )
+
+    stripe_solar_bess = os.getenv("NEXT_PUBLIC_STRIPE_SOLAR_BESS_URL", "")
+    stripe_nodal_pack = os.getenv("NEXT_PUBLIC_STRIPE_NODAL_PACK_URL", "")
+    stripe_carbon_pack = os.getenv("NEXT_PUBLIC_STRIPE_CARBON_PACK_URL", "")
+
+    products = [
+        ProProductItem(
+            id="wesm-nodal-parquet",
+            name="WESM 5-Minute Nodal LMP & Unit Outage Dataset (Parquet + CSV)",
+            priceUSD=399,
+            cadence="one-time download + monthly updates",
+            description="Generator & Load nodal schedules, nodal LMPs, basis risk vs regional GWAP/LWAP, and curated plant catalog for Luzon, Visayas, and Mindanao.",
+            features=[
+                "5-minute interval nodal LMPs (2022–present)",
+                "Generator dispatch schedules & reserve allocations",
+                "Forced & planned unit outage timelines",
+                "Nodal basis risk analysis vs regional GWAP/LWAP",
+                "Delivered as Apache Parquet & compressed CSV",
+            ],
+            sampleFiles=["wesm_nodal_lmp_sample.parquet", "wesm_outages_sample.csv"],
+            stripePaymentUrl=stripe_nodal_pack or None,
+            targetAudience="IPP developers, energy traders, utility planners",
+        ),
+        ProProductItem(
+            id="solar-bess-capture-pack",
+            name="Solar Capture Price & BESS Arbitrage Screening Pack",
+            priceUSD=149,
+            cadence="quarterly benchmark",
+            description="Fuel-specific capture prices, midday solar cannibalization ratios, and 2h/4h battery storage arbitrage spread durations across Luzon, Visayas, Mindanao, Singapore & Malaysia.",
+            features=[
+                "Solar, Wind, Coal, Gas diurnal capture price benchmarks",
+                "Midday solar cannibalization discount ratios",
+                "2-hour & 4-hour battery storage daily spread models",
+                "Top 5% vs Bottom 5% price spreads (P95 - P5)",
+                "Financial feasibility modeling template (XLSX + Python)",
+            ],
+            sampleFiles=["solar_capture_ratios_ph_sg.csv", "bess_arbitrage_model.xlsx"],
+            stripePaymentUrl=stripe_solar_bess or None,
+            targetAudience="BESS & Solar IPP developers, corporate offtakers, infrastructure funds",
+        ),
+        ProProductItem(
+            id="scope2-carbon-intensity-pack",
+            name="Scope 2 Hourly Grid Carbon Intensity Pack (PH / SG / MY / TH)",
+            priceUSD=99,
+            cadence="annual license",
+            description="Auditable hourly and 5-minute gCO2/kWh emissions factors for corporate data center, industrial, and ESG GHG Protocol Scope 2 reporting.",
+            features=[
+                "5-minute & hourly marginal and average gCO2/kWh grid factors",
+                "GHG Protocol Scope 2 Market-based & Location-based compliance",
+                "Philippines (Luzon/Visayas/Mindanao), Singapore, Malaysia, Thailand",
+                "Clean energy matching 24/7 CFE scorecards",
+                "CSV and Parquet automated ingestion pipelines",
+            ],
+            sampleFiles=["grid_carbon_intensity_hourly.parquet", "scope2_summary.csv"],
+            stripePaymentUrl=stripe_carbon_pack or None,
+            targetAudience="Hyperscale data centers, multinational ESG teams, sustainability consultants",
+        ),
+    ]
+
+    return ProCatalogResponse(products=products)

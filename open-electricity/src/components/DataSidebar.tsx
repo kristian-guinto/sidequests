@@ -10,7 +10,7 @@ import {
   TimeRange,
 } from "@/lib/types";
 import { getFuelMeta } from "@/lib/colors";
-import { ChevronDown, Zap, CloudFog, TrendingUp } from "lucide-react";
+import { ChevronDown, Zap, CloudFog, TrendingUp, Sun, BatteryCharging, Coins } from "lucide-react";
 import ReactECharts from "echarts-for-react";
 import { format, parseISO } from "date-fns";
 import { formatMarketDate } from "@/lib/chartUtils";
@@ -525,6 +525,84 @@ export function DataSidebar({
                   {tableData.peakDisplay}
                 </td>
               </tr>
+            )}
+
+            {/* Market Economics (Commercial & Capture Metrics) */}
+            {summary?.avgPriceLocal != null && summary.avgPriceLocal > 0 && (
+              <>
+                <tr className="bg-neutral-50/80 dark:bg-[#18181B]/80 text-[10px] font-bold uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+                  <td colSpan={3} className="py-1 px-2.5 sm:px-3">
+                    Market Economics
+                  </td>
+                </tr>
+
+                {/* Volume-Weighted Price (VWAP) */}
+                <tr className="bg-neutral-50/20 dark:bg-[#121215]/30 text-neutral-700 dark:text-neutral-300 font-medium">
+                  <td className="py-1.5 px-2.5 sm:px-3 text-[11px] flex items-center space-x-1.5">
+                    <Coins className="h-3 w-3 text-amber-500" />
+                    <span>Avg VWAP</span>
+                  </td>
+                  <td colSpan={2} className="py-1.5 px-2.5 sm:px-3 text-right font-mono text-[11px] text-neutral-900 dark:text-white font-semibold">
+                    {currencySymbol}{summary.avgPriceLocal.toLocaleString()}/MWh
+                    {summary.avgPriceUSD != null && summary.avgPriceUSD > 0 && (
+                      <span className="text-[10px] font-normal text-neutral-400 dark:text-neutral-500 ml-1">
+                        (${summary.avgPriceUSD}/MWh)
+                      </span>
+                    )}
+                  </td>
+                </tr>
+
+                {/* Solar Capture Price & Cannibalization Ratio */}
+                {summary.solarCapturePriceLocal != null && (
+                  <tr className="bg-neutral-50/20 dark:bg-[#121215]/30 text-neutral-700 dark:text-neutral-300 font-medium">
+                    <td className="py-1.5 px-2.5 sm:px-3 text-[11px] flex items-center space-x-1.5">
+                      <Sun className="h-3 w-3 text-amber-400" />
+                      <span>Solar Capture</span>
+                    </td>
+                    <td colSpan={2} className="py-1.5 px-2.5 sm:px-3 text-right font-mono text-[11px]">
+                      <div className="flex items-center justify-end space-x-1.5">
+                        <span className="text-neutral-900 dark:text-white font-semibold">
+                          {currencySymbol}{Math.round(summary.solarCapturePriceLocal).toLocaleString()}/MWh
+                        </span>
+                        {summary.solarCaptureRatio != null && (
+                          <span
+                            className={`inline-flex items-center px-1.5 py-0.2 rounded text-[9.5px] font-bold ${
+                              summary.solarCaptureRatio >= 1.0
+                                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                                : summary.solarCaptureRatio >= 0.95
+                                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                                  : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
+                            }`}
+                            title={`Capture Ratio: ${(summary.solarCaptureRatio * 100).toFixed(0)}% of VWAP`}
+                          >
+                            {Math.round(summary.solarCaptureRatio * 100)}% VWAP
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )}
+
+                {/* BESS Arbitrage Spread (P95 - P5) */}
+                {summary.bessSpreadLocal != null && summary.bessSpreadLocal > 0 && (
+                  <tr className="bg-neutral-50/20 dark:bg-[#121215]/30 text-neutral-700 dark:text-neutral-300 font-medium">
+                    <td className="py-1.5 px-2.5 sm:px-3 text-[11px] flex items-center space-x-1.5">
+                      <BatteryCharging className="h-3 w-3 text-emerald-500" />
+                      <span>BESS Spread (P95–P5)</span>
+                    </td>
+                    <td colSpan={2} className="py-1.5 px-2.5 sm:px-3 text-right font-mono text-[11px]">
+                      <span className="text-neutral-900 dark:text-white font-semibold">
+                        {currencySymbol}{Math.round(summary.bessSpreadLocal).toLocaleString()}/MWh
+                      </span>
+                      {summary.bessSpreadUSD != null && (
+                        <span className="text-[10px] font-normal text-neutral-400 dark:text-neutral-500 ml-1">
+                          (${Math.round(summary.bessSpreadUSD)}/MWh)
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                )}
+              </>
             )}
           </tbody>
         </table>

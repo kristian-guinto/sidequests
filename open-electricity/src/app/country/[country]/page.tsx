@@ -25,6 +25,7 @@ import { GenerationChart } from "@/components/GenerationChart";
 import { EmissionsChart } from "@/components/EmissionsChart";
 import { PriceChart } from "@/components/PriceChart";
 import { DataSidebar } from "@/components/DataSidebar";
+import { ProDataBanner } from "@/components/ProDataBanner";
 import { alignPointsToTimeGrid, getDateRangeParams, formatMarketDate } from "@/lib/chartUtils";
 import { getFuelMeta } from "@/lib/colors";
 import { useTheme } from "@/components/ThemeProvider";
@@ -81,6 +82,7 @@ export default function CountryDetailPage({ params, searchParams }: CountryPageP
   const [summary, setSummary] = useState<SummaryMetrics | null>(null);
   const [breakdown, setBreakdown] = useState<FuelBreakdownRow[]>([]);
   const [dataSource, setDataSource] = useState<string>("connected");
+  const [isProModalOpen, setIsProModalOpen] = useState<boolean>(false);
 
   // Real-time hover cursor interaction state
   const [hoveredPoint, setHoveredPoint] = useState<FuelGenerationPoint | null>(null);
@@ -260,6 +262,7 @@ export default function CountryDetailPage({ params, searchParams }: CountryPageP
         onRefresh={fetchData}
         isLoading={isLoading}
         dataSource={dataSource}
+        onOpenProModal={() => setIsProModalOpen(true)}
       />
 
       {/* No Public SCADA Notice Banner */}
@@ -396,6 +399,17 @@ export default function CountryDetailPage({ params, searchParams }: CountryPageP
               currencySymbol={countryInfo.currencySymbol}
               currencyCode={countryInfo.currencyCode}
               onHoverPoint={setHoveredPoint}
+            />
+
+            {/* Pro Intelligence & Commercial Datasets Banner */}
+            <ProDataBanner
+              country={country}
+              summary={summary}
+              currencySymbol={countryInfo.currencySymbol}
+              currencyCode={countryInfo.currencyCode}
+              isModalOpen={isProModalOpen}
+              onCloseModal={() => setIsProModalOpen(false)}
+              onOpenModal={() => setIsProModalOpen(true)}
             />
           </div>
 

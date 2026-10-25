@@ -69,9 +69,18 @@ export function getDateRangeParams(range: TimeRange = "7d", delayDays: number = 
   startDate: string;
   endDate: string;
 } {
-  const now = new Date();
-  const anchorDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - delayDays);
-  const endDate = format(anchorDate, "yyyy-MM-dd");
+  // Anchor date math to UTC+8 (Asia/Manila / Singapore / MYT) so all visitors
+  // worldwide generate identical start_date/end_date query strings and hit the Edge CDN cache.
+  const nowUtcMs = Date.now();
+  const manilaMs = nowUtcMs + 8 * 60 * 60 * 1000;
+  const manilaNow = new Date(manilaMs);
+  const end = new Date(
+    Date.UTC(
+      manilaNow.getUTCFullYear(),
+      manilaNow.getUTCMonth(),
+      manilaNow.getUTCDate() - delayDays
+    )
+  );
 
   let days = 1;
   if (range === "3d") days = 3;
@@ -79,12 +88,23 @@ export function getDateRangeParams(range: TimeRange = "7d", delayDays: number = 
   else if (range === "30d") days = 30;
   else if (range === "1y") days = 365;
 
-  const startDateObj = new Date(
-    anchorDate.getFullYear(),
-    anchorDate.getMonth(),
-    anchorDate.getDate() - (days - 1)
+  const start = new Date(
+    Date.UTC(
+      end.getUTCFullYear(),
+      end.getUTCMonth(),
+      end.getUTCDate() - (days - 1)
+    )
   );
-  const startDate = format(startDateObj, "yyyy-MM-dd");
+
+  const fmt = (d: Date): string => {
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(d.getUTCDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
+
+  const startDate = fmt(start);
+  const endDate = fmt(end);
 
   return { startDate, endDate };
 }

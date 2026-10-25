@@ -59,6 +59,10 @@ jobs:
     env:
       MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN }}
       MOTHERDUCK_DATABASE: ${{ secrets.MOTHERDUCK_DATABASE || 'open_electricity_db' }}
+      R2_ENDPOINT_URL: ${{ secrets.R2_ENDPOINT_URL }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
 
     steps:
       - name: Checkout Code
@@ -119,7 +123,7 @@ jobs:
           uv run ingest sync-facilities --target motherduck --country "$COUNTRY"
 
       - name: Verify & Inspect MotherDuck Database
-        if: success()
+        if: "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'inspect' }}"
         run: |
           COUNTRY="${{ github.event.inputs.country || 'ALL' }}"
           uv run ingest inspect --target motherduck --country "$COUNTRY" --table all --limit 5

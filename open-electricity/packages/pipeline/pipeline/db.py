@@ -1,7 +1,6 @@
 """Database storage layer and SQL rollups for OpenElectricity pipeline."""
 
 import csv
-import os
 import tempfile
 import time
 from datetime import datetime, date
@@ -179,26 +178,30 @@ class Database:
                     )
                 )
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as tf:
-            writer = csv.writer(tf)
-            writer.writerow(
-                [
-                    "country_code",
-                    "resource_id",
-                    "facility_name",
-                    "region",
-                    "fuel_tech",
-                    "capacity_mw",
-                    "is_renewable",
-                    "emissions_factor",
-                    "status",
-                ]
-            )
-            for row in data:
-                writer.writerow(row)
-            temp_path = tf.name
-
+        tmp_path: Optional[Path] = None
         try:
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".csv", delete=False
+            ) as tf:
+                tmp_path = Path(tf.name)
+                writer = csv.writer(tf)
+                writer.writerow(
+                    [
+                        "country_code",
+                        "resource_id",
+                        "facility_name",
+                        "region",
+                        "fuel_tech",
+                        "capacity_mw",
+                        "is_renewable",
+                        "emissions_factor",
+                        "status",
+                    ]
+                )
+                for row in data:
+                    writer.writerow(row)
+
+            escaped_path = tmp_path.as_posix().replace("'", "''")
             self.conn.execute(f"""
                 INSERT INTO facilities (country_code, resource_id, facility_name, region, fuel_tech, capacity_mw, is_renewable, emissions_factor, status)
                 SELECT
@@ -211,7 +214,7 @@ class Database:
                     COALESCE(TRY_CAST(is_renewable AS BOOLEAN), false),
                     COALESCE(TRY_CAST(emissions_factor AS DOUBLE), 0.0),
                     status
-                FROM read_csv('{temp_path}', header=True, all_varchar=True)
+                FROM read_csv('{escaped_path}', header=True, all_varchar=True)
                 ON CONFLICT (country_code, resource_id) DO UPDATE SET
                     facility_name = EXCLUDED.facility_name,
                     region = EXCLUDED.region,
@@ -223,8 +226,8 @@ class Database:
                     updated_at = now();
             """)
         finally:
-            if os.path.exists(temp_path):
-                os.unlink(temp_path)
+            if tmp_path is not None and tmp_path.exists():
+                tmp_path.unlink()
 
         return len(facilities)
 
@@ -238,6 +241,8 @@ class Database:
             return 0
 
         default_dur = 5 if country_code.upper() == "PH" else 30
+        curr = COUNTRY_TO_CURRENCY.get(country_code.upper(), "PHP")
+        fx_cache: Dict[Tuple[str, str], float] = {}
 
         data = []
         for r in records:
@@ -248,10 +253,13 @@ class Database:
                 fuel = r.fuel_tech.lower()
                 mw = r.generation_mw
                 mwh = r.energy_mwh
-                data.append((c_code, start_dt, reg, fuel, mw, mwh))
+                cap_local = r.capture_price_local
+                cap_dollar = r.capture_price_dollar
+                raw_dt = r.interval_start
             else:
                 c_code = r.get("country_code", country_code).upper()
-                start_raw = str(r["timestamp"])
+                raw_dt = r.get("interval_start", r.get("timestamp"))
+                start_dt = str(raw_dt)
                 reg = r["region"]
                 fuel = str(r.get("fuel_tech") or "").lower()
                 mw = float(r.get("generation_mw", 0.0) or 0.0)
@@ -262,30 +270,69 @@ class Database:
                     if raw_energy is not None
                     else round(mw * (dur / 60.0), 4)
                 )
-                data.append((c_code, start_raw, reg, fuel, mw, mwh))
+                cap_local = (
+                    float(r["capture_price_local"])
+                    if r.get("capture_price_local") is not None
+                    else None
+                )
+                cap_dollar = (
+                    float(r["capture_price_dollar"])
+                    if r.get("capture_price_dollar") is not None
+                    else None
+                )
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as tf:
-            writer = csv.writer(tf)
-            writer.writerow(
-                [
-                    "country_code",
-                    "interval_start",
-                    "region",
-                    "fuel_tech",
-                    "generation_mw",
-                    "energy_mwh",
-                ]
+            if cap_local is not None and cap_dollar is None:
+                d_val = raw_dt.date() if hasattr(raw_dt, "date") else str(raw_dt)[:10]
+                cache_key = (str(d_val)[:10], curr)
+                if cache_key not in fx_cache:
+                    try:
+                        fx_cache[cache_key] = get_fx_rate(d_val, curr, conn=self.conn)
+                    except Exception:
+                        fx_cache[cache_key] = 0.0
+                fx = fx_cache[cache_key]
+                cap_dollar = round(cap_local / fx, 2) if fx > 0 else None
+
+            data.append(
+                (
+                    c_code,
+                    start_dt,
+                    reg,
+                    fuel,
+                    mw,
+                    mwh,
+                    "" if cap_local is None else cap_local,
+                    "" if cap_dollar is None else cap_dollar,
+                )
             )
-            for row in data:
-                writer.writerow(row)
-            temp_path = tf.name
 
+        tmp_path: Optional[Path] = None
         self.conn.execute("BEGIN TRANSACTION")
         try:
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".csv", delete=False
+            ) as tf:
+                tmp_path = Path(tf.name)
+                writer = csv.writer(tf)
+                writer.writerow(
+                    [
+                        "country_code",
+                        "interval_start",
+                        "region",
+                        "fuel_tech",
+                        "generation_mw",
+                        "energy_mwh",
+                        "capture_price_local",
+                        "capture_price_dollar",
+                    ]
+                )
+                for row in data:
+                    writer.writerow(row)
+
+            escaped_path = tmp_path.as_posix().replace("'", "''")
             self.conn.execute(f"""
                 INSERT INTO energy_interval (
                     country_code, interval_start, region, fuel_tech,
-                    generation_mw, energy_mwh
+                    generation_mw, energy_mwh, capture_price_local, capture_price_dollar
                 )
                 SELECT
                     country_code,
@@ -293,19 +340,23 @@ class Database:
                     region,
                     fuel_tech,
                     COALESCE(TRY_CAST(generation_mw AS DOUBLE), 0.0),
-                    COALESCE(TRY_CAST(energy_mwh AS DOUBLE), 0.0)
-                FROM read_csv('{temp_path}', header=True, all_varchar=True)
+                    COALESCE(TRY_CAST(energy_mwh AS DOUBLE), 0.0),
+                    TRY_CAST(capture_price_local AS DOUBLE),
+                    TRY_CAST(capture_price_dollar AS DOUBLE)
+                FROM read_csv('{escaped_path}', header=True, all_varchar=True)
                 ON CONFLICT (country_code, interval_start, region, fuel_tech) DO UPDATE SET
                     generation_mw = EXCLUDED.generation_mw,
-                    energy_mwh = EXCLUDED.energy_mwh;
+                    energy_mwh = EXCLUDED.energy_mwh,
+                    capture_price_local = COALESCE(EXCLUDED.capture_price_local, energy_interval.capture_price_local),
+                    capture_price_dollar = COALESCE(EXCLUDED.capture_price_dollar, energy_interval.capture_price_dollar);
             """)
             self.conn.execute("COMMIT")
         except Exception:
             self.conn.execute("ROLLBACK")
             raise
         finally:
-            if os.path.exists(temp_path):
-                os.unlink(temp_path)
+            if tmp_path is not None and tmp_path.exists():
+                tmp_path.unlink()
 
         return len(records)
 
@@ -331,6 +382,9 @@ class Database:
                 reg = r.region
                 p_local = r.price_local
                 p_dollar = r.price_dollar
+                lwap_local = r.lwap_local
+                lwap_dollar = r.lwap_dollar
+                demand_mw = r.demand_mw
                 raw_dt = r.interval_start
             else:
                 c_code = r.get("country_code", country_code).upper()
@@ -346,14 +400,38 @@ class Database:
                     else None
                 )
                 p_dollar = r.get("price_dollar")
+                lwap_local = (
+                    float(r["lwap_local"]) if r.get("lwap_local") is not None else None
+                )
+                lwap_dollar = (
+                    float(r["lwap_dollar"])
+                    if r.get("lwap_dollar") is not None
+                    else None
+                )
+                demand_mw = (
+                    float(r["demand_mw"]) if r.get("demand_mw") is not None else None
+                )
+
+            d_val = raw_dt.date() if hasattr(raw_dt, "date") else str(raw_dt)[:10]
+            cache_key = (str(d_val)[:10], curr)
 
             if p_local is not None and p_dollar is None:
-                d_val = raw_dt.date() if hasattr(raw_dt, "date") else str(raw_dt)[:10]
-                cache_key = (str(d_val)[:10], curr)
                 if cache_key not in fx_cache:
-                    fx_cache[cache_key] = get_fx_rate(d_val, curr, conn=self.conn)
+                    try:
+                        fx_cache[cache_key] = get_fx_rate(d_val, curr, conn=self.conn)
+                    except Exception:
+                        fx_cache[cache_key] = 0.0
                 fx = fx_cache[cache_key]
                 p_dollar = round(p_local / fx, 2) if fx > 0 else None
+
+            if lwap_local is not None and lwap_dollar is None:
+                if cache_key not in fx_cache:
+                    try:
+                        fx_cache[cache_key] = get_fx_rate(d_val, curr, conn=self.conn)
+                    except Exception:
+                        fx_cache[cache_key] = 0.0
+                fx = fx_cache[cache_key]
+                lwap_dollar = round(lwap_local / fx, 2) if fx > 0 else None
 
             data.append(
                 (
@@ -362,48 +440,65 @@ class Database:
                     reg,
                     "" if p_local is None else p_local,
                     "" if p_dollar is None else p_dollar,
+                    "" if lwap_local is None else lwap_local,
+                    "" if lwap_dollar is None else lwap_dollar,
+                    "" if demand_mw is None else demand_mw,
                 )
             )
 
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as tf:
-            writer = csv.writer(tf)
-            writer.writerow(
-                [
-                    "country_code",
-                    "interval_start",
-                    "region",
-                    "price_local",
-                    "price_dollar",
-                ]
-            )
-            for row in data:
-                writer.writerow(row)
-            temp_path = tf.name
-
+        tmp_path: Optional[Path] = None
         self.conn.execute("BEGIN TRANSACTION")
         try:
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".csv", delete=False
+            ) as tf:
+                tmp_path = Path(tf.name)
+                writer = csv.writer(tf)
+                writer.writerow(
+                    [
+                        "country_code",
+                        "interval_start",
+                        "region",
+                        "price_local",
+                        "price_dollar",
+                        "lwap_local",
+                        "lwap_dollar",
+                        "demand_mw",
+                    ]
+                )
+                for row in data:
+                    writer.writerow(row)
+
+            escaped_path = tmp_path.as_posix().replace("'", "''")
             self.conn.execute(f"""
                 INSERT INTO prices_interval (
-                    country_code, interval_start, region, price_local, price_dollar
+                    country_code, interval_start, region, price_local, price_dollar,
+                    lwap_local, lwap_dollar, demand_mw
                 )
                 SELECT
                     country_code,
                     interval_start::TIMESTAMPTZ,
                     region,
                     TRY_CAST(price_local AS DOUBLE),
-                    TRY_CAST(price_dollar AS DOUBLE)
-                FROM read_csv('{temp_path}', header=True, all_varchar=True)
+                    TRY_CAST(price_dollar AS DOUBLE),
+                    TRY_CAST(lwap_local AS DOUBLE),
+                    TRY_CAST(lwap_dollar AS DOUBLE),
+                    TRY_CAST(demand_mw AS DOUBLE)
+                FROM read_csv('{escaped_path}', header=True, all_varchar=True)
                 ON CONFLICT (country_code, interval_start, region) DO UPDATE SET
-                    price_local = EXCLUDED.price_local,
-                    price_dollar = EXCLUDED.price_dollar;
+                    price_local = COALESCE(EXCLUDED.price_local, prices_interval.price_local),
+                    price_dollar = COALESCE(EXCLUDED.price_dollar, prices_interval.price_dollar),
+                    lwap_local = COALESCE(EXCLUDED.lwap_local, prices_interval.lwap_local),
+                    lwap_dollar = COALESCE(EXCLUDED.lwap_dollar, prices_interval.lwap_dollar),
+                    demand_mw = COALESCE(EXCLUDED.demand_mw, prices_interval.demand_mw);
             """)
             self.conn.execute("COMMIT")
         except Exception:
             self.conn.execute("ROLLBACK")
             raise
         finally:
-            if os.path.exists(temp_path):
-                os.unlink(temp_path)
+            if tmp_path is not None and tmp_path.exists():
+                tmp_path.unlink()
 
         return len(records)
 
@@ -432,13 +527,14 @@ class Database:
             date_cond = " AND interval_start::DATE >= ?::DATE"
             params.append(str(start_date))
         else:
-            date_cond = " AND interval_start >= (SELECT COALESCE(MAX(interval_start) - INTERVAL '3 days', '2000-01-01'::TIMESTAMPTZ) FROM energy_interval WHERE country_code = ?)"
+            date_cond = " AND interval_start::DATE >= (SELECT MAX(interval_start)::DATE - INTERVAL '3 days' FROM energy_interval WHERE country_code = ?)"
             params.append(country)
 
         energy_sql = f"""
             INSERT INTO energy_daily (
                 country_code, date, region, fuel_tech, energy_mwh,
-                avg_generation_mw, peak_generation_mw
+                avg_generation_mw, peak_generation_mw,
+                capture_price_local, capture_price_dollar
             )
             SELECT
                 country_code,
@@ -447,14 +543,24 @@ class Database:
                 fuel_tech,
                 round(sum(energy_mwh), 2) AS energy_mwh,
                 round(avg(generation_mw), 2) AS avg_generation_mw,
-                round(max(generation_mw), 2) AS peak_generation_mw
+                round(max(generation_mw), 2) AS peak_generation_mw,
+                CASE WHEN sum(CASE WHEN capture_price_local IS NOT NULL THEN energy_mwh ELSE 0 END) > 0
+                     THEN round(sum(capture_price_local * energy_mwh) / sum(CASE WHEN capture_price_local IS NOT NULL THEN energy_mwh ELSE 0 END), 2)
+                     ELSE round(avg(capture_price_local), 2)
+                END AS capture_price_local,
+                CASE WHEN sum(CASE WHEN capture_price_dollar IS NOT NULL THEN energy_mwh ELSE 0 END) > 0
+                     THEN round(sum(capture_price_dollar * energy_mwh) / sum(CASE WHEN capture_price_dollar IS NOT NULL THEN energy_mwh ELSE 0 END), 2)
+                     ELSE round(avg(capture_price_dollar), 2)
+                END AS capture_price_dollar
             FROM energy_interval
             WHERE country_code = ? {date_cond}
             GROUP BY country_code, interval_start::DATE, region, fuel_tech
             ON CONFLICT (country_code, date, region, fuel_tech) DO UPDATE SET
                 energy_mwh = EXCLUDED.energy_mwh,
                 avg_generation_mw = EXCLUDED.avg_generation_mw,
-                peak_generation_mw = EXCLUDED.peak_generation_mw;
+                peak_generation_mw = EXCLUDED.peak_generation_mw,
+                capture_price_local = EXCLUDED.capture_price_local,
+                capture_price_dollar = EXCLUDED.capture_price_dollar;
         """
         self.conn.execute("BEGIN TRANSACTION")
         try:
@@ -496,9 +602,9 @@ class Database:
             v_cond = " AND e.interval_start::DATE >= ?::DATE"
             v_params = [country, str(start_date)]
         else:
-            date_cond = " AND p.interval_start >= (SELECT COALESCE(MAX(interval_start) - INTERVAL '3 days', '2000-01-01'::TIMESTAMPTZ) FROM prices_interval WHERE country_code = ?)"
+            date_cond = " AND p.interval_start::DATE >= (SELECT MAX(interval_start)::DATE - INTERVAL '3 days' FROM prices_interval WHERE country_code = ?)"
             p_params = [country, country]
-            v_cond = " AND e.interval_start >= (SELECT COALESCE(MAX(interval_start) - INTERVAL '3 days', '2000-01-01'::TIMESTAMPTZ) FROM energy_interval WHERE country_code = ?)"
+            v_cond = " AND e.interval_start::DATE >= (SELECT MAX(interval_start)::DATE - INTERVAL '3 days' FROM energy_interval WHERE country_code = ?)"
             v_params = [country, country]
 
         price_sql = f"""
@@ -507,7 +613,8 @@ class Database:
                 vwap_price_local, twap_price_local,
                 vwap_price_dollar, twap_price_dollar,
                 price_min_local, price_p5_local, price_median_local, price_p95_local, price_max_local,
-                price_min_dollar, price_p5_dollar, price_median_dollar, price_p95_dollar, price_max_dollar
+                price_min_dollar, price_p5_dollar, price_median_dollar, price_p95_dollar, price_max_dollar,
+                lwap_price_local, lwap_price_dollar, avg_demand_mw, peak_demand_mw
             )
             SELECT
                 p.country_code,
@@ -526,7 +633,17 @@ class Database:
                 round(quantile_cont(p.price_dollar, 0.05), 2) AS price_p5_dollar,
                 round(median(p.price_dollar), 2) AS price_median_dollar,
                 round(quantile_cont(p.price_dollar, 0.95), 2) AS price_p95_dollar,
-                round(max(p.price_dollar), 2) AS price_max_dollar
+                round(max(p.price_dollar), 2) AS price_max_dollar,
+                CASE WHEN sum(CASE WHEN p.lwap_local IS NOT NULL THEN COALESCE(p.demand_mw, 0) ELSE 0 END) > 0
+                     THEN round(sum(p.lwap_local * COALESCE(p.demand_mw, 0)) / sum(CASE WHEN p.lwap_local IS NOT NULL THEN COALESCE(p.demand_mw, 0) ELSE 0 END), 2)
+                     ELSE round(avg(p.lwap_local), 2)
+                END AS lwap_price_local,
+                CASE WHEN sum(CASE WHEN p.lwap_dollar IS NOT NULL THEN COALESCE(p.demand_mw, 0) ELSE 0 END) > 0
+                     THEN round(sum(p.lwap_dollar * COALESCE(p.demand_mw, 0)) / sum(CASE WHEN p.lwap_dollar IS NOT NULL THEN COALESCE(p.demand_mw, 0) ELSE 0 END), 2)
+                     ELSE round(avg(p.lwap_dollar), 2)
+                END AS lwap_price_dollar,
+                round(avg(p.demand_mw), 2) AS avg_demand_mw,
+                round(max(p.demand_mw), 2) AS peak_demand_mw
             FROM prices_interval p
             LEFT JOIN (
                 SELECT
@@ -543,7 +660,7 @@ class Database:
                 WHERE e.country_code = ? {v_cond} AND p2.price_local IS NOT NULL
                 GROUP BY e.country_code, e.interval_start::DATE, e.region
             ) v ON p.country_code = v.country_code AND p.interval_start::DATE = v.date AND p.region = v.region
-            WHERE p.country_code = ? {date_cond} AND p.price_local IS NOT NULL
+            WHERE p.country_code = ? {date_cond} AND (p.price_local IS NOT NULL OR p.lwap_local IS NOT NULL OR p.demand_mw IS NOT NULL)
             GROUP BY p.country_code, p.interval_start::DATE, p.region, v.vwap_local, v.vwap_dollar
             ON CONFLICT (country_code, date, region) DO UPDATE SET
                 vwap_price_local = EXCLUDED.vwap_price_local,
@@ -559,7 +676,11 @@ class Database:
                 price_p5_dollar = EXCLUDED.price_p5_dollar,
                 price_median_dollar = EXCLUDED.price_median_dollar,
                 price_p95_dollar = EXCLUDED.price_p95_dollar,
-                price_max_dollar = EXCLUDED.price_max_dollar;
+                price_max_dollar = EXCLUDED.price_max_dollar,
+                lwap_price_local = EXCLUDED.lwap_price_local,
+                lwap_price_dollar = EXCLUDED.lwap_price_dollar,
+                avg_demand_mw = EXCLUDED.avg_demand_mw,
+                peak_demand_mw = EXCLUDED.peak_demand_mw;
         """
         self.conn.execute("BEGIN TRANSACTION")
         try:
@@ -595,7 +716,9 @@ class Database:
         Returns None if no data exists.
         """
         c = country_code.upper()
+        tz = COUNTRIES_CONFIG.get(c, {}).get("timezone", "UTC")
         try:
+            self.conn.execute(f"SET TimeZone = '{tz}'")
             query = """
                 SELECT MAX(latest_dt) FROM (
                     SELECT MAX(interval_start) AS latest_dt FROM energy_interval WHERE country_code = ?

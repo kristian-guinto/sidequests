@@ -2,6 +2,14 @@
 .idea/
 .vscode/
 
+.env
+.env.*
+!.env.example
+*.duckdb
+*.duckdb.wal
+*.parquet
+
 # Opportunity Radar local data
 opportunity-radar/*.json
 opportunity-radar/opportunities.json
+opportunity-radar/blueprints/

@@ -4,6 +4,22 @@ import { BlogEnergyChart } from "./BlogEnergyChart";
 import { BlogCustomChart } from "./BlogCustomChart";
 import { StatCallout, DataCallout, GridBadge } from "./BlogCallouts";
 
+function getSafeHref(rawHref?: string): string {
+  if (!rawHref) return "#";
+  const trimmed = rawHref.trim();
+  const lower = trimmed.toLowerCase();
+  if (
+    lower.startsWith("https://") ||
+    lower.startsWith("http://") ||
+    lower.startsWith("mailto:") ||
+    trimmed.startsWith("/") ||
+    trimmed.startsWith("#")
+  ) {
+    return trimmed;
+  }
+  return "#";
+}
+
 export const mdxComponents = {
   // Custom blog widgets
   BlogEnergyChart,
@@ -13,12 +29,13 @@ export const mdxComponents = {
   GridBadge,
 
   // Standard markdown enhancements
-  a: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => {
-    const isInternal = href && (href.startsWith("/") || href.startsWith("#"));
+  a: ({ href, children, rel, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => {
+    const safeHref = getSafeHref(href);
+    const isInternal = safeHref.startsWith("/") || safeHref.startsWith("#");
     if (isInternal) {
       return (
         <Link
-          href={href}
+          href={safeHref}
           className="text-emerald-600 dark:text-emerald-400 font-medium underline underline-offset-4 hover:text-emerald-500 transition-colors"
           {...props}
         >
@@ -26,11 +43,12 @@ export const mdxComponents = {
         </Link>
       );
     }
+    const safeRel = rel ? `${rel} noopener noreferrer` : "noopener noreferrer";
     return (
       <a
-        href={href}
+        href={safeHref}
         target="_blank"
-        rel="noopener noreferrer"
+        rel={safeRel}
         className="text-emerald-600 dark:text-emerald-400 font-medium underline underline-offset-4 hover:text-emerald-500 transition-colors"
         {...props}
       >
