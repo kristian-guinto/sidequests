@@ -35,6 +35,7 @@ When implementing or maintaining Python serverless API handlers (`api/index.py`)
 - Run tests via: `uv run pytest`.
 - Manage dependencies via: `uv add <pkg>`, `uv remove <pkg>`, or `uv pip install <pkg>`.
 - Never execute bare `python`, `python3`, or `pip` directly.
+- **Pre-Commit Verification (`open-electricity`)**: Run `./open-electricity/verify.sh` once as a pre-commit check after completing changes in `open-electricity` (it automatically skips if no Python files were modified; pass `--all` to force a full run).
 
 ---
 

@@ -21,41 +21,129 @@ OpenNEM-PH tracks the electricity transition in the Philippines by ingesting and
 
 ## 🏗️ Architecture
 
+### System & Deployment Architecture
+
+```mermaid
+flowchart TB
+    subgraph Sources["External Market & FX Data Sources"]
+        IEMOP["Philippines IEMOP (WESM 5m Dispatch & LMP)"]
+        EMC["Singapore EMC (NEMS 30m USEP & Generation)"]
+        MSB["Malaysia Single Buyer (30m Dispatch & SMP)"]
+        EGAT["Thailand EGAT (System Generation)"]
+        FX["FX Rates API (PHP, SGD, MYR, THB to USD)"]
+    end
+
+    subgraph CICD["CI/CD & Data Ingestion Tier (GitHub Actions)"]
+        GHA["GitHub Actions Runner (open-electricity-daily_pipeline.yml - 01:00 UTC Cron)"]
+        Ducklembic["ducklembic CLI (Schema Migrations 001-005 & Cloud Sync)"]
+        Pipeline["uv run ingest (Multi-Country Providers, Fuel Classifiers, SQL Rollups)"]
+        Archiver["NodalParquetArchiver (ZSTD Parquet Compression)"]
+    end
+
+    subgraph Storage["Cloud Storage & OLAP Tier"]
+        MotherDuck[("MotherDuck Cloud OLAP (md:open_electricity_db)")]
+        R2[("Cloudflare R2 Bucket (Cold Nodal Parquet Archive)")]
+        LocalDuck[("Local DuckDB (open_nem_ph.duckdb - Dev Mode)")]
+    end
+
+    subgraph Vercel["Application & Deployment Tier (Vercel - Root: open-electricity)"]
+        BuildFilter["Monorepo Build Guard (git diff --quiet HEAD^ HEAD ./)"]
+        EdgeCDN["Vercel Edge Network & Cache (s-maxage=300..3600)"]
+        NextJS["Next.js 14 App Router (React 18, ECharts 5, MDX Blog)"]
+        FastAPI["Vercel Python Serverless (api/index.py - FastAPI, maxDuration: 60s)"]
+        TmpDuck["Serverless DuckDB Runtime (_MD_CONN Pool & /tmp/.duckdb/extensions)"]
+    end
+
+    subgraph External["Client & Commercial Services"]
+        Browser["User Browser (ASEAN Overview, Country Dashboards, Pro Catalog)"]
+        Stripe["Stripe Checkout (B2B Nodal, Solar/BESS & Carbon Data Packs)"]
+    end
+
+    %% External Sources -> Pipeline
+    IEMOP --> Pipeline
+    EMC --> Pipeline
+    MSB --> Pipeline
+    EGAT --> Pipeline
+    FX --> Pipeline
+
+    %% CI/CD Orchestration & Storage
+    GHA --> Ducklembic
+    GHA --> Pipeline
+    Ducklembic --> MotherDuck
+    Pipeline --> Ducklembic
+    Pipeline --> Archiver
+    Pipeline --> MotherDuck
+    Pipeline -.-> LocalDuck
+    Archiver --> R2
+
+    %% Client Request & Delivery Flows
+    Browser --> EdgeCDN
+    Browser -.-> Stripe
+    BuildFilter --> NextJS
+    BuildFilter --> FastAPI
+    EdgeCDN --> NextJS
+    EdgeCDN --> FastAPI
+    FastAPI --> TmpDuck
+    TmpDuck --> MotherDuck
+    NextJS -.-> Stripe
+```
+
+### Deployment Components
+
+| Component | Platform / Runtime | Source Path | Role & Deployment Invariants |
+| :--- | :--- | :--- | :--- |
+| **Frontend Web App & Blog** | Vercel Edge CDN / Next.js 14 App Router | `src/app/`, `src/components/`, `src/content/blog/` | Static MDX blog generation and interactive SPA telemetry dashboard with Apache ECharts 5, dynamic region switching, and responsive waffle charts. |
+| **Analytical API Backend** | Vercel Python Serverless Function | `api/index.py`, `vercel.json` | High-performance FastAPI analytical gateway with `maxDuration: 60s`. Enforces `/tmp/.duckdb/extensions` directory invariant, thread-safe `_MD_CONN` connection pool reuse, and tiered `Cache-Control` (`s-maxage=300..3600`). |
+| **Monorepo Build Filter** | Vercel Build System | `vercel.json` | Enforces `ignoreCommand: "git diff --quiet HEAD^ HEAD ./"` to prevent cascading builds across unrelated monorepo projects (`nem-battery`, `pollmph`, `krillion`). |
+| **Cloud OLAP Database** | MotherDuck Serverless DuckDB | `md:open_electricity_db`, `migrations/001..005` | Primary analytical data warehouse managed via Ducklembic. Stores normalized tables: `facilities`, `energy_interval`, `prices_interval`, `energy_daily`, `prices_daily`, and `exchange_rates`. |
+| **Cold Nodal Archive** | Cloudflare R2 (S3-Compatible Object Storage) | `packages/pipeline/pipeline/archiver.py` | Idempotent long-term archive for raw 5-minute locational marginal price (LMP) and dispatch records. Compressed with ZSTD into daily Parquet partitions (`data/archive/<COUNTRY>/<YEAR>/`). |
+| **Scheduled ETL & Migrations** | GitHub Actions (Ubuntu Runner + `uv` / Python 3.12) | `.github/workflows/open-electricity-daily_pipeline.yml` | Automated daily ingestion (`01:00 UTC` cron / `workflow_dispatch`). Applies Ducklembic migrations, pulls external market data, executes multi-country providers, and respects `motherduck-ingest` concurrency lock. |
+| **Commercial Checkout** | Stripe Hosted Checkout | `src/components/ProDataBanner.tsx`, `/api/pro/catalog` | Self-service B2B data licensing and export catalog for nodal dispatch series, Solar/BESS co-location analytics, and high-resolution carbon accounting datasets. |
+
+### Repository Structure
+
 ```
 open-electricity/
 ├── .github/
 │   └── workflows/
-│       └── daily_pipeline.yml      # Automated daily GitHub Actions cron (uv run ingest)
+│       └── open-electricity-daily_pipeline.yml # Monorepo CI/CD daily ETL cron (01:00 UTC)
 ├── api/
-│   ├── index.py                    # FastAPI Backend (Vercel Serverless Function)
-│   └── pyproject.toml              # FastAPI Python dependencies
-├── migrations/                     # Versioned SQL migrations (managed by ducklembic)
+│   ├── index.py                                # FastAPI Serverless API (Vercel maxDuration: 60s)
+│   ├── pyproject.toml                          # Serverless backend dependencies
+│   └── tests/                                  # API unit tests (uv run pytest)
+├── docs/                                       # Publishing & technical guides
+├── migrations/                                 # Ducklembic versioned SQL migrations (001-005)
 │   ├── 001_initial_schema.up.sql
-│   └── 001_initial_schema.down.sql
+│   ├── 002_tiered_data_model.up.sql
+│   ├── 003_lean_data_model.up.sql
+│   ├── 004_separate_price_tables.up.sql
+│   └── 005_capture_price_and_lwap.up.sql
 ├── packages/
-│   ├── ducklembic/                 # Reusable DuckDB + MotherDuck migration & sync library
-│   └── pipeline/                   # Python data ingestion & ETL engine package (uv)
-│       ├── pyproject.toml          # Pipeline package definition & CLI entry points
+│   ├── ducklembic/                             # Reusable DuckDB + MotherDuck migration library
+│   │   ├── ducklembic/                         # Migration runner, state tracker & cloud sync
+│   │   └── pyproject.toml
+│   └── pipeline/                               # Multi-country ETL & ingestion engine (uv)
+│       ├── pyproject.toml                      # Ingestion CLI entry points
 │       └── pipeline/
-│           ├── config.py           # Configuration & constants
-│           ├── iemop_client.py     # IEMOP AJAX downloader & ZIP/CSV unpacker
-│           ├── generator_registry.py # Generator fuel tech mapper & heuristic resolver
-│           ├── data_processor.py   # 5-minute dispatch & regional aggregator
-│           ├── db.py               # DuckDB & MotherDuck storage layer (uses ducklembic)
-│           ├── ingest.py           # CLI tool for daily sync & backfills
-│           └── data/
-│               └── generators_master.json # Philippine power plant catalog
-├── src/                            # Next.js 14 Frontend
-│   ├── app/                        # Next.js App Router (Dashboard)
-│   ├── components/                 # Charts, KPI cards, Fuel table, Interconnectors
-│   └── lib/                        # Types, color palette, mock generator
-├── package.json                    # Frontend dependencies & scripts
-├── next.config.mjs                 # Next.js rewrites configuration
-├── tailwind.config.ts              # Tailwind CSS configuration
-├── open_nem_ph.duckdb              # Embedded OLAP DuckDB database (local)
-├── vercel.json                     # Vercel deployment routing configuration
-├── pyproject.toml                  # Python package configuration
-└── README.md
+│           ├── archiver.py                     # NodalParquetArchiver (ZSTD cold storage)
+│           ├── classifiers/                    # Fuel technology & plant classifier models
+│           ├── db.py                           # DuckDB & MotherDuck database operations
+│           ├── ingest.py / cli.py              # Ingestion CLI commands & dispatch loops
+│           └── providers/                      # Country market data extractors
+│               ├── base.py                     # BaseProvider interface
+│               ├── my_singlebuyer.py           # Malaysia Single Buyer (30m SMP & mix)
+│               ├── ph_iemop.py                 # Philippines IEMOP (5m WESM dispatch)
+│               ├── sg_emc.py                   # Singapore EMC (30m USEP & generation)
+│               └── th_egat.py                  # Thailand EGAT (System hourly generation)
+├── src/                                        # Next.js 14 Frontend Application
+│   ├── app/                                    # App Router (ASEAN overview, country routes, blog)
+│   ├── components/                             # ECharts visualizations, waffle charts, Pro banner
+│   ├── content/blog/                           # MDX analytical articles & market reports
+│   └── lib/                                    # Types, API client, color maps & formatters
+├── open_nem_ph.duckdb                          # Local DuckDB database (embedded development mode)
+├── vercel.json                                 # Vercel deployment routing & monorepo build guard
+├── package.json                                # Frontend dependencies & workspace scripts
+└── pyproject.toml                              # Root Python project configuration
 ```
 
 ---
@@ -139,7 +227,7 @@ Visit [`http://localhost:3000`](http://localhost:3000) to view the live dashboar
 
 ## 🤖 Daily Automated Pipeline (GitHub Actions)
 
-The repository includes a production-ready GitHub Action in [`.github/workflows/daily_pipeline.yml`](.github/workflows/daily_pipeline.yml):
+The repository includes a production-ready GitHub Action in [`.github/workflows/open-electricity-daily_pipeline.yml`](../.github/workflows/open-electricity-daily_pipeline.yml):
 - **Schedule**: Automatically runs daily at `01:00 UTC` (`09:00 AM UTC+8` Manila / Singapore / Kuala Lumpur), right after regional markets finalize interval data.
 - **Multi-Country Coverage**: Synchronizes generation mix, fuel technology categorization, and spot prices across Philippines (IEMOP), Singapore (EMC), and Malaysia (Single Buyer).
 - **MotherDuck Ingestion**: Automatically writes and rolls up data in MotherDuck Cloud using the `MOTHERDUCK_TOKEN` secret.
