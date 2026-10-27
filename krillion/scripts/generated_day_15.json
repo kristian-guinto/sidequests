@@ -1,0 +1,1870 @@
+{
+  "date": "2026-10-30",
+  "dayNumber": 15,
+  "prompts": [
+    {
+      "answers": [
+        {
+          "aliases": [
+            "Mangga",
+            "Philippine mango",
+            "Carabao mango"
+          ],
+          "answer": "Mango",
+          "tier": "plankton"
+        },
+        {
+          "aliases": [
+            "Peaches",
+            "Melocoton"
+          ],
+          "answer": "Peach",
+          "tier": "plankton"
+        },
+        {
+          "aliases": [
+            "Abukado",
+            "Avocados"
+          ],
+          "answer": "Avocado",
+          "tier": "plankton"
+        },
+        {
+          "aliases": [
+            "Cherries",
+            "Cereza"
+          ],
+          "answer": "Cherry",
+          "tier": "plankton"
+        },
+        {
+          "aliases": [
+            "Plums",
+            "Ciruela"
+          ],
+          "answer": "Plum",
+          "tier": "plankton"
+        },
+        {
+          "aliases": [
+            "Olives",
+            "Azeitona"
+          ],
+          "answer": "Olive",
+          "quip": "Botanical technicality alert! Yes, olives are stone fruits, martini drinkers rejoice.",
+          "tier": "tooclever"
+        },
+        {
+          "aliases": [
+            "Niyog",
+            "Buko",
+            "Coco"
+          ],
+          "answer": "Coconut",
+          "quip": "A fibrous one-seeded drupe! You brought high school biology trivia to a fruit fight.",
+          "tier": "tooclever"
+        },
+        {
+          "aliases": [
+            "Apricots",
+            "Albaricoque"
+          ],
+          "answer": "Apricot",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Nectarines"
+          ],
+          "answer": "Nectarine",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Dates",
+            "Datiles",
+            "Medjool date"
+          ],
+          "answer": "Date",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Prunes",
+            "Dried plum"
+          ],
+          "answer": "Prune",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Litchi",
+            "Litsiyas"
+          ],
+          "answer": "Lychee",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Usaw"
+          ],
+          "answer": "Rambutan",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Dragon eye fruit",
+            "Lansones lookalike"
+          ],
+          "answer": "Longan",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Spanish plum",
+            "Sineguelas",
+            "Red mombin",
+            "Spondias purpurea"
+          ],
+          "answer": "Siniguelas",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Cotton fruit",
+            "Sandoricum koetjape"
+          ],
+          "answer": "Santol",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Almonds",
+            "Almendra"
+          ],
+          "answer": "Almond",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Pistachios",
+            "Pistache"
+          ],
+          "answer": "Pistachio",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Blackberries",
+            "Aggregate drupe"
+          ],
+          "answer": "Blackberry",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Raspberries"
+          ],
+          "answer": "Raspberry",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Velvet apple",
+            "Kamagong fruit"
+          ],
+          "answer": "Mabolo",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Lipote berry",
+            "Syzygium polycephaloides"
+          ],
+          "answer": "Lipote",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Java plum",
+            "Black plum"
+          ],
+          "answer": "Duhat",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Bugnay",
+            "Antidesma bunius",
+            "Philippine wild berry"
+          ],
+          "answer": "Bignay",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Pili fruit",
+            "Canarium ovatum fruit",
+            "Pili"
+          ],
+          "answer": "Pili Nut Fruit",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Damson plum"
+          ],
+          "answer": "Damson",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Reine Claude"
+          ],
+          "answer": "Greengage",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Plumcot",
+            "Aprium"
+          ],
+          "answer": "Pluot",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Harpephyllum caffrum"
+          ],
+          "answer": "Kaffir Plum",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Elephant fruit",
+            "Sclerocarya birrea"
+          ],
+          "answer": "Marula",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Synsepalum dulcificum",
+            "Miracle berry"
+          ],
+          "answer": "Miracle Fruit",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Green siniguelas with rock salt",
+            "Manibalang na sineguelas"
+          ],
+          "answer": "Sineguelas na may asin sa plastic labo",
+          "quip": "Munches straight through the skin while dodging the choking hazard seed under a summer santol tree. One in a Krillion!",
+          "tier": "krillion"
+        },
+        {
+          "aliases": [
+            "Lunok santol seed",
+            "Swallowed santol pit"
+          ],
+          "answer": "Santol Buko Seed Swallowed Whole",
+          "quip": "The ultimate Pinoy ER nightmare your lola warned you about every summer. Deep trench danger!",
+          "tier": "krillion"
+        }
+      ],
+      "category": "universal",
+      "hint": "Drupes and pitted fruits with a hard woody pit enclosing the seed",
+      "id": "day15-p1",
+      "text": "Name a fruit that contains a single hard stone or pit in the center (stone fruit / drupe)"
+    },
+    {
+      "answers": [
+        {
+          "aliases": [
+            "Halohalo",
+            "Halo halo special"
+          ],
+          "answer": "Halo-Halo",
+          "tier": "plankton"
+        },
+        {
+          "aliases": [
+            "Mais con hielo",
+            "Corn with ice"
+          ],
+          "answer": "Mais con Yelo",
+          "tier": "plankton"
+        },
+        {
+          "aliases": [
+            "Saging con yelo",
+            "Banana con hielo"
+          ],
+          "answer": "Saba con Yelo",
+          "tier": "plankton"
+        },
+        {
+          "aliases": [
+            "Dirty ice cream",
+            "Pinoy ice cream"
+          ],
+          "answer": "Sorbetes",
+          "tier": "plankton"
+        },
+        {
+          "aliases": [
+            "Buco pandan salad",
+            "Buko pandan"
+          ],
+          "answer": "Buko Pandan",
+          "tier": "plankton"
+        },
+        {
+          "aliases": [
+            "Iskrambol",
+            "Skrambol",
+            "Pink scramble"
+          ],
+          "answer": "Ice Scramble",
+          "quip": "The neon-pink powdered milk nostalgia everyone thinks they are the only one remembering.",
+          "tier": "tooclever"
+        },
+        {
+          "aliases": [
+            "Pinoy fruit salad",
+            "Fiesta fruit salad"
+          ],
+          "answer": "Fruit Salad",
+          "quip": "Condensed milk and all-purpose cream bath with drained canned cocktail. Classic holiday table crutch.",
+          "tier": "tooclever"
+        },
+        {
+          "aliases": [
+            "Young coconut salad",
+            "Buco salad"
+          ],
+          "answer": "Buko Salad",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Sago at gulaman",
+            "Samalamig"
+          ],
+          "answer": "Gulaman at Sago",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Pinoy ice candy",
+            "Mango ice candy",
+            "Avocado ice candy"
+          ],
+          "answer": "Ice Candy",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Crema de mangga",
+            "Mango graham float",
+            "Mango royale"
+          ],
+          "answer": "Mango Float",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Mosaic gelatin",
+            "Cathedral window"
+          ],
+          "answer": "Cathedral Window Gelatin",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Halo-halo sa buko shell"
+          ],
+          "answer": "Buko Halo",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Ube macapuno"
+          ],
+          "answer": "Macapuno Ice Cream",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Cold leche flan",
+            "Caramel custard"
+          ],
+          "answer": "Leche Flan Chilled",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Cold ube halaya",
+            "Purple yam jam"
+          ],
+          "answer": "Ube Halaya Chilled",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Ginemis",
+            "Pinipig and gulaman with coconut milk"
+          ],
+          "answer": "Guinomis",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Zamboanga knickerbocker",
+            "Chavacano fruit parfait"
+          ],
+          "answer": "Knickerbocker",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Shredded cantaloupe cooler",
+            "Melon samalamig",
+            "Melon juice with shreds"
+          ],
+          "answer": "Melon Sa Malamig",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Abukado con yelo",
+            "Mashed avocado with condensed milk"
+          ],
+          "answer": "Avocado with Milk and Crushed Ice",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Coconut lychee salad"
+          ],
+          "answer": "Buko Lychee Sherbet",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Chilled crema de fruta",
+            "Sponge cake gelatin"
+          ],
+          "answer": "Crema de Fruta",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Fresh coconut shake",
+            "Buko juice blended"
+          ],
+          "answer": "Buko Shake",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Pinoy coffee jelly with cream"
+          ],
+          "answer": "Coffee Jelly Chilled",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "San Fernando La Union halo-halo"
+          ],
+          "answer": "Halo-Halo de Iloko",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Pagsanjan halo-halo with kundol"
+          ],
+          "answer": "Aling Taleng Halo-Halo",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Guagua Pampanga halo-halo",
+            "Sun-creamy macapuno saging flan"
+          ],
+          "answer": "Razon Halo-Halo",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Pinoy ice drop on a stick",
+            "Vintage Magnolia ice drop"
+          ],
+          "answer": "Ice Drop",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Twin pop orange chocolate",
+            "Magnolia twin pops"
+          ],
+          "answer": "Twin Popsies",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Magnolia Choc-Vim bottle chilled"
+          ],
+          "answer": "Choc-Vim",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Street ice scramble with skim milk and syrup",
+            "School gate iskrambol overload"
+          ],
+          "answer": "Iskrambol na punong-puno ng powdered milk at Hershey chocolate syrup sa plastic cup",
+          "quip": "Brain-freeze heaven bought outside the elementary school gate using 10-peso baon coins! Pure bliss.",
+          "tier": "krillion"
+        },
+        {
+          "aliases": [
+            "Frozen solid Milo ice candy",
+            "Milo ice candy na kailangan sipsipin"
+          ],
+          "answer": "Ice Candy na Milo na matigas pa sa bato",
+          "quip": "Tearing the plastic corner with your incisors and sucking pure chocolate syrup until only clear white ice remains. One in a Krillion!",
+          "tier": "krillion"
+        }
+      ],
+      "category": "filipino",
+      "hint": "Cold summer treats, icy shaved desserts, and sweet gelatin refreshments",
+      "id": "day15-p2",
+      "text": "Name an iconic Philippine dessert, cold merienda, or sweet refreshment served chilled or with ice"
+    },
+    {
+      "answers": [
+        {
+          "aliases": [
+            "100m sprint",
+            "100m dash",
+            "Men 100m",
+            "Women 100m"
+          ],
+          "answer": "100 Meters",
+          "tier": "plankton"
+        },
+        {
+          "aliases": [
+            "Olympic Marathon",
+            "42k"
+          ],
+          "answer": "Marathon",
+          "tier": "plankton"
+        },
+        {
+          "aliases": [
+            "200m sprint",
+            "200m dash"
+          ],
+          "answer": "200 Meters",
+          "tier": "plankton"
+        },
+        {
+          "aliases": [
+            "Broad jump",
+            "Olympic long jump"
+          ],
+          "answer": "Long Jump",
+          "tier": "plankton"
+        },
+        {
+          "aliases": [
+            "Vaulting",
+            "EJ Obiena event"
+          ],
+          "answer": "Pole Vault",
+          "quip": "EJ Obiena fan club present! Everyone claims this first because of Philippine pride.",
+          "tier": "tooclever"
+        },
+        {
+          "aliases": [
+            "400 meter relay",
+            "Sprint relay",
+            "4x100 relay"
+          ],
+          "answer": "4x100m Relay",
+          "quip": "Baton drop drama! The flashiest relay on Olympic prime time.",
+          "tier": "tooclever"
+        },
+        {
+          "aliases": [
+            "400m dash",
+            "Quarter mile"
+          ],
+          "answer": "400 Meters",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "800m run",
+            "Half mile"
+          ],
+          "answer": "800 Meters",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "1500m run",
+            "Metric mile"
+          ],
+          "answer": "1500 Meters",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Fosbury flop",
+            "Olympic high jump"
+          ],
+          "answer": "High Jump",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Hop step and jump"
+          ],
+          "answer": "Triple Jump",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Shotput",
+            "Throwing shot"
+          ],
+          "answer": "Shot Put",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Discus",
+            "Discus event"
+          ],
+          "answer": "Discus Throw",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Javelin",
+            "Spear throw"
+          ],
+          "answer": "Javelin Throw",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Hammer",
+            "Olympic hammer throw"
+          ],
+          "answer": "Hammer Throw",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "110 meter hurdles",
+            "Men high hurdles"
+          ],
+          "answer": "110m Hurdles",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "100 meter hurdles",
+            "Women sprint hurdles"
+          ],
+          "answer": "100m Hurdles",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "5000m run",
+            "5k track"
+          ],
+          "answer": "5000 Meters",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "10000m run",
+            "10k track"
+          ],
+          "answer": "10000 Meters",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "400 meter hurdles",
+            "Intermediate hurdles"
+          ],
+          "answer": "400m Hurdles",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Steeplechase",
+            "Water jump hurdle"
+          ],
+          "answer": "3000m Steeplechase",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "4x400 relay",
+            "Mile relay"
+          ],
+          "answer": "4x400m Relay",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Olympic decathlon",
+            "10-event discipline"
+          ],
+          "answer": "Decathlon",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Women heptathlon",
+            "7-event discipline"
+          ],
+          "answer": "Heptathlon",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "20 kilometer walk",
+            "Racewalking 20k"
+          ],
+          "answer": "20km Race Walk",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "35 kilometer race walk",
+            "50km race walk"
+          ],
+          "answer": "35km Race Walk",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Universal 4x400 relay",
+            "Mixed relay track"
+          ],
+          "answer": "Mixed 4x400m Relay",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Historic standing long jump",
+            "Ray Ewry event"
+          ],
+          "answer": "Standing Long Jump",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Historic Olympic cross country",
+            "1924 cross country"
+          ],
+          "answer": "Cross Country Running",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Olympic tug of war 1900-1920"
+          ],
+          "answer": "Tug of War",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Asia fastest woman sprint",
+            "Diay de Vega 100m"
+          ],
+          "answer": "Lydia de Vega Sprinting in Gintong Alay Spikes",
+          "quip": "Asia’s Sprint Queen dominating the track with national pride etched into every stride. Immortal legacy!",
+          "tier": "krillion"
+        },
+        {
+          "aliases": [
+            "Mona Sulaiman sprint",
+            "1960s Asian Games queen"
+          ],
+          "answer": "Mona Sulaiman Historic Century Dash",
+          "quip": "The legendary Cotabato powerhouse who blazed regional track history. Golden trench heritage!",
+          "tier": "krillion"
+        }
+      ],
+      "category": "universal",
+      "hint": "Olympic running, jumping, throwing, or combined track and field events",
+      "id": "day15-p3",
+      "text": "Name a recognized track and field / athletics event contested at the Summer Olympic Games"
+    },
+    {
+      "answers": [
+        {
+          "aliases": [
+            "Lucky Me Original",
+            "Original pancit canton"
+          ],
+          "answer": "Lucky Me! Pancit Canton Original",
+          "tier": "plankton"
+        },
+        {
+          "aliases": [
+            "Lucky Me Calamansi",
+            "Kalamansi flavor pancit canton"
+          ],
+          "answer": "Lucky Me! Pancit Canton Kalamansi",
+          "tier": "plankton"
+        },
+        {
+          "aliases": [
+            "Chilimansi",
+            "Lucky Me Chilimansi"
+          ],
+          "answer": "Lucky Me! Pancit Canton Chilimansi",
+          "tier": "plankton"
+        },
+        {
+          "aliases": [
+            "Extra Hot",
+            "Lucky Me Extra Hot"
+          ],
+          "answer": "Lucky Me! Pancit Canton Extra Hot Chili",
+          "tier": "plankton"
+        },
+        {
+          "aliases": [
+            "Lucky Me Beef",
+            "Beef flavor instant mami"
+          ],
+          "answer": "Lucky Me! Beef Mami",
+          "tier": "plankton"
+        },
+        {
+          "aliases": [
+            "Lucky Me Chicken",
+            "Chicken mami noodles"
+          ],
+          "answer": "Lucky Me! Chicken Mami",
+          "tier": "plankton"
+        },
+        {
+          "aliases": [
+            "Payless Xtra Big",
+            "Payless noodles"
+          ],
+          "answer": "Payless Pancit Canton",
+          "quip": "The budget student upgrade that gives you 30% more noodles for surviving midterms.",
+          "tier": "tooclever"
+        },
+        {
+          "aliases": [
+            "Fire noodles",
+            "Korean spicy noodles",
+            "Samyang 2x spicy"
+          ],
+          "answer": "Samyang Buldak",
+          "quip": "Internet spicy challenge warrior. Tears, milk, and regret included.",
+          "tier": "tooclever"
+        },
+        {
+          "aliases": [
+            "Sweet & spicy pancit canton",
+            "Sweet spicy"
+          ],
+          "answer": "Lucky Me! Sweet and Spicy",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Nissin cup",
+            "Cup noodles seafood"
+          ],
+          "answer": "Nissin Cup Noodles",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Nissin instant ramen",
+            "Nissin beef"
+          ],
+          "answer": "Nissin Ramen",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Yakisoba savory beef",
+            "Nissin yakisoba spicy chicken"
+          ],
+          "answer": "Nissin Yakisoba",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "La Paz Batchoy bowl",
+            "Lucky Me Batchoy"
+          ],
+          "answer": "Lucky Me! Supreme La Paz Batchoy",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Lucky me bulalo",
+            "Bulalo cup"
+          ],
+          "answer": "Lucky Me! Supreme Bulalo",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Maggi noodles",
+            "Maggi chicken"
+          ],
+          "answer": "Maggi 2-Minute Noodles",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Indomie",
+            "Indomie Mi Goreng",
+            "Indomie goreng"
+          ],
+          "answer": "Mi Goreng Indomie",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Quick chow pancit canton",
+            "Quickchow mami"
+          ],
+          "answer": "Quickchow",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Instant lomi",
+            "Lucky me instant lomi"
+          ],
+          "answer": "Lucky Me! Lomi",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Lucky Me Sotanghon cup",
+            "Instant glass noodles"
+          ],
+          "answer": "Lucky Me! Sotanghon",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Curly spaghetti instant"
+          ],
+          "answer": "Lucky Me! Curly Spaghetti",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Instant sopas",
+            "Lucky me sopas"
+          ],
+          "answer": "Lucky Me! Macaroni Soup",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Nongshim Shin Ramyun",
+            "Korean Shin ramen"
+          ],
+          "answer": "Shin Ramyun",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Ottogi Jin Ramen",
+            "Jin spicy"
+          ],
+          "answer": "Jin Ramen",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Payless beef mami",
+            "Payless chicken"
+          ],
+          "answer": "Payless Instant Mami",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Hobe bihon noodles",
+            "Instant pancit bihon"
+          ],
+          "answer": "Hobe Express Instant Bihon",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Shanghai instant noodles",
+            "Pancit shanghai patok"
+          ],
+          "answer": "Pancit Shanghai",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Super Q cup noodles"
+          ],
+          "answer": "Super Q Instant Bihon",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Go Noodless",
+            "Lucky Me Go Cup"
+          ],
+          "answer": "Lucky Me! Go NoodSearch",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Knorr noodle soup",
+            "Knorr mami"
+          ],
+          "answer": "Knorr Real Chinese Soup Noodle",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Monde egg noodles chicken mami"
+          ],
+          "answer": "Monde Special Mami",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Two packs chilimansi with runny sunny side up",
+            "Double pack chilimansi with egg"
+          ],
+          "answer": "Dalawang Pakete ng Chilimansi na may malasado na itlog",
+          "quip": "Because one pack is never enough, three packs is pure guilt, but two packs with a runny yolk is absolute college nirvana!",
+          "tier": "krillion"
+        },
+        {
+          "aliases": [
+            "Comshop kuya cooked pancit canton",
+            "Pisonet canton with monobloc chair vibes"
+          ],
+          "answer": "Lucky Me Pancit Canton na niluto ng computer shop bantay",
+          "quip": "Boiled in a dingy water kettle, mixed in a plastic-lined bowl, eaten while defending your Dota base at 2:00 AM. Cult classic!",
+          "tier": "krillion"
+        }
+      ],
+      "category": "filipino",
+      "hint": "Late-night pantry saviors, dormitory staples, and sari-sari store noodle packs",
+      "id": "day15-p4",
+      "text": "Name a brand, line, or classic flavor variant of instant noodles or instant pancit canton in the Philippines"
+    },
+    {
+      "answers": [
+        {
+          "aliases": [
+            "First violin",
+            "Second violin",
+            "Fiddle"
+          ],
+          "answer": "Violin",
+          "tier": "plankton"
+        },
+        {
+          "aliases": [
+            "Violoncello"
+          ],
+          "answer": "Cello",
+          "tier": "plankton"
+        },
+        {
+          "aliases": [
+            "Alto violin"
+          ],
+          "answer": "Viola",
+          "tier": "plankton"
+        },
+        {
+          "aliases": [
+            "Contrabass",
+            "Standup bass",
+            "String bass",
+            "Upright bass"
+          ],
+          "answer": "Double Bass",
+          "tier": "plankton"
+        },
+        {
+          "aliases": [
+            "Concert harp",
+            "Pedal harp",
+            "Orchestral harp"
+          ],
+          "answer": "Harp",
+          "tier": "plankton"
+        },
+        {
+          "aliases": [
+            "Pianoforte",
+            "Grand piano"
+          ],
+          "answer": "Piano",
+          "quip": "String or percussion? The eternal music school debate! Technicians say hammered strings count.",
+          "tier": "tooclever"
+        },
+        {
+          "aliases": [
+            "Clavicembalo",
+            "Cembalo"
+          ],
+          "answer": "Harpsichord",
+          "quip": "Baroque flex! You can practically hear Vivaldi's powdered wig rustling in the breeze.",
+          "tier": "tooclever"
+        },
+        {
+          "aliases": [
+            "Classical guitar",
+            "Spanish guitar"
+          ],
+          "answer": "Acoustic Guitar",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Renaissance lute",
+            "Archlute"
+          ],
+          "answer": "Lute",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Orchestral mandolin",
+            "Mandolina"
+          ],
+          "answer": "Mandolin",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Chitarrone",
+            "Extended neck lute"
+          ],
+          "answer": "Theorbo",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Bass viol",
+            "Gamba"
+          ],
+          "answer": "Viola da Gamba",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Octave violin",
+            "Pochette"
+          ],
+          "answer": "Violin Piccolo",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Extended range contrabass"
+          ],
+          "answer": "Five-String Double Bass",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Amplified violin"
+          ],
+          "answer": "Electric Violin",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Historical clavichord"
+          ],
+          "answer": "Clavichord",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Hammered dulcimer",
+            "Santur"
+          ],
+          "answer": "Dulcimer",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Concert zither"
+          ],
+          "answer": "Zither",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Medieval psaltery"
+          ],
+          "answer": "Psaltery",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Haydn baryton",
+            "Baryton viol"
+          ],
+          "answer": "Baryton",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Viola d amore",
+            "Love viol with sympathetic strings"
+          ],
+          "answer": "Viola d Amore",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Giant contrabass",
+            "Sub-bass octobass"
+          ],
+          "answer": "Octobass",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Hardingfele"
+          ],
+          "answer": "Hardanger Fiddle",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Keyed fiddle"
+          ],
+          "answer": "Nyckelharpa",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Medieval fiddle"
+          ],
+          "answer": "Vielle",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Renaissance rebec"
+          ],
+          "answer": "Rebec",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Medieval gittern"
+          ],
+          "answer": "Gittern",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Cittern",
+            "English guitar"
+          ],
+          "answer": "Citterio Cittern",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Philippine bandurria in symphony",
+            "Bandurria playing classical"
+          ],
+          "answer": "Rondalla Bandurria trespassing on Beethoven score",
+          "quip": "14 strings of tremolo steel invading a European hall with pure Kundiman power. One in a Krillion!",
+          "tier": "krillion"
+        },
+        {
+          "aliases": [
+            "Three-story tall octobass",
+            "Sub-audible orchestral monster"
+          ],
+          "answer": "Octobass Sub-Woofer String Plucked with Lever",
+          "quip": "Standing on a platform pulling mechanical levers just to hit a 16 Hz seismic rumble in the Mariana Trench!",
+          "tier": "krillion"
+        }
+      ],
+      "category": "universal",
+      "hint": "Bowed and plucked chordophones of the orchestral string family",
+      "id": "day15-p5",
+      "text": "Name a string instrument found in a Western classical orchestra or chamber ensemble"
+    },
+    {
+      "answers": [
+        {
+          "aliases": [
+            "Ang Probinsyano",
+            "Cardo Dalisay show",
+            "Probinsyano"
+          ],
+          "answer": "FPJ s Ang Probinsyano",
+          "tier": "plankton"
+        },
+        {
+          "aliases": [
+            "Pangako Sayo",
+            "Amor Powers show"
+          ],
+          "answer": "Pangako Sa Yo",
+          "tier": "plankton"
+        },
+        {
+          "aliases": [
+            "Mara and Clara",
+            "Judy Ann Santos classic"
+          ],
+          "answer": "Mara Clara",
+          "tier": "plankton"
+        },
+        {
+          "aliases": [
+            "Enca",
+            "Sang gre Encantadia"
+          ],
+          "answer": "Encantadia",
+          "tier": "plankton"
+        },
+        {
+          "aliases": [
+            "Aguiluz Alwina",
+            "Mulawin GMA"
+          ],
+          "answer": "Mulawin",
+          "tier": "plankton"
+        },
+        {
+          "aliases": [
+            "Judy Ann Esperanza"
+          ],
+          "answer": "Esperanza",
+          "tier": "plankton"
+        },
+        {
+          "aliases": [
+            "Daniela Mondragon show",
+            "Romina vs Daniela"
+          ],
+          "answer": "Kadenang Ginto",
+          "quip": "Daniela Mondragon dragging her red suitcase straight into viral meme immortality!",
+          "tier": "tooclever"
+        },
+        {
+          "aliases": [
+            "Angel Locsin Darna",
+            "Marian Rivera Darna",
+            "Jane de Leon Darna"
+          ],
+          "answer": "Darna TV Series",
+          "quip": "Swallowing the magical white pebble on primetime television for the fifth remake.",
+          "tier": "tooclever"
+        },
+        {
+          "aliases": [
+            "Mula sa Puso Claudine",
+            "Via and Gabriel"
+          ],
+          "answer": "Mula Sa Puso",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Marian Rivera Marimar",
+            "Thalia Marimar PH"
+          ],
+          "answer": "Marimar",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Ivy Aguas",
+            "Lily Cruz show",
+            "Maja Salvador Wildflower"
+          ],
+          "answer": "Wildflower",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Coco Martin Walang Hanggan",
+            "Dawn Zulueta Richard Gomez"
+          ],
+          "answer": "Walang Hanggan",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "OTWOL",
+            "JaDine teleserye"
+          ],
+          "answer": "On the Wings of Love",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "KathNiel Got to Believe",
+            "G2B"
+          ],
+          "answer": "Got to Believe",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Dennis Trillo legal wives"
+          ],
+          "answer": "Legal Wives",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Angel Locsin Jericho Rosales",
+            "Monica and Nicole"
+          ],
+          "answer": "The Legal Wife",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Francine Prieto Eliza Pineda"
+          ],
+          "answer": "Maria Flordeluna",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Santino",
+            "Bro teleserye",
+            "Zaijian Jaranilla"
+          ],
+          "answer": "May Bukas Pa",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Marian Rivera Amaya",
+            "Epic historical drama"
+          ],
+          "answer": "Amaya",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Sunshine Dizon Bakekang"
+          ],
+          "answer": "Bakekang",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Piolo Pascual Angel Locsin Lobo"
+          ],
+          "answer": "Lobo",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "John Lloyd Angel Locsin Imortal"
+          ],
+          "answer": "Imortal",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "KathNiel La Luna Sangre"
+          ],
+          "answer": "La Luna Sangre",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "My Husbands Lover",
+            "TomDen teleserye"
+          ],
+          "answer": "My Husband s Lover",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Jessy Mendiola Maria Mercedes"
+          ],
+          "answer": "Maria Mercedes",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Maya and Sir Chief",
+            "Jodi Sta Maria Richard Yap"
+          ],
+          "answer": "Be Careful With My Heart",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Classic 1977 Gulong ng Palad",
+            "Marianing Luisa"
+          ],
+          "answer": "Gulong ng Palad",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Julie Vega classic Annaliza 1980"
+          ],
+          "answer": "Annaliza",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Janice de Belen Flordeluna 1978"
+          ],
+          "answer": "Flordeluna",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Michael de Mesa Tirso Cruz Valiente"
+          ],
+          "answer": "Valiente",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Vintage RPN-9 soap"
+          ],
+          "answer": "Heredero",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Princess Punzalan Selina"
+          ],
+          "answer": "Selina Perlas ng Silangan",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Princess Punzalan bus explosion laugh",
+            "Mula Sa Puso iconic bus blast"
+          ],
+          "answer": "Selina Pereira Tumatawa Habang Sumasabog ang Bus",
+          "quip": "The greatest kontrabida laughter in Philippine television history as Via's bus erupts in fire! Pure cinema.",
+          "tier": "krillion"
+        },
+        {
+          "aliases": [
+            "Matitikman ninyo ang batas ng api",
+            "Eula Valdez Amor Powers slap"
+          ],
+          "answer": "Amor Powers Wine Glass Throwing Extravaganza",
+          "quip": "‘Matitikman ninyo ang batas ng isang api!’ delivered while swirling vintage red wine in high couture. Peak drama!",
+          "tier": "krillion"
+        }
+      ],
+      "category": "filipino",
+      "hint": "Legendary ABS-CBN, GMA, or RPN primetime dramas that stopped nationwide traffic",
+      "id": "day15-p6",
+      "text": "Name an iconic Philippine primetime teleserye, soap opera, or television drama series"
+    },
+    {
+      "answers": [
+        {
+          "aliases": [
+            "Pastry roller",
+            "Dough roller"
+          ],
+          "answer": "Rolling Pin",
+          "tier": "plankton"
+        },
+        {
+          "aliases": [
+            "Wire whisk",
+            "Balloon whisk"
+          ],
+          "answer": "Whisk",
+          "tier": "plankton"
+        },
+        {
+          "aliases": [
+            "Cookie sheet",
+            "Baking tray",
+            "Sheet pan"
+          ],
+          "answer": "Baking Sheet",
+          "tier": "plankton"
+        },
+        {
+          "aliases": [
+            "Measuring cups",
+            "Liquid measuring cup",
+            "Dry measuring cup"
+          ],
+          "answer": "Measuring Cup",
+          "tier": "plankton"
+        },
+        {
+          "aliases": [
+            "Measuring spoons",
+            "Tablespoon teaspoon measure"
+          ],
+          "answer": "Measuring Spoon",
+          "tier": "plankton"
+        },
+        {
+          "aliases": [
+            "Digital food scale",
+            "Gram scale",
+            "Bakers scale"
+          ],
+          "answer": "Kitchen Scale",
+          "quip": "Baking is chemistry, not art! Grams over cups every single time.",
+          "tier": "tooclever"
+        },
+        {
+          "aliases": [
+            "Baking paper",
+            "Silicone baking mat",
+            "Silpat"
+          ],
+          "answer": "Parchment Paper",
+          "quip": "Non-stick security blanket preventing burnt bottom crust heartbreak.",
+          "tier": "tooclever"
+        },
+        {
+          "aliases": [
+            "Stainless steel mixing bowl",
+            "Glass bowl"
+          ],
+          "answer": "Mixing Bowl",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Silicone spatula",
+            "Bowl scraper"
+          ],
+          "answer": "Rubber Spatula",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Basting brush",
+            "Silicone brush"
+          ],
+          "answer": "Pastry Brush",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Round cake pan",
+            "Square cake pan"
+          ],
+          "answer": "Cake Pan",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Cupcake pan",
+            "Muffin tray"
+          ],
+          "answer": "Muffin Tin",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Wire cooling rack"
+          ],
+          "answer": "Cooling Rack",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Sieve",
+            "Fine mesh strainer"
+          ],
+          "answer": "Flour Sifter",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Pastry bag and nozzle",
+            "Frosting bag"
+          ],
+          "answer": "Piping Bag",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "KitchenAid mixer",
+            "Planetary mixer"
+          ],
+          "answer": "Stand Mixer",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Electric hand beater"
+          ],
+          "answer": "Hand Mixer",
+          "tier": "schooler"
+        },
+        {
+          "aliases": [
+            "Dough scraper",
+            "Pastry scraper"
+          ],
+          "answer": "Bench Scraper",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Dough blender",
+            "Pastry blender"
+          ],
+          "answer": "Pastry Cutter",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Cheesecake pan",
+            "Removable bottom pan"
+          ],
+          "answer": "Springform Pan",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Fluted tube pan",
+            "Bundt mold"
+          ],
+          "answer": "Bundt Pan",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Biscuit cutter",
+            "Pastry ring"
+          ],
+          "answer": "Cookie Cutter",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Internal oven gauge"
+          ],
+          "answer": "Oven Thermometer",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Kitchen timer",
+            "Baking timer"
+          ],
+          "answer": "Timer",
+          "tier": "rare"
+        },
+        {
+          "aliases": [
+            "Proofing basket",
+            "Brotform"
+          ],
+          "answer": "Banneton Basket",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Dough scoring blade",
+            "Scoring razor"
+          ],
+          "answer": "Bread Lame",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Dough hook whisk"
+          ],
+          "answer": "Danish Dough Whisk",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Ceramic baking beans",
+            "Blind bake weights"
+          ],
+          "answer": "Pie Weights",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Sugar thermometer"
+          ],
+          "answer": "Candy Thermometer",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Cake ring acetate strip"
+          ],
+          "answer": "Acetate Collar",
+          "tier": "deepcut"
+        },
+        {
+          "aliases": [
+            "Orange plastic empanada maker",
+            "Dumpling press gadget"
+          ],
+          "answer": "Empanada Crimper Mold na Kulay Kahel",
+          "quip": "The hinged plastic clam from Divisoria that stamps perfect crinkle edges on your auntie’s beef empanadas. One in a Krillion!",
+          "tier": "krillion"
+        },
+        {
+          "aliases": [
+            "Bibingka clay oven with embers on top",
+            "Traditional charcoal bibingkahan"
+          ],
+          "answer": "Palayok Pang-Bibingka with Glowing Charcoal on Top Sheet",
+          "quip": "Top-heat baking physics pioneered on the Manila church sidewalk every Simbang Gabi! Emden Deep mastery.",
+          "tier": "krillion"
+        }
+      ],
+      "category": "universal",
+      "hint": "Baking utensils, measuring tools, prep gadgets, and pastry molds",
+      "id": "day15-p7",
+      "text": "Name a tool, utensil, or piece of equipment used for baking pastries, cakes, or breads"
+    }
+  ],
+  "title": "Trench Expeditions & Archipelago Echoes"
+}
