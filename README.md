@@ -8,7 +8,6 @@ Monorepo for my side projects.
 | [`pollmph/`](pollmph) | AI-powered sentiment oracle tracking Philippine socio-political discourse (Supabase + Gemini, Next.js frontend) |
 | [`nem-battery/`](nem-battery) | NEM battery market analyzer: AEMO data pipeline + unsupervised clustering of battery trading strategies (DuckDB/MotherDuck) |
 | [`experiments/`](experiments) | Ad-hoc research, spikes, and model explorations (e.g. `timesfm3/`) |
-| [`safety-guard/`](safety-guard) | Compiled sub-2ms Go AST safety interceptor for Antigravity (`PreToolUse` hook) |
 | [`krillion/`](krillion) | Philippine Trench daily reverse-rarity trivia dive game (`krillion.guinto.org`, Next.js + Neon Postgres) |
 
 ## Layout
